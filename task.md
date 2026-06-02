@@ -1,0 +1,28 @@
+# Tasks for MypersonalTracker
+
+- [x] Phase 1: Project Initialization & Theme (Aesthetics)
+  - [x] Initialize Flutter app for Android and Windows in `e:/Projects/Money_Tracker`
+  - [x] Configure `pubspec.yaml` with all database, UI, and parsing dependencies
+  - [x] Implement design tokens & themes (Midnight Dark theme, glassmorphic layout) in `lib/core/theme.dart`
+  - [x] Build Main Shell navigation layout (glass dashboard, bottom nav, settings screen)
+- [/] Phase 2: Core Manual Logging & Accounts
+  - [/] Set up Isar local database models (`Transaction`, `CreditCard`, `Loan`, `Holding`)
+  - [ ] Implement manual transaction logging screen (with split expense support, categories, and accounts)
+  - [ ] Build Credit Card Manager dashboard and Loan tracking ledger (repayments, EMIs)
+- [ ] Phase 3: Automation (SMS, IMAP & Statements)
+  - [ ] Build Android background SMS listener with regex parsing for Indian banks
+  - [ ] Build IMAP sync service to fetch transaction alerts directly from Gmail/Outlook
+  - [ ] Implement automated statement downloader & local PDF password decrypter
+- [ ] Phase 4: Investments Tracker (Zerodha & Coin)
+  - [ ] Create Excel/CSV holdings file picker and parser
+  - [ ] Integrate public APIs (Yahoo Finance, AMFI NAVs) for real-time portfolio updates
+  - [ ] Design investment dashboard showing asset allocations and returns
+- [ ] Phase 5: Mid-Month Forecasting & Advisor Engine
+  - [ ] Build mathematical cashflow forecasting engine (recurring spends, velocity checks)
+  - [ ] Integrate Local LLM (MediaPipe on Android, Ollama on Windows) and fallback API Keys
+  - [ ] Implement local data sanitization policy for cloud API calls
+  - [ ] Design the Dual Mode Advisor Dashboard & AI chat interface
+- [ ] Phase 6: Sync & Security
+  - [ ] Implement AES-256 local database encryption
+  - [ ] Build Google Drive App Folder / WebDAV automated sync worker
+  - [ ] Integrate local biometric authentication (FaceID/Fingerprint)
