@@ -102,6 +102,57 @@ final creditCardsProvider = StateNotifierProvider<CreditCardsNotifier, AsyncValu
   return CreditCardsNotifier(dbService);
 });
 
+// --- BANK ACCOUNTS NOTIFIER ---
+class BankAccountsNotifier extends StateNotifier<AsyncValue<List<BankAccount>>> {
+  final DatabaseService _dbService;
+
+  BankAccountsNotifier(this._dbService) : super(const AsyncValue.loading()) {
+    loadBankAccounts();
+  }
+
+  Future<void> loadBankAccounts() async {
+    try {
+      state = const AsyncValue.loading();
+      final accounts = await _dbService.getAllBankAccounts();
+      state = AsyncValue.data(accounts);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> addBankAccount(BankAccount account) async {
+    try {
+      await _dbService.saveBankAccount(account);
+      await loadBankAccounts();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> removeBankAccount(int id) async {
+    try {
+      await _dbService.deleteBankAccount(id);
+      await loadBankAccounts();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> updateBankAccount(BankAccount account) async {
+    try {
+      await _dbService.saveBankAccount(account);
+      await loadBankAccounts();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final bankAccountsProvider = StateNotifierProvider<BankAccountsNotifier, AsyncValue<List<BankAccount>>>((ref) {
+  final dbService = ref.watch(databaseServiceProvider);
+  return BankAccountsNotifier(dbService);
+});
+
 // --- LOANS NOTIFIER ---
 class LoansNotifier extends StateNotifier<AsyncValue<List<Loan>>> {
   final DatabaseService _dbService;

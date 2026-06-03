@@ -40,6 +40,7 @@ class QuantForecastService {
     required List<CreditCard> cards,
     required List<Loan> loans,
     required List<Holding> holdings,
+    required List<BankAccount> bankAccounts,
   }) {
     final now = DateTime.now();
 
@@ -123,6 +124,9 @@ class QuantForecastService {
 
     // 6. Calculate Cash and Bank Balance
     double cashAndBank = 0.0;
+    for (final acc in bankAccounts) {
+      cashAndBank += acc.balance;
+    }
     for (final tx in transactions) {
       if (tx.cardId == null) {
         if (tx.transactionType == 'income') {

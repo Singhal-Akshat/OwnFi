@@ -272,6 +272,8 @@ class DashboardView extends ConsumerWidget {
         (loansState.valueOrNull?.isEmpty ?? true) &&
         (holdingsState.valueOrNull?.isEmpty ?? true);
 
+    final bankAccountsState = ref.watch(bankAccountsProvider);
+
     double cashAndBank = 0.0;
     txsState.whenData((txs) {
       for (final tx in txs) {
@@ -282,6 +284,12 @@ class DashboardView extends ConsumerWidget {
             cashAndBank -= tx.amount;
           }
         }
+      }
+    });
+
+    bankAccountsState.whenData((accounts) {
+      for (final acc in accounts) {
+        cashAndBank += acc.balance;
       }
     });
 
@@ -322,7 +330,7 @@ class DashboardView extends ConsumerWidget {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   Text(
-                    'MypersonalTracker',
+                    'Akshat',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                 ],
@@ -340,44 +348,30 @@ class DashboardView extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
 
-          // Glass Net Worth Card
-          GlassBlur(
-            borderRadius: 20,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'NET WORTH',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    formatCurrency(netWorth),
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildAssetMini('Investments', formatCurrency(totalHoldingsVal), AppColors.neonEmerald),
-                      _buildAssetMini('Cash & Bank', formatCurrency(cashAndBank), AppColors.neonTeal),
-                      _buildAssetMini('Outstanding', formatCurrency(-totalCardOutstanding), Colors.redAccent),
-                    ],
-                  ),
-                ],
-              ),
+          // Horizontal Balance Cards Slider
+          SizedBox(
+            height: 165,
+            child: bankAccountsState.when(
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+              error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+              data: (accounts) {
+                return ListView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    // Card 1: Net Worth Card
+                    _buildNetWorthCard(context, netWorth, totalHoldingsVal, cashAndBank, totalCardOutstanding, formatCurrency),
+                    
+                    // Card 2+: Bank Accounts
+                    ...accounts.map((account) {
+                      return _buildBankAccountCard(context, ref, account, formatCurrency);
+                    }),
+                    
+                    // Card Last: Add Bank Account Button Card
+                    _buildAddBankAccountCardButton(context, ref),
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 25),
@@ -463,10 +457,24 @@ class DashboardView extends ConsumerWidget {
                               tx.description,
                               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                             ),
-                            subtitle: Text(
-                              '${tx.category} • ${tx.accountName ?? (tx.cardId != null ? 'Credit Card' : 'Cash')} • $dateStr',
-                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                            ),
+                            subtitle: () {
+                              String accountDisplayName = 'Cash';
+                              if (tx.cardId != null) {
+                                accountDisplayName = 'Credit Card';
+                              } else if (tx.accountName != null) {
+                                if (tx.accountName!.startsWith('bank:')) {
+                                  final bankId = int.tryParse(tx.accountName!.substring(5));
+                                  final bank = bankAccountsState.valueOrNull?.firstWhere((b) => b.id == bankId, orElse: () => BankAccount());
+                                  accountDisplayName = bank != null && bank.bankName.isNotEmpty ? bank.bankName : 'Bank';
+                                } else {
+                                  accountDisplayName = tx.accountName!;
+                                }
+                              }
+                              return Text(
+                                '${tx.category} • $accountDisplayName • $dateStr',
+                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              );
+                            }(),
                             trailing: Text(
                               formattedAmt,
                               style: TextStyle(
@@ -511,6 +519,434 @@ class DashboardView extends ConsumerWidget {
     );
   }
 
+  Widget _buildNetWorthCard(BuildContext context, double netWorth, double totalHoldingsVal, double cashAndBank, double totalCardOutstanding, String Function(double) formatCurrency) {
+    return Container(
+      width: 290,
+      margin: const EdgeInsets.only(right: 16),
+      child: GlassBlur(
+        borderRadius: 20,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'NET WORTH',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  formatCurrency(netWorth),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildAssetMini('Investments', formatCurrency(totalHoldingsVal), AppColors.neonEmerald),
+                  _buildAssetMini('Cash/Bank', formatCurrency(cashAndBank), AppColors.neonTeal),
+                  _buildAssetMini('Outstanding', formatCurrency(-totalCardOutstanding), Colors.redAccent),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBankAccountCard(BuildContext context, WidgetRef ref, BankAccount account, String Function(double) formatCurrency) {
+    return BankAccountCard(
+      account: account,
+      ref: ref,
+      formatCurrency: formatCurrency,
+      onOptionsPressed: _showBankAccountOptions,
+    );
+  }
+
+  Widget _buildAddBankAccountCardButton(BuildContext context, WidgetRef ref) {
+    return Container(
+      width: 140,
+      margin: const EdgeInsets.only(right: 16),
+      child: GestureDetector(
+        onTap: () => _showAddBankAccountDialog(context, ref),
+        child: GlassBlur(
+          borderRadius: 20,
+          cardColor: Colors.white.withOpacity(0.02),
+          borderColor: Colors.white.withOpacity(0.08),
+          child: const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.add_card_rounded, color: AppColors.neonTeal, size: 28),
+                SizedBox(height: 8),
+                Text(
+                  'Add Bank',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showBankAccountDetailsBottomSheet(BuildContext context, BankAccount account) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return GlassBlur(
+          borderRadius: 24,
+          blurX: 30,
+          blurY: 30,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.4),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      account.bankName,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const Icon(Icons.lock_outline_rounded, color: AppColors.neonTeal, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildDetailRow('Account Holder', account.accountHolderName),
+                const SizedBox(height: 12),
+                _buildDetailRow('Account Number', account.fullAccountNumber),
+                const SizedBox(height: 12),
+                _buildDetailRow('IFSC Code', account.ifscCode),
+                const SizedBox(height: 12),
+                _buildDetailRow('Balance', '₹${account.balance.toStringAsFixed(2)}'),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.neonTeal,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        Text(
+          value.isEmpty ? 'N/A' : value,
+          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  void _showBankAccountOptions(BuildContext context, WidgetRef ref, BankAccount account) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return GlassBlur(
+          borderRadius: 24,
+          child: Container(
+            color: Colors.black.withOpacity(0.4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.edit_rounded, color: Colors.white),
+                  title: const Text('Edit Account', style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAddBankAccountDialog(context, ref, existingAccount: account);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                  title: const Text('Delete Account', style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        backgroundColor: AppColors.obsidianSurface,
+                        title: const Text('Delete Account', style: TextStyle(color: Colors.white)),
+                        content: Text('Are you sure you want to delete ${account.bankName} account?', style: const TextStyle(color: Colors.white70)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              ref.read(bankAccountsProvider.notifier).removeBankAccount(account.id);
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Account deleted'), backgroundColor: AppColors.obsidianSurface),
+                              );
+                            },
+                            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddBankAccountDialog(BuildContext context, WidgetRef ref, {BankAccount? existingAccount}) {
+    final nameController = TextEditingController(text: existingAccount?.bankName ?? '');
+    final holderController = TextEditingController(text: existingAccount?.accountHolderName ?? 'Akshat');
+    final fullNumberController = TextEditingController(text: existingAccount?.fullAccountNumber ?? '');
+    final last4Controller = TextEditingController(text: existingAccount?.last4 ?? '');
+    final ifscController = TextEditingController(text: existingAccount?.ifscCode ?? '');
+    final balanceController = TextEditingController(text: existingAccount?.balance.toStringAsFixed(0) ?? '0');
+
+    String selectedLogo = existingAccount?.logoAsset ?? '';
+    String selectedCardColor = existingAccount?.colorHex ?? '#0D47A1';
+
+    final logoOptions = {
+      '': 'None',
+      'HDB.svg': 'HDFC Bank',
+      'SBI-logo.svg': 'State Bank of India',
+    };
+
+    final colorOptions = {
+      '#0D47A1': 'HDFC Blue',
+      '#0084B4': 'SBI Sky Blue',
+      '#FF9933': 'ICICI Orange',
+      '#900A36': 'Axis Maroon',
+      '#006064': 'Teal Slate',
+      '#263238': 'Carbon Obsidian',
+    };
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: GlassBlur(
+                borderRadius: 24,
+                blurX: 30,
+                blurY: 30,
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          existingAccount == null ? 'Register Bank Account' : 'Edit Bank Account',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: nameController,
+                          decoration: const InputDecoration(labelText: 'Bank Name (e.g. HDFC Bank)', border: OutlineInputBorder()),
+                          onChanged: (val) {
+                            final lower = val.toLowerCase();
+                            if (lower.contains('hdfc')) {
+                              setState(() {
+                                selectedLogo = 'HDB.svg';
+                                selectedCardColor = '#0D47A1';
+                              });
+                            } else if (lower.contains('sbi') || lower.contains('state bank')) {
+                              setState(() {
+                                selectedLogo = 'SBI-logo.svg';
+                                selectedCardColor = '#0084B4';
+                              });
+                            } else if (lower.contains('icici')) {
+                              setState(() {
+                                selectedCardColor = '#FF9933';
+                              });
+                            } else if (lower.contains('axis')) {
+                              setState(() {
+                                selectedCardColor = '#900A36';
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: holderController,
+                          decoration: const InputDecoration(labelText: 'Account Holder Name', border: OutlineInputBorder()),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextField(
+                                controller: fullNumberController,
+                                decoration: const InputDecoration(labelText: 'Account Number', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                                onChanged: (val) {
+                                  if (val.length >= 4) {
+                                    last4Controller.text = val.substring(val.length - 4);
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 1,
+                              child: TextField(
+                                controller: last4Controller,
+                                decoration: const InputDecoration(labelText: 'Last 4', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                                maxLength: 4,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: ifscController,
+                          decoration: const InputDecoration(labelText: 'IFSC Code', border: OutlineInputBorder()),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: balanceController,
+                          decoration: const InputDecoration(labelText: 'Current Balance', border: OutlineInputBorder()),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: selectedLogo,
+                          decoration: const InputDecoration(labelText: 'Bank Logo', border: OutlineInputBorder()),
+                          items: logoOptions.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+                          onChanged: (val) => setState(() => selectedLogo = val!),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: selectedCardColor,
+                          decoration: const InputDecoration(labelText: 'Card Color Accent', border: OutlineInputBorder()),
+                          items: colorOptions.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+                          onChanged: (val) => setState(() => selectedCardColor = val!),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                              onPressed: () {
+                                final bank = nameController.text.trim();
+                                final holder = holderController.text.trim();
+                                final fullNum = fullNumberController.text.trim();
+                                final l4 = last4Controller.text.trim();
+                                final ifsc = ifscController.text.trim();
+                                final bal = double.tryParse(balanceController.text) ?? 0.0;
+
+                                if (bank.isEmpty || l4.isEmpty) {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      backgroundColor: AppColors.obsidianSurface,
+                                      title: const Text('Invalid Input', style: TextStyle(color: Colors.white)),
+                                      content: const Text('Please fill Bank Name and Account Number.', style: TextStyle(color: Colors.white70)),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: const Text('OK', style: TextStyle(color: AppColors.neonTeal)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                final account = existingAccount ?? BankAccount();
+                                account
+                                  ..bankName = bank
+                                  ..accountHolderName = holder
+                                  ..fullAccountNumber = fullNum
+                                  ..last4 = l4
+                                  ..ifscCode = ifsc
+                                  ..balance = bal
+                                  ..logoAsset = selectedLogo
+                                  ..colorHex = selectedCardColor;
+
+                                if (existingAccount == null) {
+                                  ref.read(bankAccountsProvider.notifier).addBankAccount(account);
+                                } else {
+                                  ref.read(bankAccountsProvider.notifier).updateBankAccount(account);
+                                }
+                                Navigator.pop(context);
+                              },
+                              child: Text(existingAccount == null ? 'Add Account' : 'Save Changes'),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showAddExpenseDialog(BuildContext context, WidgetRef ref, {Transaction? existingTransaction}) {
     final amountController = TextEditingController(text: existingTransaction != null ? existingTransaction.amount.toStringAsFixed(0) : '');
     final descController = TextEditingController(text: existingTransaction?.description ?? '');
@@ -547,6 +983,7 @@ class DashboardView extends ConsumerWidget {
         return StatefulBuilder(
           builder: (context, setState) {
             final cardsState = ref.watch(creditCardsProvider);
+            final bankAccountsState = ref.watch(bankAccountsProvider);
 
             return Dialog(
               backgroundColor: Colors.transparent,
@@ -622,19 +1059,48 @@ class DashboardView extends ConsumerWidget {
                           value: selectedAccountType,
                           decoration: const InputDecoration(labelText: 'Account / Card', border: OutlineInputBorder()),
                           dropdownColor: AppColors.obsidianSurface,
-                          items: [
-                            const DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-                            const DropdownMenuItem(value: 'Bank', child: Text('Bank Account')),
-                            ...cardsState.maybeWhen(
-                              data: (cards) => cards.map(
-                                (card) => DropdownMenuItem(
+                          items: () {
+                            final List<DropdownMenuItem<String>> menuItems = [
+                              const DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                            ];
+                            
+                            bankAccountsState.maybeWhen(
+                              data: (accounts) {
+                                if (accounts.isEmpty) {
+                                  menuItems.add(const DropdownMenuItem(value: 'Bank', child: Text('Bank Account')));
+                                } else {
+                                  menuItems.addAll(accounts.map((acc) => DropdownMenuItem(
+                                    value: 'bank:${acc.id}',
+                                    child: Text('${acc.bankName} (..${acc.last4})'),
+                                  )));
+                                }
+                              },
+                              orElse: () {
+                                menuItems.add(const DropdownMenuItem(value: 'Bank', child: Text('Bank Account')));
+                              },
+                            );
+
+                            cardsState.maybeWhen(
+                              data: (cards) {
+                                menuItems.addAll(cards.map((card) => DropdownMenuItem(
                                   value: 'card:${card.id}',
                                   child: Text('${card.cardName} (..${card.last4})'),
-                                ),
-                              ),
-                              orElse: () => [],
-                            ),
-                          ],
+                                )));
+                              },
+                              orElse: () {},
+                            );
+
+                            final hasSelection = menuItems.any((item) => item.value == selectedAccountType);
+                            if (!hasSelection) {
+                              menuItems.add(DropdownMenuItem(
+                                value: selectedAccountType,
+                                child: Text(selectedAccountType.startsWith('bank:') 
+                                  ? 'Deleted Bank Account' 
+                                  : selectedAccountType.startsWith('card:') ? 'Deleted Card' : selectedAccountType),
+                              ));
+                            }
+                            return menuItems;
+                          }(),
                           onChanged: (val) {
                             if (val != null) {
                               setState(() {
@@ -4116,6 +4582,539 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
           ),
         );
       },
+    );
+  }
+}
+
+class BankAccountCard extends StatefulWidget {
+  final BankAccount account;
+  final WidgetRef ref;
+  final String Function(double) formatCurrency;
+  final Function(BuildContext, WidgetRef, BankAccount) onOptionsPressed;
+
+  const BankAccountCard({
+    super.key,
+    required this.account,
+    required this.ref,
+    required this.formatCurrency,
+    required this.onOptionsPressed,
+  });
+
+  @override
+  State<BankAccountCard> createState() => _BankAccountCardState();
+}
+
+class _BankAccountCardState extends State<BankAccountCard> {
+  bool _isFlipped = false;
+
+  void _copyToClipboard(String text, String label) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label copied to clipboard'),
+        duration: const Duration(seconds: 1),
+        backgroundColor: AppColors.obsidianSurface,
+      ),
+    );
+  }
+
+  Future<void> _authenticateAndFlip() async {
+    final LocalAuthentication auth = LocalAuthentication();
+    try {
+      final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
+      final bool canAuthenticate = canAuthenticateWithBiometrics || await auth.isDeviceSupported();
+      
+      if (!canAuthenticate) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Biometric auth not available')));
+        }
+        return;
+      }
+      
+      final bool didAuthenticate = await auth.authenticate(
+        localizedReason: 'Authenticate to view secure bank details',
+        options: const AuthenticationOptions(biometricOnly: true),
+      );
+      
+      if (didAuthenticate && mounted) {
+        setState(() => _isFlipped = true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Auth error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Color cardColor = AppColors.glassCard;
+    if (widget.account.colorHex.isNotEmpty) {
+      try {
+        cardColor = Color(int.parse(widget.account.colorHex.replaceFirst('#', '0xff'))).withOpacity(0.18);
+      } catch (_) {}
+    }
+
+    return Container(
+      width: 290,
+      margin: const EdgeInsets.only(right: 16),
+      child: GestureDetector(
+        onLongPress: () => widget.onOptionsPressed(context, widget.ref, widget.account),
+        onTap: () {
+          if (!_isFlipped) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => BankAccountDetailView(account: widget.account)),
+            );
+          }
+        },
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            final flipAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+            );
+            return AnimatedBuilder(
+              animation: flipAnimation,
+              child: child,
+              builder: (context, child) {
+                return Transform(
+                  transform: Matrix4.identity()..scale(flipAnimation.value, 1.0),
+                  alignment: Alignment.center,
+                  child: child,
+                );
+              },
+            );
+          },
+          child: _isFlipped ? _buildBackSide(cardColor) : _buildFrontSide(cardColor),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFrontSide(Color cardColor) {
+    return GlassBlur(
+      key: const ValueKey('front'),
+      borderRadius: 20,
+      cardColor: cardColor,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.account.bankName.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                          letterSpacing: 1.0,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '•••• ${widget.account.last4}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (widget.account.logoAsset.isNotEmpty)
+                  SvgPicture.asset(
+                    'assets/bank_logos/${widget.account.logoAsset}',
+                    width: 24,
+                    height: 24,
+                  )
+                else
+                  const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 24),
+              ],
+            ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'BALANCE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        widget.formatCurrency(widget.account.balance),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.visibility_rounded, color: AppColors.neonTeal, size: 22),
+                  onPressed: _authenticateAndFlip,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBackSide(Color cardColor) {
+    return GlassBlur(
+      key: const ValueKey('back'),
+      borderRadius: 20,
+      cardColor: cardColor,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'SECURE DETAILS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.neonTeal,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => setState(() => _isFlipped = false),
+                    child: const Icon(Icons.visibility_off_rounded, color: AppColors.textSecondary, size: 18),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              _buildBackDetailRow('Holder', widget.account.accountHolderName),
+              const SizedBox(height: 6),
+              _buildBackDetailRow('A/C No', widget.account.fullAccountNumber),
+              const SizedBox(height: 6),
+              _buildBackDetailRow('IFSC', widget.account.ifscCode),
+              const Spacer(),
+            ],
+          ),
+        ),
+    );
+  }
+
+  Widget _buildBackDetailRow(String label, String value) {
+    final displayValue = value.isEmpty ? 'N/A' : value;
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: const TextStyle(fontSize: 8, color: AppColors.textMuted, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                displayValue,
+                style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ],
+          ),
+        ),
+        if (value.isNotEmpty)
+          GestureDetector(
+            onTap: () => _copyToClipboard(value, label),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.copy_rounded, color: AppColors.neonTeal, size: 14),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class BankAccountDetailView extends ConsumerStatefulWidget {
+  final BankAccount account;
+
+  const BankAccountDetailView({super.key, required this.account});
+
+  @override
+  ConsumerState<BankAccountDetailView> createState() => _BankAccountDetailViewState();
+}
+
+class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
+  late TextEditingController _balanceController;
+  bool _isEditingBalance = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _balanceController = TextEditingController(text: widget.account.balance.toStringAsFixed(0));
+  }
+
+  @override
+  void dispose() {
+    _balanceController.dispose();
+    super.dispose();
+  }
+
+  void _saveBalance() async {
+    final newBal = double.tryParse(_balanceController.text) ?? 0.0;
+    final updatedAcc = widget.account..balance = newBal;
+    
+    await ref.read(bankAccountsProvider.notifier).updateBankAccount(updatedAcc);
+    
+    setState(() => _isEditingBalance = false);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Balance updated successfully'), backgroundColor: AppColors.obsidianSurface),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final txsState = ref.watch(transactionsProvider);
+    final bankAccountsState = ref.watch(bankAccountsProvider);
+    
+    Color cardColor = AppColors.glassCard;
+    if (widget.account.colorHex.isNotEmpty) {
+      try {
+        cardColor = Color(int.parse(widget.account.colorHex.replaceFirst('#', '0xff'))).withOpacity(0.18);
+      } catch (_) {}
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          const AnimatedGradientBackground(),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      Text(
+                        'Account Detail',
+                        style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(width: 48),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  GlassBlur(
+                    borderRadius: 20,
+                    cardColor: cardColor,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.account.bankName.toUpperCase(),
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'A/C: •••• ${widget.account.last4}',
+                                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                              if (widget.account.logoAsset.isNotEmpty)
+                                SvgPicture.asset(
+                                  'assets/bank_logos/${widget.account.logoAsset}',
+                                  width: 32,
+                                  height: 32,
+                                )
+                              else
+                                const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 32),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          
+                          const Text(
+                            'CURRENT BALANCE',
+                            style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              if (!_isEditingBalance) ...[
+                                Text(
+                                  '₹${widget.account.balance.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                                const SizedBox(width: 12),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_rounded, color: AppColors.neonTeal, size: 20),
+                                  onPressed: () => setState(() => _isEditingBalance = true),
+                                ),
+                              ] else ...[
+                                SizedBox(
+                                  width: 150,
+                                  child: TextField(
+                                    controller: _balanceController,
+                                    keyboardType: TextInputType.number,
+                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                                    decoration: const InputDecoration(
+                                      prefixText: '₹',
+                                      border: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.neonTeal)),
+                                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.neonTeal, width: 2)),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  icon: const Icon(Icons.check_circle_rounded, color: AppColors.neonEmerald, size: 28),
+                                  onPressed: _saveBalance,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 28),
+                                  onPressed: () {
+                                    setState(() {
+                                      _balanceController.text = widget.account.balance.toStringAsFixed(0);
+                                      _isEditingBalance = false;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  const Text(
+                    'Transaction History',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 12),
+
+                  Expanded(
+                    child: txsState.when(
+                      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+                      error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+                      data: (txs) {
+                        final accountTxs = txs.where((t) => t.accountName == 'bank:${widget.account.id}').toList();
+                        accountTxs.sort((a, b) => b.timestamp.compareTo(a.timestamp)); // recent to previous
+
+                        if (accountTxs.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              'No transactions associated with this bank.',
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: accountTxs.length,
+                          itemBuilder: (context, index) {
+                            final tx = accountTxs[index];
+                            final isIncome = tx.transactionType == 'income';
+                            final formattedAmt = '${isIncome ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
+                            
+                            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            final dateStr = '${tx.timestamp.day} ${months[tx.timestamp.month - 1]}';
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: GlassBlur(
+                                borderRadius: 16,
+                                child: ListTile(
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: (isIncome ? AppColors.neonEmerald : AppColors.neonTeal).withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      isIncome ? Icons.arrow_downward : Icons.arrow_upward,
+                                      color: isIncome ? AppColors.neonEmerald : AppColors.neonTeal,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    tx.description,
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                  ),
+                                  subtitle: Text(
+                                    '${tx.category} • $dateStr',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                  ),
+                                  trailing: Text(
+                                    formattedAmt,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: isIncome ? AppColors.neonEmerald : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

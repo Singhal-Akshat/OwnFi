@@ -88,3 +88,4 @@ flutter:
   assets:
     - assets/models/
     - assets/credit_card_images/
+    - assets/bank_logos/

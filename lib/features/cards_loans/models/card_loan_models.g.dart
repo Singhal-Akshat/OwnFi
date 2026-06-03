@@ -3588,6 +3588,1649 @@ extension LoanQueryProperty on QueryBuilder<Loan, Loan, QQueryProperty> {
   }
 }
 
+// coverage:ignore-file
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
+
+extension GetBankAccountCollection on Isar {
+  IsarCollection<BankAccount> get bankAccounts => this.collection();
+}
+
+const BankAccountSchema = CollectionSchema(
+  name: r'BankAccount',
+  id: 6972968476381051766,
+  properties: {
+    r'accountHolderName': PropertySchema(
+      id: 0,
+      name: r'accountHolderName',
+      type: IsarType.string,
+    ),
+    r'balance': PropertySchema(
+      id: 1,
+      name: r'balance',
+      type: IsarType.double,
+    ),
+    r'bankName': PropertySchema(
+      id: 2,
+      name: r'bankName',
+      type: IsarType.string,
+    ),
+    r'colorHex': PropertySchema(
+      id: 3,
+      name: r'colorHex',
+      type: IsarType.string,
+    ),
+    r'fullAccountNumber': PropertySchema(
+      id: 4,
+      name: r'fullAccountNumber',
+      type: IsarType.string,
+    ),
+    r'ifscCode': PropertySchema(
+      id: 5,
+      name: r'ifscCode',
+      type: IsarType.string,
+    ),
+    r'last4': PropertySchema(
+      id: 6,
+      name: r'last4',
+      type: IsarType.string,
+    ),
+    r'logoAsset': PropertySchema(
+      id: 7,
+      name: r'logoAsset',
+      type: IsarType.string,
+    )
+  },
+  estimateSize: _bankAccountEstimateSize,
+  serialize: _bankAccountSerialize,
+  deserialize: _bankAccountDeserialize,
+  deserializeProp: _bankAccountDeserializeProp,
+  idName: r'id',
+  indexes: {},
+  links: {},
+  embeddedSchemas: {},
+  getId: _bankAccountGetId,
+  getLinks: _bankAccountGetLinks,
+  attach: _bankAccountAttach,
+  version: '3.1.0+1',
+);
+
+int _bankAccountEstimateSize(
+  BankAccount object,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  var bytesCount = offsets.last;
+  bytesCount += 3 + object.accountHolderName.length * 3;
+  bytesCount += 3 + object.bankName.length * 3;
+  bytesCount += 3 + object.colorHex.length * 3;
+  bytesCount += 3 + object.fullAccountNumber.length * 3;
+  bytesCount += 3 + object.ifscCode.length * 3;
+  bytesCount += 3 + object.last4.length * 3;
+  bytesCount += 3 + object.logoAsset.length * 3;
+  return bytesCount;
+}
+
+void _bankAccountSerialize(
+  BankAccount object,
+  IsarWriter writer,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  writer.writeString(offsets[0], object.accountHolderName);
+  writer.writeDouble(offsets[1], object.balance);
+  writer.writeString(offsets[2], object.bankName);
+  writer.writeString(offsets[3], object.colorHex);
+  writer.writeString(offsets[4], object.fullAccountNumber);
+  writer.writeString(offsets[5], object.ifscCode);
+  writer.writeString(offsets[6], object.last4);
+  writer.writeString(offsets[7], object.logoAsset);
+}
+
+BankAccount _bankAccountDeserialize(
+  Id id,
+  IsarReader reader,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  final object = BankAccount();
+  object.accountHolderName = reader.readString(offsets[0]);
+  object.balance = reader.readDouble(offsets[1]);
+  object.bankName = reader.readString(offsets[2]);
+  object.colorHex = reader.readString(offsets[3]);
+  object.fullAccountNumber = reader.readString(offsets[4]);
+  object.id = id;
+  object.ifscCode = reader.readString(offsets[5]);
+  object.last4 = reader.readString(offsets[6]);
+  object.logoAsset = reader.readString(offsets[7]);
+  return object;
+}
+
+P _bankAccountDeserializeProp<P>(
+  IsarReader reader,
+  int propertyId,
+  int offset,
+  Map<Type, List<int>> allOffsets,
+) {
+  switch (propertyId) {
+    case 0:
+      return (reader.readString(offset)) as P;
+    case 1:
+      return (reader.readDouble(offset)) as P;
+    case 2:
+      return (reader.readString(offset)) as P;
+    case 3:
+      return (reader.readString(offset)) as P;
+    case 4:
+      return (reader.readString(offset)) as P;
+    case 5:
+      return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readString(offset)) as P;
+    case 7:
+      return (reader.readString(offset)) as P;
+    default:
+      throw IsarError('Unknown property with id $propertyId');
+  }
+}
+
+Id _bankAccountGetId(BankAccount object) {
+  return object.id;
+}
+
+List<IsarLinkBase<dynamic>> _bankAccountGetLinks(BankAccount object) {
+  return [];
+}
+
+void _bankAccountAttach(
+    IsarCollection<dynamic> col, Id id, BankAccount object) {
+  object.id = id;
+}
+
+extension BankAccountQueryWhereSort
+    on QueryBuilder<BankAccount, BankAccount, QWhere> {
+  QueryBuilder<BankAccount, BankAccount, QAfterWhere> anyId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+}
+
+extension BankAccountQueryWhere
+    on QueryBuilder<BankAccount, BankAccount, QWhereClause> {
+  QueryBuilder<BankAccount, BankAccount, QAfterWhereClause> idEqualTo(Id id) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(
+        lower: id,
+        upper: id,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterWhereClause> idNotEqualTo(
+      Id id) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            )
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            )
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterWhereClause> idGreaterThan(Id id,
+      {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.greaterThan(lower: id, includeLower: include),
+      );
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterWhereClause> idLessThan(Id id,
+      {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.lessThan(upper: id, includeUpper: include),
+      );
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterWhereClause> idBetween(
+    Id lowerId,
+    Id upperId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(
+        lower: lowerId,
+        includeLower: includeLower,
+        upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+}
+
+extension BankAccountQueryFilter
+    on QueryBuilder<BankAccount, BankAccount, QFilterCondition> {
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'accountHolderName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'accountHolderName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'accountHolderName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'accountHolderName',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'accountHolderName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'accountHolderName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'accountHolderName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'accountHolderName',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'accountHolderName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      accountHolderNameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'accountHolderName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> balanceEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'balance',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      balanceGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'balance',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> balanceLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'balance',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> balanceBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'balance',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> bankNameEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'bankName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      bankNameGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'bankName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      bankNameLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'bankName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> bankNameBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'bankName',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      bankNameStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'bankName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      bankNameEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'bankName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      bankNameContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'bankName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> bankNameMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'bankName',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      bankNameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'bankName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      bankNameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'bankName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> colorHexEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'colorHex',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      colorHexGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'colorHex',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      colorHexLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'colorHex',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> colorHexBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'colorHex',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      colorHexStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'colorHex',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      colorHexEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'colorHex',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      colorHexContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'colorHex',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> colorHexMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'colorHex',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      colorHexIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'colorHex',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      colorHexIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'colorHex',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'fullAccountNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'fullAccountNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'fullAccountNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'fullAccountNumber',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'fullAccountNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'fullAccountNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'fullAccountNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'fullAccountNumber',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'fullAccountNumber',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      fullAccountNumberIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'fullAccountNumber',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> idEqualTo(
+      Id value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> idGreaterThan(
+    Id value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> idLessThan(
+    Id value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> idBetween(
+    Id lower,
+    Id upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> ifscCodeEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ifscCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      ifscCodeGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'ifscCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      ifscCodeLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'ifscCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> ifscCodeBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'ifscCode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      ifscCodeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'ifscCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      ifscCodeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'ifscCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      ifscCodeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'ifscCode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> ifscCodeMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'ifscCode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      ifscCodeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ifscCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      ifscCodeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'ifscCode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> last4EqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'last4',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      last4GreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'last4',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> last4LessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'last4',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> last4Between(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'last4',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> last4StartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'last4',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> last4EndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'last4',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> last4Contains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'last4',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> last4Matches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'last4',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition> last4IsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'last4',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      last4IsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'last4',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'logoAsset',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'logoAsset',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'logoAsset',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'logoAsset',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'logoAsset',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'logoAsset',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'logoAsset',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'logoAsset',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'logoAsset',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterFilterCondition>
+      logoAssetIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'logoAsset',
+        value: '',
+      ));
+    });
+  }
+}
+
+extension BankAccountQueryObject
+    on QueryBuilder<BankAccount, BankAccount, QFilterCondition> {}
+
+extension BankAccountQueryLinks
+    on QueryBuilder<BankAccount, BankAccount, QFilterCondition> {}
+
+extension BankAccountQuerySortBy
+    on QueryBuilder<BankAccount, BankAccount, QSortBy> {
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy>
+      sortByAccountHolderName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'accountHolderName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy>
+      sortByAccountHolderNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'accountHolderName', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByBalance() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balance', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByBalanceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balance', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByBankName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'bankName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByBankNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'bankName', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByColorHex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'colorHex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByColorHexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'colorHex', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy>
+      sortByFullAccountNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fullAccountNumber', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy>
+      sortByFullAccountNumberDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fullAccountNumber', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByIfscCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ifscCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByIfscCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ifscCode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByLast4() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'last4', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByLast4Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'last4', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByLogoAsset() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'logoAsset', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> sortByLogoAssetDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'logoAsset', Sort.desc);
+    });
+  }
+}
+
+extension BankAccountQuerySortThenBy
+    on QueryBuilder<BankAccount, BankAccount, QSortThenBy> {
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy>
+      thenByAccountHolderName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'accountHolderName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy>
+      thenByAccountHolderNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'accountHolderName', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByBalance() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balance', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByBalanceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'balance', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByBankName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'bankName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByBankNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'bankName', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByColorHex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'colorHex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByColorHexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'colorHex', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy>
+      thenByFullAccountNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fullAccountNumber', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy>
+      thenByFullAccountNumberDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fullAccountNumber', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenById() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByIfscCode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ifscCode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByIfscCodeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ifscCode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByLast4() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'last4', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByLast4Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'last4', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByLogoAsset() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'logoAsset', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QAfterSortBy> thenByLogoAssetDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'logoAsset', Sort.desc);
+    });
+  }
+}
+
+extension BankAccountQueryWhereDistinct
+    on QueryBuilder<BankAccount, BankAccount, QDistinct> {
+  QueryBuilder<BankAccount, BankAccount, QDistinct> distinctByAccountHolderName(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'accountHolderName',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QDistinct> distinctByBalance() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'balance');
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QDistinct> distinctByBankName(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'bankName', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QDistinct> distinctByColorHex(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'colorHex', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QDistinct> distinctByFullAccountNumber(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'fullAccountNumber',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QDistinct> distinctByIfscCode(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'ifscCode', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QDistinct> distinctByLast4(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'last4', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<BankAccount, BankAccount, QDistinct> distinctByLogoAsset(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'logoAsset', caseSensitive: caseSensitive);
+    });
+  }
+}
+
+extension BankAccountQueryProperty
+    on QueryBuilder<BankAccount, BankAccount, QQueryProperty> {
+  QueryBuilder<BankAccount, int, QQueryOperations> idProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<BankAccount, String, QQueryOperations>
+      accountHolderNameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'accountHolderName');
+    });
+  }
+
+  QueryBuilder<BankAccount, double, QQueryOperations> balanceProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'balance');
+    });
+  }
+
+  QueryBuilder<BankAccount, String, QQueryOperations> bankNameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'bankName');
+    });
+  }
+
+  QueryBuilder<BankAccount, String, QQueryOperations> colorHexProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'colorHex');
+    });
+  }
+
+  QueryBuilder<BankAccount, String, QQueryOperations>
+      fullAccountNumberProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'fullAccountNumber');
+    });
+  }
+
+  QueryBuilder<BankAccount, String, QQueryOperations> ifscCodeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'ifscCode');
+    });
+  }
+
+  QueryBuilder<BankAccount, String, QQueryOperations> last4Property() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'last4');
+    });
+  }
+
+  QueryBuilder<BankAccount, String, QQueryOperations> logoAssetProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'logoAsset');
+    });
+  }
+}
+
 // **************************************************************************
 // IsarEmbeddedGenerator
 // **************************************************************************

@@ -54,3 +54,17 @@ class Loan {
 
   int? linkedTransactionId; // reference to the transaction id in database
 }
+
+@collection
+class BankAccount {
+  Id id = Isar.autoIncrement;
+
+  String bankName = ''; // e.g. HDFC, SBI
+  String accountHolderName = '';
+  String last4 = '';
+  String fullAccountNumber = '';
+  String ifscCode = '';
+  double balance = 0.0;
+  String logoAsset = ''; // e.g. HDB.svg, SBI-logo.svg
+  String colorHex = ''; // e.g. #003366
+}

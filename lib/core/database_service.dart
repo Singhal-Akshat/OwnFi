@@ -27,7 +27,7 @@ class DatabaseService {
     if (_isar != null) return;
     final dir = await getApplicationSupportDirectory();
     _isar = await Isar.open(
-      [TransactionSchema, CreditCardSchema, LoanSchema, HoldingSchema],
+      [TransactionSchema, CreditCardSchema, LoanSchema, HoldingSchema, BankAccountSchema],
       directory: dir.path,
       inspector: true, // Enable local Isar DB inspector in debug mode
     );
@@ -290,6 +290,23 @@ class DatabaseService {
     });
   }
 
+  // ----------------- BANK ACCOUNTS CRUD -----------------
+  Future<List<BankAccount>> getAllBankAccounts() async {
+    return isar.bankAccounts.where().findAll();
+  }
+
+  Future<void> saveBankAccount(BankAccount account) async {
+    await isar.writeTxn(() async {
+      await isar.bankAccounts.put(account);
+    });
+  }
+
+  Future<void> deleteBankAccount(int id) async {
+    await isar.writeTxn(() async {
+      await isar.bankAccounts.delete(id);
+    });
+  }
+
   Future<void> clearAllData() async {
     const storage = FlutterSecureStorage();
     await storage.write(key: 'settings_has_cleared_data', value: 'true');
@@ -299,6 +316,7 @@ class DatabaseService {
       await isar.creditCards.clear();
       await isar.loans.clear();
       await isar.holdings.clear();
+      await isar.bankAccounts.clear();
     });
   }
 }

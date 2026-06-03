@@ -16,8 +16,9 @@ final quantForecastResultProvider = Provider<AsyncValue<QuantForecastResult>>((r
   final cardsState = ref.watch(creditCardsProvider);
   final loansState = ref.watch(loansProvider);
   final holdingsState = ref.watch(holdingsProvider);
+  final bankAccountsState = ref.watch(bankAccountsProvider);
 
-  if (txsState.isLoading || cardsState.isLoading || loansState.isLoading || holdingsState.isLoading) {
+  if (txsState.isLoading || cardsState.isLoading || loansState.isLoading || holdingsState.isLoading || bankAccountsState.isLoading) {
     return const AsyncValue.loading();
   }
 
@@ -25,11 +26,13 @@ final quantForecastResultProvider = Provider<AsyncValue<QuantForecastResult>>((r
   if (cardsState.hasError) return AsyncValue.error(cardsState.error!, cardsState.stackTrace!);
   if (loansState.hasError) return AsyncValue.error(loansState.error!, loansState.stackTrace!);
   if (holdingsState.hasError) return AsyncValue.error(holdingsState.error!, holdingsState.stackTrace!);
+  if (bankAccountsState.hasError) return AsyncValue.error(bankAccountsState.error!, bankAccountsState.stackTrace!);
 
   final txs = txsState.value ?? [];
   final cards = cardsState.value ?? [];
   final loans = loansState.value ?? [];
   final holdings = holdingsState.value ?? [];
+  final bankAccounts = bankAccountsState.value ?? [];
 
   final service = ref.watch(quantForecastServiceProvider);
   try {
@@ -38,6 +41,7 @@ final quantForecastResultProvider = Provider<AsyncValue<QuantForecastResult>>((r
       cards: cards,
       loans: loans,
       holdings: holdings,
+      bankAccounts: bankAccounts,
     );
     return AsyncValue.data(result);
   } catch (e, st) {
