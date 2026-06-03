@@ -19,6 +19,17 @@ class ScannedCard {
 }
 
 class NfcCardReaderService {
+  static const _channel = MethodChannel('com.mypersonaltracker.tracker/nfc');
+
+  /// Open Android settings for NFC
+  Future<void> openNfcSettings() async {
+    try {
+      await _channel.invokeMethod('openNfcSettings');
+    } catch (e) {
+      print('Failed to open NFC settings: $e');
+    }
+  }
+
   // Common AIDs for EMV credit cards
   static const List<Map<String, dynamic>> _aids = [
     {

@@ -202,14 +202,39 @@ class _NfcScanDialogState extends State<NfcScanDialog> with SingleTickerProvider
                   style: const TextStyle(fontSize: 12, color: Colors.redAccent),
                 ),
                 const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.neonTeal.withOpacity(0.2),
-                    foregroundColor: AppColors.neonTeal,
-                    side: const BorderSide(color: AppColors.neonTeal, width: 1),
-                  ),
-                  onPressed: _startNfcScan,
-                  child: const Text('Retry Scan'),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.neonTeal.withOpacity(0.2),
+                          foregroundColor: AppColors.neonTeal,
+                          side: const BorderSide(color: AppColors.neonTeal, width: 1),
+                        ),
+                        onPressed: _startNfcScan,
+                        child: const Text('Retry Scan'),
+                      ),
+                    ),
+                    if (_errorMessage.contains('disabled') || _errorMessage.contains('supported')) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orangeAccent.withOpacity(0.2),
+                            foregroundColor: Colors.orangeAccent,
+                            side: const BorderSide(color: Colors.orangeAccent, width: 1),
+                          ),
+                          onPressed: () async {
+                            await _nfcService.openNfcSettings();
+                          },
+                          child: const Text('Turn ON NFC'),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
               
