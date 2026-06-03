@@ -77,6 +77,24 @@ class CreditCardsNotifier extends StateNotifier<AsyncValue<List<CreditCard>>> {
       state = AsyncValue.error(e, st);
     }
   }
+
+  Future<void> removeCreditCard(int id) async {
+    try {
+      await _dbService.deleteCreditCard(id);
+      await loadCreditCards();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> updateCreditCard(CreditCard card) async {
+    try {
+      await _dbService.saveCreditCard(card);
+      await loadCreditCards();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
 }
 
 final creditCardsProvider = StateNotifierProvider<CreditCardsNotifier, AsyncValue<List<CreditCard>>>((ref) {

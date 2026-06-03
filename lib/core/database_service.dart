@@ -250,6 +250,12 @@ class DatabaseService {
     });
   }
 
+  Future<void> deleteCreditCard(int id) async {
+    await isar.writeTxn(() async {
+      await isar.creditCards.delete(id);
+    });
+  }
+
   // ----------------- LOANS CRUD -----------------
   Future<List<Loan>> getAllLoans() async {
     return isar.loans.where().findAll();

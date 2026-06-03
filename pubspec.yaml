@@ -69,6 +69,7 @@ dependencies:
   shared_preferences: ^2.5.5
   disk_space_2: ^1.0.12
   google_fonts: ^8.1.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:

@@ -20,6 +20,7 @@ import 'ui/chat/model_selector.dart';
 import 'services/model_repository.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:local_auth/local_auth.dart';
@@ -807,7 +808,7 @@ class CardsLoansView extends ConsumerWidget {
                   physics: const BouncingScrollPhysics(),
                   children: [
                     ...cards.map((card) {
-                      return _buildCreditCardItem(context, card);
+                      return _buildCreditCardItem(context, ref, card);
                     }),
                     _buildAddCardButton(context, ref),
                   ],
@@ -934,23 +935,23 @@ class CardsLoansView extends ConsumerWidget {
     return months[targetDate.month - 1];
   }
 
-  Widget _buildCreditCardItem(BuildContext context, CreditCard card) {
+  Widget _buildCreditCardItem(BuildContext context, WidgetRef ref, CreditCard card) {
     bool showSpent = true; // State for toggle
+    bool isLongPressed = false; // State for edit/delete
 
     return StatefulBuilder(
       builder: (context, setState) {
-        return Container(
-          width: 220,
-          margin: const EdgeInsets.only(right: 16),
+        return GestureDetector(
+          onLongPress: () => setState(() => isLongPressed = true),
+          onTap: () {
+            if (isLongPressed) setState(() => isLongPressed = false);
+          },
+          child: Container(
+            width: 220,
+            margin: const EdgeInsets.only(right: 16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
-            image: card.imageUrl.isNotEmpty
-                ? DecorationImage(
-                    image: AssetImage('assets/credit_card_images/${card.imageUrl}'),
-                    fit: BoxFit.cover,
-                  )
-                : null,
             gradient: card.imageUrl.isEmpty
                 ? LinearGradient(
                     colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
@@ -959,61 +960,93 @@ class CardsLoansView extends ConsumerWidget {
                   )
                 : null,
           ),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.5), // Darker at top for name readability
-                  Colors.transparent,             // Clear in middle to show card artwork
-                  Colors.black.withOpacity(0.2), // Slightly darker at bottom
-                ],
-              ),
-            ),
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Top area: Card Name and secure digits
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _toTitleCase(card.cardName),
-                      style: GoogleFonts.montserrat(
-                        fontSize: 20, 
-                        fontWeight: FontWeight.w800, 
-                        color: Colors.white, 
-                        letterSpacing: 0.5,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background Image layer (supports SVG and raster images)
+              if (card.imageUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: card.imageUrl.toLowerCase().endsWith('.svg')
+                      ? SvgPicture.asset(
+                          'assets/credit_card_images/${card.imageUrl}',
+                          fit: BoxFit.cover,
+                        )
+                      : Image.asset(
+                          'assets/credit_card_images/${card.imageUrl}',
+                          fit: BoxFit.cover,
+                        ),
+                ),
+              
+              // Foreground content
+              if (isLongPressed)
+                GlassBlur(
+                  borderRadius: 20,
+                  blurX: 25.0,
+                  blurY: 25.0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
                     ),
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () => _authenticateAndShowCardDetails(context, card),
+                    child: Center(
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            card.last4.isNotEmpty ? card.last4 : "****",
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 22, 
-                              color: Colors.white, 
-                              fontWeight: FontWeight.bold, 
-                              letterSpacing: 2.0,
-                            ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.white, size: 36),
+                            onPressed: () {
+                              setState(() => isLongPressed = false);
+                              _showAddCardDialog(context, ref, existingCard: card);
+                            },
                           ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.visibility_rounded, color: Colors.white70, size: 24),
+                          const SizedBox(width: 32),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 36),
+                            onPressed: () {
+                              setState(() => isLongPressed = false);
+                              ref.read(creditCardsProvider.notifier).removeCreditCard(card.id);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Card deleted'), backgroundColor: AppColors.obsidianSurface),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
+                )
+              else
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.black.withOpacity(0.15), // Gentle global dimming
+                  ),
+                  padding: const EdgeInsets.all(20.0),
+                child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                GestureDetector(
+                  onTap: () => _authenticateAndShowCardDetails(context, card),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        card.last4.isNotEmpty ? card.last4 : "****",
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 22, 
+                          color: Colors.white, 
+                          fontWeight: FontWeight.bold, 
+                          letterSpacing: 2.0,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.visibility_rounded, color: Colors.white70, size: 24),
+                    ],
+                  ),
                 ),
+                
+                const SizedBox(height: 100),
                 
                 // Bottom area: Spent/Statement Toggle
                 GestureDetector(
@@ -1074,8 +1107,12 @@ class CardsLoansView extends ConsumerWidget {
                     ),
                   ),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
+          ),
+        ],
+        ),
           ),
         );
       }
@@ -1240,23 +1277,23 @@ class CardsLoansView extends ConsumerWidget {
     );
   }
 
-  void _showAddCardDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final last4Controller = TextEditingController();
-    final stmtDayController = TextEditingController(text: '15');
-    final dueDayController = TextEditingController(text: '5');
+  void _showAddCardDialog(BuildContext context, WidgetRef ref, {CreditCard? existingCard}) {
+    final nameController = TextEditingController(text: existingCard?.cardName ?? '');
+    final last4Controller = TextEditingController(text: existingCard?.last4 ?? '');
+    final stmtDayController = TextEditingController(text: existingCard?.statementDay.toString() ?? '15');
+    final dueDayController = TextEditingController(text: existingCard?.dueDay.toString() ?? '5');
     
     // Secure Fields
-    final fullCardNumberController = TextEditingController();
-    final expiryDateController = TextEditingController();
-    final cvvController = TextEditingController();
+    final fullCardNumberController = TextEditingController(text: existingCard?.fullCardNumber ?? '');
+    final expiryDateController = TextEditingController(text: existingCard?.expiryDate ?? '');
+    final cvvController = TextEditingController(text: existingCard?.cvv ?? '');
     
     // Financial metrics for card
-    final currentSpendingsController = TextEditingController(text: '0');
-    final statementAmountController = TextEditingController(text: '0');
+    final currentSpendingsController = TextEditingController(text: existingCard?.currentSpendings.toStringAsFixed(0) ?? '0');
+    final statementAmountController = TextEditingController(text: existingCard?.statementAmount.toStringAsFixed(0) ?? '0');
 
-    String selectedBrand = 'Visa';
-    String selectedImage = '';
+    String selectedBrand = existingCard?.brand.isNotEmpty == true ? existingCard!.brand : 'Visa';
+    String selectedImage = existingCard?.imageUrl ?? '';
     
     final imageOptions = [
       '',
@@ -1457,7 +1494,23 @@ class CardsLoansView extends ConsumerWidget {
                                   return;
                                 }
 
-                                final card = CreditCard()
+                                // Duplicate Check
+                                final existingCards = ref.read(creditCardsProvider).value ?? [];
+                                if (existingCard == null) {
+                                  final cardNumber = fullCardNumberController.text.trim();
+                                  if (cardNumber.isNotEmpty) {
+                                    final isDuplicate = existingCards.any((c) => c.fullCardNumber == cardNumber);
+                                    if (isDuplicate) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Duplicate error: A card with this number already exists!')),
+                                      );
+                                      return;
+                                    }
+                                  }
+                                }
+
+                                final card = existingCard ?? CreditCard();
+                                card
                                   ..cardName = name
                                   ..last4 = last4
                                   ..statementDay = stmt
@@ -1470,10 +1523,14 @@ class CardsLoansView extends ConsumerWidget {
                                   ..currentSpendings = curSp
                                   ..statementAmount = stmAm;
 
-                                ref.read(creditCardsProvider.notifier).addCreditCard(card);
+                                if (existingCard == null) {
+                                  ref.read(creditCardsProvider.notifier).addCreditCard(card);
+                                } else {
+                                  ref.read(creditCardsProvider.notifier).updateCreditCard(card);
+                                }
                                 Navigator.pop(context);
                               },
-                              child: const Text('Add Card'),
+                              child: Text(existingCard == null ? 'Add Card' : 'Save Changes'),
                             ),
                           ],
                         )
