@@ -74,8 +74,8 @@ class QuantForecastService {
     for (final tx in recentExpenses) {
       totalExpense += tx.amount;
     }
-    // If no transactions, fallback to a sensible default velocity (e.g. ₹1,500/day)
-    final dailyVelocity = recentExpenses.isEmpty ? 1500.0 : totalExpense / 30.0;
+    // If no transactions, fallback to a daily velocity of 0.0
+    final dailyVelocity = recentExpenses.isEmpty ? 0.0 : totalExpense / 30.0;
 
     // 2. Calculate remaining days in month
     final lastDay = DateTime(now.year, now.month + 1, 0).day;
@@ -95,7 +95,7 @@ class QuantForecastService {
     }
 
     // 4. Detect Rent
-    double detectedRent = 25000.0; // Default rent fallback
+    double detectedRent = 0.0; // Default rent fallback
     bool rentDetected = false;
     for (final tx in transactions) {
       final isRent = tx.category.toLowerCase() == 'rent' ||
@@ -121,8 +121,8 @@ class QuantForecastService {
       projectedSpend += detectedRent;
     }
 
-    // 6. Calculate Cash and Bank Balance (adjusted baseline)
-    double cashAndBank = 325820.0;
+    // 6. Calculate Cash and Bank Balance
+    double cashAndBank = 0.0;
     for (final tx in transactions) {
       if (tx.cardId == null) {
         if (tx.transactionType == 'income') {

@@ -99,15 +99,27 @@ class MainNavigationShell extends StatefulWidget {
   State<MainNavigationShell> createState() => _MainNavigationShellState();
 }
 
-class _MainNavigationShellState extends State<MainNavigationShell> {
+class _MainNavigationShellState extends State<MainNavigationShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOnboarding();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    setState(() {});
   }
 
   Future<void> _checkOnboarding() async {
@@ -132,10 +144,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      extendBody: true,
       body: Stack(
         children: [
           const AnimatedGradientBackground(),
           SafeArea(
+            bottom: false,
             child: IndexedStack(
               index: _currentIndex,
               children: _screens,
@@ -143,7 +157,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: View.of(context).viewInsets.bottom > 0
+          ? null
+          : SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: GlassBlur(
@@ -256,7 +272,7 @@ class DashboardView extends ConsumerWidget {
         (loansState.valueOrNull?.isEmpty ?? true) &&
         (holdingsState.valueOrNull?.isEmpty ?? true);
 
-    double cashAndBank = isEmptyDb ? 0.0 : 325820.0;
+    double cashAndBank = 0.0;
     txsState.whenData((txs) {
       for (final tx in txs) {
         if (tx.cardId == null) {
@@ -269,7 +285,7 @@ class DashboardView extends ConsumerWidget {
       }
     });
 
-    final netWorth = isEmptyDb ? 0.0 : (totalHoldingsVal + cashAndBank + totalReceivables - totalCardOutstanding - totalDebts);
+    final netWorth = totalHoldingsVal + cashAndBank + totalReceivables - totalCardOutstanding - totalDebts;
 
     String formatCurrency(double val) {
       final sign = val < 0 ? '-' : '';
@@ -2262,7 +2278,7 @@ class AdvisorView extends ConsumerStatefulWidget {
   ConsumerState<AdvisorView> createState() => _AdvisorViewState();
 }
 
-class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProviderStateMixin {
+class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _advisorTabController;
   final TextEditingController _chatInputController = TextEditingController();
   final List<Map<String, String>> _messages = [];
@@ -2271,6 +2287,7 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _advisorTabController = TabController(length: 2, vsync: this);
     // Initialize welcome message
     _messages.add({
@@ -2281,9 +2298,15 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _advisorTabController.dispose();
     _chatInputController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    setState(() {});
   }
 
   @override
@@ -2616,31 +2639,36 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
         ),
 
         // Text Input box
-        Row(
-          children: [
-            Expanded(
-              child: GlassBlur(
-                borderRadius: 16,
-                child: TextField(
-                  controller: _chatInputController,
-                  decoration: const InputDecoration(
-                    hintText: 'Ask advisor (e.g. should I pre-pay home loan?)',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        Padding(
+          padding: EdgeInsets.only(
+            bottom: View.of(context).viewInsets.bottom > 0 ? 12.0 : 90.0,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: GlassBlur(
+                  borderRadius: 16,
+                  child: TextField(
+                    controller: _chatInputController,
+                    decoration: const InputDecoration(
+                      hintText: 'Ask advisor (e.g. should I pre-pay home loan?)',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onSubmitted: (_) => _sendMessage(),
                   ),
-                  onSubmitted: (_) => _sendMessage(),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            GlassBlur(
-              borderRadius: 16,
-              child: IconButton(
-                icon: const Icon(Icons.send_rounded, color: AppColors.neonTeal),
-                onPressed: _sendMessage,
+              const SizedBox(width: 8),
+              GlassBlur(
+                borderRadius: 16,
+                child: IconButton(
+                  icon: const Icon(Icons.send_rounded, color: AppColors.neonTeal),
+                  onPressed: _sendMessage,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
