@@ -1298,8 +1298,10 @@ class CardsLoansView extends ConsumerWidget {
     
     final imageOptions = [
       '',
+      'HDFC_MoneyBack_Vertical_HQ.avif',
       'IDFC_Millennia_HQ.avif',
       'LIC_Axis_Cropped_Vector.svg',
+      'RBL_Bank_Fitted.avif',
       'SBI_SimplySave_Mobile.avif',
       'Scapia_Rupay.avif',
       'Scapia_Visa.avif',
