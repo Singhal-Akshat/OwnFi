@@ -15,14 +15,23 @@ import 'features/investments/models/holding_model.dart';
 import 'features/advisor/services/quant_forecast_service.dart';
 import 'features/advisor/services/ai_advisor_service.dart';
 import 'features/advisor/providers/advisor_providers.dart';
-import 'package:gemini_nano_android/gemini_nano_android.dart';
+import 'ui/settings/model_download_page.dart';
+import 'package:flutter_gemma/flutter_gemma.dart';
+
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:local_auth/local_auth.dart';
 import 'core/lock_screen.dart';
 import 'core/sync_service.dart';
+import 'core/animated_gradient_background.dart';
+import 'features/cards_loans/widgets/nfc_scan_radar.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await FlutterGemma.initialize();
+  } catch (e) {
+    print('Failed to initialize FlutterGemma: $e');
+  }
   final dbService = DatabaseService();
   await dbService.init();
 
@@ -176,111 +185,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 }
 
 // ---------------------------------------------------------------------------
-// STUNNING BACKGROUND RADIAL GRADIENTS ORBS ANIMATOR
-// ---------------------------------------------------------------------------
-class AnimatedGradientBackground extends StatefulWidget {
-  const AnimatedGradientBackground({super.key});
-
-  @override
-  State<AnimatedGradientBackground> createState() => _AnimatedGradientBackgroundState();
-}
-
-class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 25),
-    )..repeat(reverse: true);
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        final val = _animation.value;
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.midnightBg,
-          ),
-          child: Stack(
-            children: [
-              // Purple Orb (top left to center right)
-              Positioned(
-                top: -100 + (val * 200),
-                left: -100 + (val * 150),
-                child: Container(
-                  width: 400,
-                  height: 400,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.neonPurple.withOpacity(0.2),
-                        AppColors.neonPurple.withOpacity(0.0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Teal Orb (bottom right to center left)
-              Positioned(
-                bottom: -150 + (val * 250),
-                right: -100 + (val * 200),
-                child: Container(
-                  width: 450,
-                  height: 450,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.neonTeal.withOpacity(0.18),
-                        AppColors.neonTeal.withOpacity(0.0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Pink Orb (middle-bottom animation)
-              Positioned(
-                top: 300 + (val * 100),
-                right: 200 - (val * 300),
-                child: Container(
-                  width: 300,
-                  height: 300,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.neonPink.withOpacity(0.12),
-                        AppColors.neonPink.withOpacity(0.0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
 // VIEW 1: HOME DASHBOARD SCREEN
 // ---------------------------------------------------------------------------
 class DashboardView extends ConsumerWidget {
@@ -321,7 +225,13 @@ class DashboardView extends ConsumerWidget {
     });
 
     // Baseline Cash/Bank is ₹3,25,820. We adjust it by manual cash/bank transactions.
-    double cashAndBank = 325820.0;
+    // If the database is completely empty, cashAndBank and netWorth should be exactly 0.
+    final bool isEmptyDb = (txsState.valueOrNull?.isEmpty ?? true) &&
+        (cardsState.valueOrNull?.isEmpty ?? true) &&
+        (loansState.valueOrNull?.isEmpty ?? true) &&
+        (holdingsState.valueOrNull?.isEmpty ?? true);
+
+    double cashAndBank = isEmptyDb ? 0.0 : 325820.0;
     txsState.whenData((txs) {
       for (final tx in txs) {
         if (tx.cardId == null) {
@@ -334,7 +244,7 @@ class DashboardView extends ConsumerWidget {
       }
     });
 
-    final netWorth = totalHoldingsVal + cashAndBank + totalReceivables - totalCardOutstanding - totalDebts;
+    final netWorth = isEmptyDb ? 0.0 : (totalHoldingsVal + cashAndBank + totalReceivables - totalCardOutstanding - totalDebts);
 
     String formatCurrency(double val) {
       final sign = val < 0 ? '-' : '';
@@ -1139,7 +1049,36 @@ class CardsLoansView extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Register Credit Card', style: Theme.of(context).textTheme.titleLarge),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Register Credit Card',
+                            style: Theme.of(context).textTheme.titleLarge,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.neonTeal,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          ),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => NfcScanDialog(
+                                nameController: nameController,
+                                last4Controller: last4Controller,
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.nfc_rounded, size: 18),
+                          label: const Text('Scan', style: TextStyle(fontSize: 13)),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: nameController,
@@ -2010,20 +1949,11 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
     final useLocalStr = await const FlutterSecureStorage().read(key: 'ai_use_local');
     final useLocal = useLocalStr == 'true';
     if (useLocal) {
-      if (Platform.isAndroid) {
-        try {
-          final geminiNano = GeminiNanoAndroid();
-          final isAvailable = await geminiNano.isAvailable();
-          if (isAvailable) {
-            return 'Gemini Nano (100% Offline NPU - Ready)';
-          } else {
-            return 'Ollama Fallback (Gemini Nano is downloading in background)';
-          }
-        } catch (_) {}
-      }
-      final host = await const FlutterSecureStorage().read(key: 'ai_ollama_host') ?? 'http://localhost:11434';
-      return 'Ollama Local Host ($host)';
+        // Local LLM via FlutterGemma is enabled.
+        return 'Flutter Gemma Local Model';
     }
+    final host = await const FlutterSecureStorage().read(key: 'ai_ollama_host') ?? 'http://localhost:11434';
+    return 'Ollama Local Host ($host)';
     final geminiKey = await const FlutterSecureStorage().read(key: 'ai_gemini_key');
     if (geminiKey != null && geminiKey.isNotEmpty) {
       return 'Gemini Cloud API (Online)';
@@ -2192,7 +2122,6 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
                 border: Border.all(color: AppColors.neonPurple.withOpacity(0.2)),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     width: 6,
@@ -2203,9 +2132,13 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    'Active Engine: $engine',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                  Expanded(
+                    child: Text(
+                      'Active Engine: $engine',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -2387,6 +2320,7 @@ class SettingsView extends ConsumerStatefulWidget {
 class _SettingsViewState extends ConsumerState<SettingsView> {
   bool _biometricsEnabled = true;
   bool _localLLMEnabled = false;
+  bool _checkingLocalLLM = false;
   int _smsLookbackValue = 180;
   String _smsLookbackUnit = 'days';
 
@@ -2511,23 +2445,26 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               children: [
                 SwitchListTile(
                   title: const Text('Enable On-Device LLM', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Run Gemini Nano locally on mobile NPU (Ollama on desktop)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  subtitle: const Text('Run LLM locally on device via Flutter Gemma (Ollama on desktop)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   value: _localLLMEnabled,
                   activeColor: AppColors.neonPurple,
                   onChanged: (val) async {
-                    setState(() => _localLLMEnabled = val);
+                    setState(() {
+                      _localLLMEnabled = val;
+                    });
                     await _storage.write(key: 'ai_use_local', value: val.toString());
-                    if (val && Platform.isAndroid) {
-                      try {
-                        final geminiNano = GeminiNanoAndroid();
-                        bool isAvailable = await geminiNano.isAvailable();
-                        if (!isAvailable && mounted) {
-                          _showGeminiNanoInfoDialog(context);
-                        }
-                      } catch (e) {
-                        print('Error checking Gemini Nano availability: $e');
-                      }
-                    }
+                  },
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
+                  title: const Text('Manage Local Models', style: TextStyle(fontSize: 14)),
+                  subtitle: const Text('Download or delete on-device model files', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.download_rounded, size: 20, color: AppColors.textSecondary),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ModelDownloadPage()),
+                    );
                   },
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
@@ -3085,9 +3022,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (stateContext, setState) {
             return Dialog(
               backgroundColor: Colors.transparent,
               child: GlassBlur(
@@ -3106,7 +3043,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           const SizedBox(width: 8),
                           Text(
                             'Erase All Data',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            style: Theme.of(stateContext).textTheme.titleLarge?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -3149,7 +3086,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           TextButton(
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () => Navigator.pop(dialogContext),
                             child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
                           ),
                           const SizedBox(width: 12),
@@ -3164,7 +3101,8 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             onPressed: !canDelete
                                 ? null
                                 : () async {
-                                    Navigator.pop(context); // Close confirm dialog
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    Navigator.pop(dialogContext); // Close confirm dialog
                                     
                                     // Trigger security authentication layer
                                     final authenticated = await _authenticateUserForClear(context);
@@ -3182,14 +3120,14 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                       ref.read(loansProvider.notifier).loadLoans();
                                       ref.read(holdingsProvider.notifier).loadHoldings();
                                       
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      messenger.showSnackBar(
                                         const SnackBar(
                                           content: Text('All data successfully cleared from the database.'),
                                           backgroundColor: Colors.redAccent,
                                         ),
                                       );
                                     } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      messenger.showSnackBar(
                                         const SnackBar(
                                           content: Text('Authentication failed. Data was not deleted.'),
                                           backgroundColor: Colors.orangeAccent,

@@ -201,3 +201,37 @@ We resolved the Windows-specific launch issues to ensure robust offline usage:
 *   **Build Success**: The Windows desktop application now compiles and launches successfully without any database environment exceptions.
 *   **Web Compile Issue Explanation**: The errors encountered when running `flutter run -d chrome` are due to JavaScript's limitation of representing 64-bit integers exactly (max safe integer is $2^{53} - 1$). Since the app is built exclusively for native Windows and Android targets (as per the design goals), web targets are not supported, and you should run the application on **Windows** (`flutter run -d windows`) or **Android**.
 
+---
+
+# Walkthrough - Phase 7: NFC Credit Card Scanner
+
+We have successfully completed **Phase 7**! The application now supports adding credit cards using contactless NFC scanning (using the EMV standard) and provides a premium simulated scanner fallback for development, testing, and non-supported environments.
+
+## 🛠️ Changes Completed
+
+### 1. Added NFC Card Reader Service
+* **Service**: Created [nfc_card_reader_service.dart](file:///e:/Projects/Money_Tracker/lib/features/cards_loans/services/nfc_card_reader_service.dart) to interface with physical card chips using the `nfc_manager` package.
+* **EMV APDU Sequences**: Implements low-level smart card commands:
+  * Selects the **PPSE** (Proximity Payment System Environment) directory to search for supported Application Identifiers (AIDs).
+  * Direct selects common **AIDs** (Visa, Mastercard, Amex, RuPay) if PPSE is unavailable.
+  * Sequentially reads card records (SFIs 1–4, Records 1–5).
+* **TLV Parsing**: Decodes BCD-encoded Tag **`0x5A`** (PAN / Primary Account Number) and Tag **`0x5F24`** (Expiry Date) to automatically extract:
+  * Scanned Card Name (brand detected dynamically).
+  * Card Brand (Visa, Mastercard, Amex, RuPay).
+  * Last 4 digits of the card.
+  * Card Expiration Date.
+
+### 2. Built Premium NFC Scan Dialog UI & Animation
+* **Dialog Widget**: Created [nfc_scan_radar.dart](file:///e:/Projects/Money_Tracker/lib/features/cards_loans/widgets/nfc_scan_radar.dart).
+* **Pulse Radar Animation**: Designed a custom pulsating concentric circle wave animation with glowing neon teal shadows and a central card silhouette.
+* **Simulator Fallback**: Added a **"Simulate Scan"** button to mock successful card discovery and parsing after a 2-second delay. It cycles randomly between major credit cards (e.g. HDFC Regalia Gold, SBI Card Prime, Amex Platinum Travel, BOI RuPay Select) with realistic pre-fills.
+
+### 3. Integrated into Add Card Flow
+* **Trigger button**: Added a text button next to the title in the "Register Credit Card" modal inside [main.dart](file:///e:/Projects/Money_Tracker/lib/main.dart).
+* **Pre-fill Controllers**: Scanned or simulated card parameters automatically bind and update the card name and last 4 digits text fields.
+
+## 🧪 Verification & Results
+* **Analysis**: Ran `flutter analyze` inside the workspace. The code successfully passes compile checks with **0 errors**.
+* **Simulator Verification**: Verified on Windows Desktop and emulators using the "Simulate Scan" button. The mock card details are successfully generated and populate the form fields.
+
+

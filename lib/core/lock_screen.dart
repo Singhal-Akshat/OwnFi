@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'theme.dart';
-import '../main.dart'; // import to access AnimatedGradientBackground and GlassBlur
-
+import 'animated_gradient_background.dart';
 class LockScreen extends StatefulWidget {
   final VoidCallback onAuthenticated;
 

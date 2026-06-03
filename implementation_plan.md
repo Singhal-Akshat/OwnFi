@@ -10,6 +10,16 @@ We are building a private, local-first personal finance and investment advisor a
 > [!IMPORTANT]
 > **Ollama on Laptop**: To run the local LLM on your laptop, you will need Ollama installed and running (`ollama run gemma2:2b` or similar). The app will connect to it locally on `http://localhost:11434`. On your phone, we will set up the Google AI Edge SDK to load a downloaded `.bin` model file, or you can supply an API key (Gemini/OpenAI) for cloud processing.
 
+> [!IMPORTANT]
+> **NFC Card Scanner Security and Simulation**:
+> * **Security Compliance**: For privacy and card security, the scanner *only* retrieves the public card brand (e.g. Visa/Mastercard) and the PAN (using the last 4 digits). Sensitive credentials (CVV, CVV2, and PINs) are never accessed or stored.
+> * **Simulated Scan Mode**: Real NFC EMV reading is only supported on physical Android devices. On Windows Desktop, emulators, or if physical scanning fails, we provide a premium **Simulated Scan** utility within the scan dialog to populate test cards easily.
+
+## Open Questions
+
+> [!NOTE]
+> **NFC Card Default Limit**: When a card is successfully scanned via NFC, we cannot retrieve its credit limit or outstanding balance from the chip itself. We propose pre-filling the Card Name and Last 4 digits, while defaulting the Credit Limit to ₹1,00,000 and Outstanding Balance to ₹0, allowing you to adjust them before registering. Is this default configuration acceptable?
+
 ---
 
 ## Proposed Changes
@@ -127,6 +137,16 @@ We will build local parser services and real-time public API price fetchers:
 *   Encrypt database exports using AES-256 with a master password key.
 *   Upload/download backups from the user's private Google Drive (App Data folder) or WebDAV endpoint.
 
+#### Phase 7: NFC Credit Card Scanner
+*   **Service**: Create `lib/features/cards_loans/services/nfc_card_reader_service.dart` to manage the NFC scanner lifecycle.
+    *   Implements `NfcManager` session lifecycle (`startSession`/`stopSession`).
+    *   Sends standard EMV APDUs: PPSE select, AID select, and sequential `READ RECORD` commands to scan SFIs 1–4, records 1–5.
+    *   Parses TLV tags `0x5A` (PAN) and `0x5F24` (Expiry) to extract card brands (Visa/Mastercard/Amex/RuPay) and last 4 digits.
+*   **UI Overlay & Simulation**:
+    *   Design a premium glassmorphic NFC Scan Dialog inside the Credit Card manager with a pulsating neon radar animation and a card wireframe silhouette.
+    *   Provide a "Simulate Scan" option to mock successful reads for Windows Desktop testing and emulator environments.
+    *   Bind scanned card parameters to the main "Register Credit Card" form controllers.
+
 ---
 
 ## Verification Plan
@@ -136,7 +156,8 @@ We will build local parser services and real-time public API price fetchers:
 *   **Parsing Tests**: Mock banking SMS messages and IMAP email contents to ensure regex parsing accuracy.
 *   **Import Parsers**: Test parser functions with mock Zerodha holdings `.csv` and `.xlsx` files.
 *   **Financial Calculations**: Test interest compounding, EMI splits, and Holt-Winters forecasting outputs.
+*   **NFC Parser Tests**: Verify BCD-encoded PAN and Expiry tag parsing helpers inside the NFC reader service.
 
 ### Manual Verification
-*   Run the app on Windows Desktop to test UI layout, local Ollama integration, file picking, and Yahoo Finance fetches.
-*   Compile to Android and test on the Samsung S24 Ultra to verify SMS permissions, background receiving, and MediaPipe local inference.
+*   **Windows Desktop**: Open the credit card register modal, click "Scan Card", select "Simulate Scan", and verify that the card brand and last 4 digits are successfully parsed and pre-filled into the form.
+*   **Android S24 Ultra**: Compile the APK, launch the app, click "Scan Card", and scan a physical EMV credit card. Verify that the app detects the card via NFC, vibrates (haptics), extracts the card type and last 4 digits, and pre-fills the registration modal.

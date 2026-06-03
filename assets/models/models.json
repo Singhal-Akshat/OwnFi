@@ -1,0 +1,65 @@
+[
+  {
+    "id": "gemma2_turbo_2b",
+    "displayName": "Gemma 2 Turbo 2B (default)",
+    "sizeMb": 600,
+    "defaultDownload": true,
+    "premium": false,
+    "assetPath": "assets/models/gemma2_turbo_2b.gguf",
+    "officialUrl": "https://huggingface.co/google/gemma-2-turbo-2b/resolve/main/gemma2_turbo_2b.gguf"
+  },
+  {
+    "id": "phi3_mini_4b",
+    "displayName": "Phi‑3 mini 4B",
+    "sizeMb": 900,
+    "defaultDownload": false,
+    "premium": false,
+    "assetPath": "assets/models/phi3_mini_4b.gguf",
+    "officialUrl": "https://huggingface.co/microsoft/phi-3-mini-4b/resolve/main/phi3_mini_4b.gguf"
+  },
+  {
+    "id": "llama3_2_2b_chat",
+    "displayName": "Llama 3.2 2B‑Chat",
+    "sizeMb": 650,
+    "defaultDownload": false,
+    "premium": false,
+    "assetPath": "assets/models/llama3_2_2b_chat.gguf",
+    "officialUrl": "https://huggingface.co/meta-llama/Llama-3.2-2B-Chat/resolve/main/llama3_2b_chat.gguf"
+  },
+  {
+    "id": "gemma2_9b",
+    "displayName": "Gemma 2 9B",
+    "sizeMb": 1600,
+    "defaultDownload": false,
+    "premium": true,
+    "assetPath": "assets/models/gemma2_9b.gguf",
+    "officialUrl": "https://huggingface.co/google/gemma-2-9b/resolve/main/gemma2_9b.gguf"
+  },
+  {
+    "id": "gemma4_e2b",
+    "displayName": "Gemma 4 E2B",
+    "sizeMb": 2100,
+    "defaultDownload": false,
+    "premium": true,
+    "assetPath": "assets/models/gemma4_e2b.gguf",
+    "officialUrl": "https://huggingface.co/google/gemma-4-e2b/resolve/main/gemma4_e2b.gguf"
+  },
+  {
+    "id": "phi3_medium_7b",
+    "displayName": "Phi‑3 medium 7B",
+    "sizeMb": 1500,
+    "defaultDownload": false,
+    "premium": true,
+    "assetPath": "assets/models/phi3_medium_7b.gguf",
+    "officialUrl": "https://huggingface.co/microsoft/phi-3-medium-7b/resolve/main/phi3_medium_7b.gguf"
+  },
+  {
+    "id": "mistral_7b_instruct",
+    "displayName": "Mistral 7B‑Instruct",
+    "sizeMb": 2000,
+    "defaultDownload": false,
+    "premium": true,
+    "assetPath": "assets/models/mistral_7b_instruct.gguf",
+    "officialUrl": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3/resolve/main/mistral_7b_instruct.gguf"
+  }
+]

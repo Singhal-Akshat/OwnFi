@@ -23,6 +23,27 @@ subprojects {
     val adjustNamespace: () -> Unit = {
         val android = project.extensions.findByName("android")
         if (android != null) {
+            // Force compileSdkVersion to 34 to avoid missing older SDK platforms (e.g. SDK 31)
+            try {
+                val setCompileSdk = android.javaClass.getMethod("setCompileSdk", java.lang.Integer::class.java)
+                setCompileSdk.invoke(android, 34)
+            } catch (e: Exception) {
+                try {
+                    val setCompileSdkInt = android.javaClass.getMethod("setCompileSdk", Int::class.java)
+                    setCompileSdkInt.invoke(android, 34)
+                } catch (e2: Exception) {
+                    try {
+                        val setCompileSdkVersion = android.javaClass.getMethod("setCompileSdkVersion", java.lang.Integer::class.java)
+                        setCompileSdkVersion.invoke(android, 34)
+                    } catch (e3: Exception) {
+                        try {
+                            val setCompileSdkVersionInt = android.javaClass.getMethod("setCompileSdkVersion", Int::class.java)
+                            setCompileSdkVersionInt.invoke(android, 34)
+                        } catch (e4: Exception) {}
+                    }
+                }
+            }
+
             try {
                 val getNamespace = android.javaClass.getMethod("getNamespace")
                 val currentNamespace = getNamespace.invoke(android) as? String

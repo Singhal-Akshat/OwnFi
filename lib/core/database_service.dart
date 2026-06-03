@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../features/expenses/models/transaction_model.dart';
 import '../features/cards_loans/models/card_loan_models.dart';
 import '../features/investments/models/holding_model.dart';
@@ -41,6 +42,10 @@ class DatabaseService {
   }
 
   Future<void> seedDemoData() async {
+    const storage = FlutterSecureStorage();
+    final hasCleared = await storage.read(key: 'settings_has_cleared_data');
+    if (hasCleared == 'true') return; // do not re-seed if the user cleared data
+
     final cardCount = await isar.creditCards.count();
     if (cardCount > 0) return; // already seeded
 
@@ -280,6 +285,9 @@ class DatabaseService {
   }
 
   Future<void> clearAllData() async {
+    const storage = FlutterSecureStorage();
+    await storage.write(key: 'settings_has_cleared_data', value: 'true');
+
     await isar.writeTxn(() async {
       await isar.transactions.clear();
       await isar.creditCards.clear();

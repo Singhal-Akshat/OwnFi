@@ -26,3 +26,9 @@
   - [x] Implement AES-256 local database encryption
   - [x] Build Google Drive App Folder / WebDAV automated sync worker
   - [x] Integrate local biometric authentication (FaceID/Fingerprint)
+- [x] Phase 7: NFC Credit Card Scanner
+  - [x] Create `NfcCardReaderService` with real EMV APDU track parsing (Visa, Mastercard, Amex, RuPay)
+  - [x] Design glassmorphic scan overlay with pulsating neon radar animation
+  - [x] Build premium "Simulate Scan" utility for desktop and emulator testing
+  - [x] Hook up NFC scanned parameters to pre-fill the "Register Credit Card" form
+

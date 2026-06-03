@@ -43,6 +43,25 @@ class QuantForecastService {
   }) {
     final now = DateTime.now();
 
+    final isEmptyDb = transactions.isEmpty && cards.isEmpty && loans.isEmpty && holdings.isEmpty;
+    if (isEmptyDb) {
+      return QuantForecastResult(
+        dailyVelocity: 0.0,
+        remainingDays: DateTime(now.year, now.month + 1, 0).day - now.day,
+        projectedSpend: 0.0,
+        recurringEmis: 0.0,
+        detectedRent: 0.0,
+        cashAndBank: 0.0,
+        stocksVal: 0.0,
+        mfVal: 0.0,
+        stocksPercentage: 0.0,
+        mfsPercentage: 0.0,
+        emergencyFundMonths: 0.0,
+        recommendedEmergencyFund: 0.0,
+        rebalanceAmount: 0.0,
+      );
+    }
+
     // 1. Calculate Daily Spending Velocity of the last 30 days
     final thirtyDaysAgo = now.subtract(const Duration(days: 30));
     final recentExpenses = transactions.where((tx) =>
