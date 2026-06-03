@@ -1,10 +1,36 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:file_picker/file_picker.dart';
 import 'core/theme.dart';
+import 'core/database_service.dart';
+import 'core/providers.dart';
+import 'features/expenses/models/transaction_model.dart';
+import 'features/cards_loans/models/card_loan_models.dart';
+import 'features/investments/models/holding_model.dart';
+import 'features/advisor/services/quant_forecast_service.dart';
+import 'features/advisor/services/ai_advisor_service.dart';
+import 'features/advisor/providers/advisor_providers.dart';
+import 'core/lock_screen.dart';
+import 'core/sync_service.dart';
 
-void main() {
-  runApp(const ProviderScope(child: MyApp()));
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final dbService = DatabaseService();
+  await dbService.init();
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        databaseServiceProvider.overrideWithValue(dbService),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -17,7 +43,32 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
       debugShowCheckedModeBanner: false,
-      home: const MainNavigationShell(),
+      home: const AppStartupLockGate(),
+    );
+  }
+}
+
+class AppStartupLockGate extends ConsumerStatefulWidget {
+  const AppStartupLockGate({super.key});
+
+  @override
+  ConsumerState<AppStartupLockGate> createState() => _AppStartupLockGateState();
+}
+
+class _AppStartupLockGateState extends ConsumerState<AppStartupLockGate> {
+  bool _isUnlocked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isUnlocked) {
+      return const MainNavigationShell();
+    }
+    return LockScreen(
+      onAuthenticated: () {
+        setState(() {
+          _isUnlocked = true;
+        });
+      },
     );
   }
 }
@@ -229,11 +280,77 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
 // ---------------------------------------------------------------------------
 // VIEW 1: HOME DASHBOARD SCREEN
 // ---------------------------------------------------------------------------
-class DashboardView extends StatelessWidget {
+class DashboardView extends ConsumerWidget {
   const DashboardView({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final txsState = ref.watch(transactionsProvider);
+    final cardsState = ref.watch(creditCardsProvider);
+    final loansState = ref.watch(loansProvider);
+    final holdingsState = ref.watch(holdingsProvider);
+
+    // Dynamic Net Worth Calculation
+    double totalHoldingsVal = 0.0;
+    holdingsState.whenData((holdings) {
+      for (final h in holdings) {
+        totalHoldingsVal += h.currentPrice * h.quantity;
+      }
+    });
+
+    double totalCardOutstanding = 0.0;
+    cardsState.whenData((cards) {
+      for (final c in cards) {
+        totalCardOutstanding += c.balance;
+      }
+    });
+
+    double totalDebts = 0.0;
+    double totalReceivables = 0.0;
+    loansState.whenData((loans) {
+      for (final l in loans) {
+        if (l.isLent) {
+          totalReceivables += l.remainingBalance;
+        } else {
+          totalDebts += l.remainingBalance;
+        }
+      }
+    });
+
+    // Baseline Cash/Bank is ₹3,25,820. We adjust it by manual cash/bank transactions.
+    double cashAndBank = 325820.0;
+    txsState.whenData((txs) {
+      for (final tx in txs) {
+        if (tx.cardId == null) {
+          if (tx.transactionType == 'income') {
+            cashAndBank += tx.amount;
+          } else if (tx.transactionType == 'expense') {
+            cashAndBank -= tx.amount;
+          }
+        }
+      }
+    });
+
+    final netWorth = totalHoldingsVal + cashAndBank + totalReceivables - totalCardOutstanding - totalDebts;
+
+    String formatCurrency(double val) {
+      final sign = val < 0 ? '-' : '';
+      final absVal = val.abs();
+      final str = absVal.toStringAsFixed(0);
+      String result = str;
+      if (str.length > 3) {
+        // Group last 3 digits, then groups of 2 for Indian Lakhs/Crores grouping
+        final last3 = str.substring(str.length - 3);
+        final rest = str.substring(0, str.length - 3);
+        final restGrouped = rest.replaceAllMapped(
+          RegExp(r'(\d+?)(?=(\d{2})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
+        result = '$restGrouped,$last3';
+      }
+      return '$sign₹$result';
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -261,8 +378,7 @@ class DashboardView extends StatelessWidget {
                 child: IconButton(
                   icon: const Icon(Icons.add, color: AppColors.neonTeal),
                   onPressed: () {
-                    // Quick Expense Dialog
-                    _showAddExpenseDialog(context);
+                    _showAddExpenseDialog(context, ref);
                   },
                 ),
               ),
@@ -289,9 +405,9 @@ class DashboardView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    '₹12,45,820',
-                    style: TextStyle(
+                  Text(
+                    formatCurrency(netWorth),
+                    style: const TextStyle(
                       fontSize: 36,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -301,9 +417,9 @@ class DashboardView extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildAssetMini('Investments', '₹9,80,000', AppColors.neonEmerald),
-                      _buildAssetMini('Cash & Bank', '₹3,25,820', AppColors.neonTeal),
-                      _buildAssetMini('Outstanding', '-₹60,000', Colors.redAccent),
+                      _buildAssetMini('Investments', formatCurrency(totalHoldingsVal), AppColors.neonEmerald),
+                      _buildAssetMini('Cash & Bank', formatCurrency(cashAndBank), AppColors.neonTeal),
+                      _buildAssetMini('Outstanding', formatCurrency(-totalCardOutstanding), Colors.redAccent),
                     ],
                   ),
                 ],
@@ -321,20 +437,107 @@ class DashboardView extends StatelessWidget {
 
           // Transactions List
           Expanded(
-            child: ListView(
-              physics: const BouncingScrollPhysics(),
-              children: [
-                _buildTransactionItem('Netflix Subscription', 'recurring', '-₹649', 'Entertainment', 'May 28', AppColors.neonPurple),
-                _buildTransactionItem('Zerodha Dividend', 'income', '+₹1,200', 'Investment', 'May 27', AppColors.neonEmerald),
-                _buildTransactionItem('Amazon Purchase', 'expense', '-₹15,000', 'Electronics', 'May 25', AppColors.neonTeal),
-                _buildTransactionItem('HDFC Card Bill Pay', 'transfer', '-₹24,500', 'Card Payment', 'May 20', AppColors.neonPink),
-                _buildTransactionItem('Dine-out Split with Joy', 'split', '+₹1,850', 'Food', 'May 18', Colors.amber),
-              ],
+            child: txsState.when(
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+              error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+              data: (txs) {
+                if (txs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No transactions yet. Click + to add one!',
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: txs.length,
+                  itemBuilder: (context, index) {
+                    final tx = txs[index];
+                    Color iconColor = AppColors.neonTeal;
+                    if (tx.transactionType == 'income') {
+                      iconColor = AppColors.neonEmerald;
+                    } else if (tx.transactionType == 'transfer') {
+                      iconColor = AppColors.neonPink;
+                    } else if (tx.category == 'Entertainment') {
+                      iconColor = AppColors.neonPurple;
+                    }
+
+                    final formattedAmt = '${tx.transactionType == 'income' ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
+                    final dateStr = '${tx.timestamp.day} ${_getMonthName(tx.timestamp.month)}';
+
+                    return Dismissible(
+                      key: ValueKey(tx.id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 28),
+                      ),
+                      onDismissed: (_) {
+                        ref.read(transactionsProvider.notifier).removeTransaction(tx.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${tx.description} deleted'),
+                            backgroundColor: AppColors.obsidianSurface,
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: GlassBlur(
+                          borderRadius: 16,
+                          child: ListTile(
+                            onTap: () => _showAddExpenseDialog(context, ref, existingTransaction: tx),
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: iconColor.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                tx.transactionType == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
+                                color: iconColor,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              tx.description,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                            subtitle: Text(
+                              '${tx.category} • ${tx.accountName ?? (tx.cardId != null ? 'Credit Card' : 'Cash')} • $dateStr',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                            trailing: Text(
+                              formattedAmt,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: tx.transactionType == 'income' ? AppColors.neonEmerald : Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
       ),
     );
+  }
+
+  static String _getMonthName(int month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[month - 1];
   }
 
   Widget _buildAssetMini(String label, String value, Color color) {
@@ -354,119 +557,279 @@ class DashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildTransactionItem(
-      String title, String type, String amount, String category, String date, Color iconColor) {
-    final isNegative = amount.startsWith('-');
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GlassBlur(
-        borderRadius: 16,
-        child: ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              type == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
-              color: iconColor,
-              size: 20,
-            ),
-          ),
-          title: Text(
-            title,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-          ),
-          subtitle: Text(
-            '$category • $date',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          trailing: Text(
-            amount,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: isNegative ? Colors.white : AppColors.neonEmerald,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  void _showAddExpenseDialog(BuildContext context, WidgetRef ref, {Transaction? existingTransaction}) {
+    final amountController = TextEditingController(text: existingTransaction != null ? existingTransaction.amount.toStringAsFixed(0) : '');
+    final descController = TextEditingController(text: existingTransaction?.description ?? '');
+    final catController = TextEditingController(text: existingTransaction?.category ?? '');
 
-  void _showAddExpenseDialog(BuildContext context) {
+    String selectedType = existingTransaction?.transactionType ?? 'expense';
+    String selectedAccountType = 'Cash'; // Cash, Bank, CreditCard
+    int? selectedCardId;
+    if (existingTransaction != null) {
+      if (existingTransaction.cardId != null) {
+        selectedCardId = int.tryParse(existingTransaction.cardId!);
+        selectedAccountType = 'card:${existingTransaction.cardId}';
+      } else {
+        selectedAccountType = existingTransaction.accountName ?? 'Cash';
+      }
+    }
+    bool isSplit = existingTransaction?.isSplit ?? false;
+
+    // Split Details controllers
+    final splitFriendController = TextEditingController(
+      text: (existingTransaction != null && existingTransaction.isSplit && existingTransaction.splitDetails.isNotEmpty)
+          ? existingTransaction.splitDetails.first.friendName ?? ''
+          : ''
+    );
+    final splitAmountController = TextEditingController(
+      text: (existingTransaction != null && existingTransaction.isSplit && existingTransaction.splitDetails.isNotEmpty)
+          ? existingTransaction.splitDetails.first.amount.toStringAsFixed(0)
+          : ''
+    );
+
     showDialog(
       context: context,
       builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: GlassBlur(
-            borderRadius: 24,
-            blurX: 30,
-            blurY: 30,
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Quick Manual Log',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  const TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Amount (INR)',
-                      prefixText: '₹ ',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 12),
-                  const TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Description (e.g. Croma purchase)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Category (Food, Shopping, Bills)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.neonTeal,
-                          foregroundColor: Colors.black,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final cardsState = ref.watch(creditCardsProvider);
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: GlassBlur(
+                borderRadius: 24,
+                blurX: 30,
+                blurY: 30,
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          existingTransaction != null ? 'Edit Transaction' : 'Manual Transaction Entry',
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
-                        onPressed: () {
-                          // Simulate adding
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Expense logged successfully (Mocked)')),
-                          );
-                        },
-                        child: const Text('Log Expense'),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+
+                        // Transaction Type Dropdown
+                        DropdownButtonFormField<String>(
+                          value: selectedType,
+                          decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
+                          dropdownColor: AppColors.obsidianSurface,
+                          items: const [
+                            DropdownMenuItem(value: 'expense', child: Text('Expense')),
+                            DropdownMenuItem(value: 'income', child: Text('Income')),
+                            DropdownMenuItem(value: 'transfer', child: Text('Card Repayment (Transfer)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => selectedType = val);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Amount
+                        TextField(
+                          controller: amountController,
+                          decoration: const InputDecoration(
+                            labelText: 'Amount (INR)',
+                            prefixText: '₹ ',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Description
+                        TextField(
+                          controller: descController,
+                          decoration: const InputDecoration(
+                            labelText: 'Description',
+                            hintText: 'e.g. Croma Store',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Category
+                        TextField(
+                          controller: catController,
+                          decoration: const InputDecoration(
+                            labelText: 'Category',
+                            hintText: 'e.g. Electronics, Food, Bills',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Payment Source / Account Selection
+                        DropdownButtonFormField<String>(
+                          value: selectedAccountType,
+                          decoration: const InputDecoration(labelText: 'Account / Card', border: OutlineInputBorder()),
+                          dropdownColor: AppColors.obsidianSurface,
+                          items: [
+                            const DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                            const DropdownMenuItem(value: 'Bank', child: Text('Bank Account')),
+                            ...cardsState.maybeWhen(
+                              data: (cards) => cards.map(
+                                (card) => DropdownMenuItem(
+                                  value: 'card:${card.id}',
+                                  child: Text('${card.cardName} (..${card.last4})'),
+                                ),
+                              ),
+                              orElse: () => [],
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                selectedAccountType = val;
+                                if (val.startsWith('card:')) {
+                                  selectedCardId = int.tryParse(val.substring(5));
+                                } else {
+                                  selectedCardId = null;
+                                }
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Split Toggle
+                        CheckboxListTile(
+                          title: const Text('Split Expense?', style: TextStyle(fontSize: 14)),
+                          subtitle: const Text('Split bills with friends/contacts', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          value: isSplit,
+                          activeColor: AppColors.neonTeal,
+                          contentPadding: EdgeInsets.zero,
+                          onChanged: (val) {
+                            if (val != null) setState(() => isSplit = val);
+                          },
+                        ),
+
+                        if (isSplit) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: splitFriendController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Friend Name',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: splitAmountController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Owed Amount',
+                                    prefixText: '₹ ',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+
+                        // Buttons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.neonTeal,
+                                foregroundColor: Colors.black,
+                              ),
+                              onPressed: () {
+                                final amount = double.tryParse(amountController.text) ?? 0.0;
+                                final desc = descController.text.trim();
+                                final category = catController.text.trim();
+
+                                if (amount <= 0 || desc.isEmpty || category.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please fill all required fields')),
+                                  );
+                                  return;
+                                }
+
+                                final tx = existingTransaction ?? Transaction();
+                                tx.amount = amount;
+                                tx.description = desc;
+                                tx.category = category;
+                                if (existingTransaction == null) {
+                                  tx.timestamp = DateTime.now();
+                                  tx.source = 'manual';
+                                }
+                                tx.transactionType = selectedType;
+
+                                if (selectedCardId != null) {
+                                  tx.cardId = selectedCardId.toString();
+                                  tx.accountName = 'Credit Card';
+                                } else {
+                                  tx.cardId = null;
+                                  tx.accountName = selectedAccountType;
+                                }
+
+                                if (isSplit) {
+                                  tx.isSplit = true;
+                                  final splitAmt = double.tryParse(splitAmountController.text) ?? 0.0;
+                                  final friend = splitFriendController.text.trim();
+                                  if (splitAmt > 0 && friend.isNotEmpty) {
+                                    tx.splitDetails = [
+                                      TransactionSplitDetail()
+                                        ..amount = splitAmt
+                                        ..category = category
+                                        ..friendName = friend
+                                        ..description = 'Owed from split: $desc',
+                                    ];
+
+                                    // Add to borrowed/lent loans ledger!
+                                    if (existingTransaction == null || !existingTransaction.isSplit) {
+                                      final loan = Loan()
+                                        ..contactName = friend
+                                        ..isLent = true // they owe us money, so it is lent
+                                        ..amount = splitAmt
+                                        ..remainingBalance = splitAmt
+                                        ..startDate = DateTime.now()
+                                        ..interestRate = 0.0
+                                        ..compoundInterval = 'none'
+                                        ..emiAmount = 0.0;
+                                      ref.read(loansProvider.notifier).addLoan(loan);
+                                    }
+                                  }
+                                } else {
+                                  tx.isSplit = false;
+                                  tx.splitDetails = [];
+                                }
+
+                                ref.read(transactionsProvider.notifier).addTransaction(tx);
+                                Navigator.pop(context);
+                              },
+                              child: Text(existingTransaction != null ? 'Save Changes' : 'Log Transaction'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -476,11 +839,14 @@ class DashboardView extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // VIEW 2: CARDS & LOANS VIEW
 // ---------------------------------------------------------------------------
-class CardsLoansView extends StatelessWidget {
+class CardsLoansView extends ConsumerWidget {
   const CardsLoansView({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cardsState = ref.watch(creditCardsProvider);
+    final loansState = ref.watch(loansProvider);
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -495,14 +861,31 @@ class CardsLoansView extends StatelessWidget {
           // Cards horizontal scroll list
           SizedBox(
             height: 190,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              children: [
-                _buildCreditCardItem('HDFC Regalia', '1234', '₹1,45,000 / ₹5,00,000', '15th', '05th June', AppColors.tealBlueGradient),
-                _buildCreditCardItem('ICICI Amazon Pay', '5678', '₹24,500 / ₹3,00,000', '20th', '10th June', AppColors.purplePinkGradient),
-                _buildAddCardButton(context),
-              ],
+            child: cardsState.when(
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+              error: (err, _) => Center(child: Text('Error: $err')),
+              data: (cards) {
+                return ListView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    ...cards.map((card) {
+                      final limitStr = '₹${card.balance.toStringAsFixed(0)} / ₹${card.creditLimit.toStringAsFixed(0)}';
+                      final dueSuffix = _getOrdinalSuffix(card.dueDay);
+                      final stmtSuffix = _getOrdinalSuffix(card.statementDay);
+                      return _buildCreditCardItem(
+                        card.cardName,
+                        card.last4,
+                        limitStr,
+                        '${card.statementDay}$stmtSuffix',
+                        '${card.dueDay}$dueSuffix of next month',
+                        AppColors.tealBlueGradient,
+                      );
+                    }),
+                    _buildAddCardButton(context, ref),
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 24),
@@ -518,7 +901,7 @@ class CardsLoansView extends StatelessWidget {
               TextButton.icon(
                 icon: const Icon(Icons.add, size: 16, color: AppColors.neonTeal),
                 label: const Text('Add Loan', style: TextStyle(color: AppColors.neonTeal, fontSize: 13)),
-                onPressed: () {},
+                onPressed: () => _showAddLoanDialog(context, ref),
               ),
             ],
           ),
@@ -526,18 +909,82 @@ class CardsLoansView extends StatelessWidget {
 
           // Loans items list
           Expanded(
-            child: ListView(
-              physics: const BouncingScrollPhysics(),
-              children: [
-                _buildLoanItem('Home Loan (SBI)', 'Borrowed', '₹45,00,000', 'EMI: ₹38,200 (8.5%)', Colors.redAccent),
-                _buildLoanItem('Joy (Split settlement)', 'Lent (Receivable)', '₹3,500', 'Friendly Loan (0%)', AppColors.neonEmerald),
-                _buildLoanItem('Car Loan (HDFC)', 'Borrowed', '₹8,50,000', 'EMI: ₹18,400 (9.2%)', Colors.redAccent),
-              ],
+            child: loansState.when(
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+              error: (err, _) => Center(child: Text('Error: $err')),
+              data: (loans) {
+                if (loans.isEmpty) {
+                  return const Center(
+                    child: Text('No active loans. Click Add Loan to track!', style: TextStyle(color: AppColors.textMuted)),
+                  );
+                }
+                return ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: loans.length,
+                  itemBuilder: (context, index) {
+                    final loan = loans[index];
+                    final String typeStr = loan.isLent ? 'Lent (Receivable)' : 'Borrowed (Debt)';
+                    final Color typeColor = loan.isLent ? AppColors.neonEmerald : Colors.redAccent;
+                    final String emiInfo = loan.emiAmount > 0
+                        ? 'EMI: ₹${loan.emiAmount.toStringAsFixed(0)} (${loan.interestRate}%)'
+                        : 'Friendly Loan (${loan.interestRate}%)';
+
+                     return Dismissible(
+                      key: ValueKey(loan.id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 28),
+                      ),
+                      onDismissed: (_) {
+                        ref.read(loansProvider.notifier).removeLoan(loan.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${loan.contactName}\'s loan deleted'),
+                            backgroundColor: AppColors.obsidianSurface,
+                          ),
+                        );
+                      },
+                      child: GestureDetector(
+                        onTap: () => _showAddLoanDialog(context, ref, existingLoan: loan),
+                        child: _buildLoanItem(
+                          loan.contactName,
+                          typeStr,
+                          '₹${loan.remainingBalance.toStringAsFixed(0)}',
+                          emiInfo,
+                          typeColor,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
       ),
     );
+  }
+
+  static String _getOrdinalSuffix(int value) {
+    if (value >= 11 && value <= 13) {
+      return 'th';
+    }
+    switch (value % 10) {
+      case 1:
+        return 'st';
+      case 2:
+        return 'nd';
+      case 3:
+        return 'rd';
+      default:
+        return 'th';
+    }
   }
 
   Widget _buildCreditCardItem(
@@ -591,7 +1038,7 @@ class CardsLoansView extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildCardFooter('Statement Day', '$billDay of month'),
+                  _buildCardFooter('Statement Day', billDay),
                   _buildCardFooter('Due Date', dueText),
                 ],
               ),
@@ -613,12 +1060,12 @@ class CardsLoansView extends StatelessWidget {
     );
   }
 
-  Widget _buildAddCardButton(BuildContext context) {
+  Widget _buildAddCardButton(BuildContext context, WidgetRef ref) {
     return Container(
       width: 150,
       margin: const EdgeInsets.only(right: 16),
       child: GestureDetector(
-        onTap: () {},
+        onTap: () => _showAddCardDialog(context, ref),
         child: GlassBlur(
           borderRadius: 20,
           borderColor: AppColors.glassBorder.withOpacity(0.05),
@@ -664,19 +1111,268 @@ class CardsLoansView extends StatelessWidget {
       ),
     );
   }
+
+  void _showAddCardDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final limitController = TextEditingController();
+    final last4Controller = TextEditingController();
+    final stmtDayController = TextEditingController(text: '15');
+    final dueDayController = TextEditingController(text: '5');
+    final balanceController = TextEditingController(text: '0');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            blurX: 30,
+            blurY: 30,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Register Credit Card', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: 'Card Name (e.g. HDFC Regalia)', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: last4Controller,
+                      decoration: const InputDecoration(labelText: 'Last 4 digits', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: limitController,
+                      decoration: const InputDecoration(labelText: 'Credit Limit (INR)', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: balanceController,
+                      decoration: const InputDecoration(labelText: 'Current Outstanding Balance (INR)', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: stmtDayController,
+                            decoration: const InputDecoration(labelText: 'Statement Day (1-28)', border: OutlineInputBorder()),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: dueDayController,
+                            decoration: const InputDecoration(labelText: 'Due Day (1-28)', border: OutlineInputBorder()),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                          onPressed: () {
+                            final name = nameController.text.trim();
+                            final limit = double.tryParse(limitController.text) ?? 0.0;
+                            final last4 = last4Controller.text.trim();
+                            final balance = double.tryParse(balanceController.text) ?? 0.0;
+                            final stmt = int.tryParse(stmtDayController.text) ?? 15;
+                            final due = int.tryParse(dueDayController.text) ?? 5;
+
+                            if (name.isEmpty || limit <= 0 || last4.length != 4) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please fill all fields accurately')),
+                              );
+                              return;
+                            }
+
+                            final card = CreditCard()
+                              ..cardName = name
+                              ..last4 = last4
+                              ..creditLimit = limit
+                              ..balance = balance
+                              ..statementDay = stmt
+                              ..dueDay = due;
+
+                            ref.read(creditCardsProvider.notifier).addCreditCard(card);
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Add Card'),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddLoanDialog(BuildContext context, WidgetRef ref, {Loan? existingLoan}) {
+    final contactController = TextEditingController(text: existingLoan?.contactName ?? '');
+    final amountController = TextEditingController(text: existingLoan != null ? existingLoan.amount.toStringAsFixed(0) : '');
+    final rateController = TextEditingController(text: existingLoan != null ? existingLoan.interestRate.toString() : '0');
+    final emiController = TextEditingController(text: existingLoan != null ? existingLoan.emiAmount.toStringAsFixed(0) : '0');
+    bool isLent = existingLoan?.isLent ?? false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: GlassBlur(
+                borderRadius: 24,
+                blurX: 30,
+                blurY: 30,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        existingLoan != null ? 'Edit Loan / Debt' : 'Track Loan / Debt',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<bool>(
+                        value: isLent,
+                        decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
+                        dropdownColor: AppColors.obsidianSurface,
+                        items: const [
+                          DropdownMenuItem(value: false, child: Text('Borrowed (Debt)')),
+                          DropdownMenuItem(value: true, child: Text('Lent (Receivable)')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setState(() => isLent = val);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: contactController,
+                        decoration: const InputDecoration(labelText: 'Contact / Lender Name', border: OutlineInputBorder()),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: amountController,
+                        decoration: const InputDecoration(labelText: 'Amount (INR)', border: OutlineInputBorder()),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: rateController,
+                              decoration: const InputDecoration(labelText: 'Interest Rate (%)', border: OutlineInputBorder()),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: emiController,
+                              decoration: const InputDecoration(labelText: 'Monthly EMI (0 if none)', border: OutlineInputBorder()),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                            onPressed: () {
+                              final contact = contactController.text.trim();
+                              final amount = double.tryParse(amountController.text) ?? 0.0;
+                              final rate = double.tryParse(rateController.text) ?? 0.0;
+                              final emi = double.tryParse(emiController.text) ?? 0.0;
+
+                              if (contact.isEmpty || amount <= 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Please enter name and valid amount')),
+                                );
+                                return;
+                              }
+
+                              final loan = existingLoan ?? Loan();
+                              loan.contactName = contact;
+                              loan.isLent = isLent;
+                              loan.amount = amount;
+                              if (existingLoan == null) {
+                                loan.remainingBalance = amount;
+                                loan.startDate = DateTime.now();
+                              } else {
+                                if (existingLoan.amount == existingLoan.remainingBalance) {
+                                  loan.remainingBalance = amount;
+                                }
+                              }
+                              loan.interestRate = rate;
+                              loan.emiAmount = emi;
+
+                              ref.read(loansProvider.notifier).addLoan(loan);
+                              Navigator.pop(context);
+                            },
+                            child: Text(existingLoan != null ? 'Save Changes' : 'Add Loan'),
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
 // VIEW 3: INVESTMENTS VIEW (Zerodha & Coin holdings)
 // ---------------------------------------------------------------------------
-class InvestmentsView extends StatefulWidget {
+class InvestmentsView extends ConsumerStatefulWidget {
   const InvestmentsView({super.key});
 
   @override
-  State<InvestmentsView> createState() => _InvestmentsViewState();
+  ConsumerState<InvestmentsView> createState() => _InvestmentsViewState();
 }
 
-class _InvestmentsViewState extends State<InvestmentsView> with SingleTickerProviderStateMixin {
+class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -693,6 +1389,8 @@ class _InvestmentsViewState extends State<InvestmentsView> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final holdingsState = ref.watch(holdingsProvider);
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -702,9 +1400,19 @@ class _InvestmentsViewState extends State<InvestmentsView> with SingleTickerProv
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Investments',
-                style: Theme.of(context).textTheme.headlineMedium,
+              Row(
+                children: [
+                  Text(
+                    'Investments',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.sync_rounded, color: AppColors.neonTeal, size: 20),
+                    tooltip: 'Refresh Prices',
+                    onPressed: () => _refreshPrices(context),
+                  ),
+                ],
               ),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
@@ -716,9 +1424,7 @@ class _InvestmentsViewState extends State<InvestmentsView> with SingleTickerProv
                 icon: const Icon(Icons.file_upload_rounded, size: 16),
                 label: const Text('Import CSV', style: TextStyle(fontSize: 12)),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Zerodha/Coin holding file picker opened (Mocked)')),
-                  );
+                  _showImportDialog(context);
                 },
               ),
             ],
@@ -749,60 +1455,201 @@ class _InvestmentsViewState extends State<InvestmentsView> with SingleTickerProv
           ),
           const SizedBox(height: 16),
 
-          // Total valuation banner
-          GlassBlur(
-            borderRadius: 16,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Total valuation banner & Asset Allocation Pie Chart
+          holdingsState.when(
+            loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+            error: (err, _) => Center(child: Text('Error: $err')),
+            data: (holdings) {
+              double currentVal = 0.0;
+              double buyCost = 0.0;
+              double stockVal = 0.0;
+              double mfVal = 0.0;
+
+              for (final h in holdings) {
+                final val = h.currentPrice * h.quantity;
+                currentVal += val;
+                buyCost += h.buyAvgPrice * h.quantity;
+                if (h.assetType == 'stock') {
+                  stockVal += val;
+                } else {
+                  mfVal += val;
+                }
+              }
+
+              final returnsAmt = currentVal - buyCost;
+              final returnsPct = buyCost > 0 ? (returnsAmt / buyCost) * 100 : 0.0;
+              final isNegative = returnsAmt < 0;
+
+              final totalVal = stockVal + mfVal;
+              final double stockPct = totalVal > 0 ? (stockVal / totalVal) * 100 : 0.0;
+              final double mfPct = totalVal > 0 ? (mfVal / totalVal) * 100 : 0.0;
+
+              String formatCurrency(double val) {
+                final sign = val < 0 ? '-' : '';
+                return '$sign₹${val.abs().toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}';
+              }
+
+              return Column(
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Current Valuation', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                      SizedBox(height: 4),
-                      Text('₹9,80,000', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                    ],
+                  GlassBlur(
+                    borderRadius: 16,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Current Valuation', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              const SizedBox(height: 4),
+                              Text(formatCurrency(currentVal), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text('Total Returns', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${isNegative ? "" : "+"}${formatCurrency(returnsAmt)} (${isNegative ? "" : "+"}${returnsPct.toStringAsFixed(1)}%)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: isNegative ? Colors.redAccent : AppColors.neonEmerald,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('Total Returns', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                      SizedBox(height: 4),
-                      Text('+₹1,24,000 (+14.5%)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.neonEmerald)),
-                    ],
-                  ),
+                  if (totalVal > 0) ...[
+                    const SizedBox(height: 12),
+                    GlassBlur(
+                      borderRadius: 16,
+                      child: Container(
+                        height: 110,
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 10),
+                            SizedBox(
+                              width: 80,
+                              height: 80,
+                              child: PieChart(
+                                PieChartData(
+                                  sections: [
+                                    if (stockVal > 0)
+                                      PieChartSectionData(
+                                        color: AppColors.neonTeal,
+                                        value: stockVal,
+                                        title: '${stockPct.toStringAsFixed(0)}%',
+                                        radius: 28,
+                                        titleStyle: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black),
+                                      ),
+                                    if (mfVal > 0)
+                                      PieChartSectionData(
+                                        color: AppColors.neonEmerald,
+                                        value: mfVal,
+                                        title: '${mfPct.toStringAsFixed(0)}%',
+                                        radius: 28,
+                                        titleStyle: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black),
+                                      ),
+                                  ],
+                                  sectionsSpace: 2,
+                                  centerSpaceRadius: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildLegendItem('Stocks (Zerodha)', formatCurrency(stockVal), AppColors.neonTeal),
+                                  const SizedBox(height: 8),
+                                  _buildLegendItem('Mutual Funds (Coin)', formatCurrency(mfVal), AppColors.neonEmerald),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ),
-            ),
+              );
+            },
           ),
           const SizedBox(height: 16),
 
           // Tab content
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // Stocks
-                ListView(
-                  physics: const BouncingScrollPhysics(),
+            child: holdingsState.when(
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+              error: (err, _) => Center(child: Text('Error: $err')),
+              data: (holdings) {
+                final stocks = holdings.where((h) => h.assetType == 'stock').toList();
+                final mutualFunds = holdings.where((h) => h.assetType == 'mutual_fund').toList();
+
+                return TabBarView(
+                  controller: _tabController,
                   children: [
-                    _buildHoldingItem('TCS', 'TATA Consultancy Services', '25 Qty', 'Avg: ₹3,820', 'Current: ₹4,150', '+8.6%'),
-                    _buildHoldingItem('RELIANCE', 'Reliance Industries Ltd.', '50 Qty', 'Avg: ₹2,450', 'Current: ₹2,920', '+19.1%'),
-                    _buildHoldingItem('INFY', 'Infosys Ltd.', '30 Qty', 'Avg: ₹1,610', 'Current: ₹1,480', '-8.1%'),
+                    // Stocks List
+                    stocks.isEmpty
+                        ? const Center(child: Text('No stocks. Click Import to add holdings!', style: TextStyle(color: AppColors.textMuted)))
+                        : ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: stocks.length,
+                            itemBuilder: (context, index) {
+                              final h = stocks[index];
+                              final cost = h.buyAvgPrice * h.quantity;
+                              final curVal = h.currentPrice * h.quantity;
+                              final ret = curVal - cost;
+                              final pct = cost > 0 ? (ret / cost) * 100 : 0.0;
+                              final isNegative = ret < 0;
+
+                              return _buildHoldingItem(
+                                h.symbol,
+                                h.name,
+                                '${h.quantity.toStringAsFixed(0)} Qty',
+                                'Avg: ₹${h.buyAvgPrice.toStringAsFixed(0)}',
+                                'Current: ₹${h.currentPrice.toStringAsFixed(0)}',
+                                '${isNegative ? "" : "+"}${pct.toStringAsFixed(1)}%',
+                              );
+                            },
+                          ),
+                    // Mutual Funds List
+                    mutualFunds.isEmpty
+                        ? const Center(child: Text('No mutual funds. Click Import to add holdings!', style: TextStyle(color: AppColors.textMuted)))
+                        : ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: mutualFunds.length,
+                            itemBuilder: (context, index) {
+                              final h = mutualFunds[index];
+                              final cost = h.buyAvgPrice * h.quantity;
+                              final curVal = h.currentPrice * h.quantity;
+                              final ret = curVal - cost;
+                              final pct = cost > 0 ? (ret / cost) * 100 : 0.0;
+                              final isNegative = ret < 0;
+
+                              return _buildHoldingItem(
+                                h.symbol,
+                                h.name,
+                                '${h.quantity.toStringAsFixed(0)} Units',
+                                'Avg NAV: ₹${h.buyAvgPrice.toStringAsFixed(1)}',
+                                'Current NAV: ₹${h.currentPrice.toStringAsFixed(1)}',
+                                '${isNegative ? "" : "+"}${pct.toStringAsFixed(1)}%',
+                              );
+                            },
+                          ),
                   ],
-                ),
-                // MFs
-                ListView(
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    _buildHoldingItem('Parag Parikh Flexi Cap', 'Direct Growth Mutual Fund', '1240 Units', 'Avg NAV: ₹62.4', 'Current NAV: ₹78.9', '+26.4%'),
-                    _buildHoldingItem('Nippon India Small Cap', 'Direct Growth Mutual Fund', '820 Units', 'Avg NAV: ₹110.2', 'Current NAV: ₹132.5', '+20.2%'),
-                  ],
-                ),
-              ],
+                );
+              },
             ),
           ),
         ],
@@ -843,32 +1690,254 @@ class _InvestmentsViewState extends State<InvestmentsView> with SingleTickerProv
       ),
     );
   }
+
+  void _showImportDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            blurX: 30,
+            blurY: 30,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Import Portfolio holdings', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Select your holdings CSV or Excel export from Zerodha Console or Coin:',
+                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 20),
+                  ListTile(
+                    leading: const Icon(Icons.show_chart_rounded, color: AppColors.neonTeal),
+                    title: const Text('Zerodha Holdings (CSV/Excel)', style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('Upload Console holdings sheet', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _pickAndParseFile(context, 'zerodha');
+                    },
+                  ),
+                  const Divider(height: 1, color: AppColors.glassBorder),
+                  ListTile(
+                    leading: const Icon(Icons.pie_chart_rounded, color: AppColors.neonEmerald),
+                    title: const Text('Coin Mutual Funds (CSV/Excel)', style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('Upload Coin holdings sheet', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _pickAndParseFile(context, 'coin');
+                    },
+                  ),
+                  const Divider(height: 1, color: AppColors.glassBorder),
+                  ListTile(
+                    leading: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
+                    title: const Text('Clear All Holdings', style: TextStyle(fontSize: 14, color: Colors.redAccent)),
+                    subtitle: const Text('Reset local investments portfolio', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await ref.read(holdingsProvider.notifier).clearAllHoldings();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('All holdings cleared.')),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                      )
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndParseFile(BuildContext context, String broker) async {
+    try {
+      FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv', 'xlsx', 'xls'],
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      Uint8List? fileBytes = file.bytes;
+
+      if (fileBytes == null && file.path != null) {
+        fileBytes = await File(file.path!).readAsBytes();
+      }
+
+      if (fileBytes == null) {
+        throw Exception('Could not read file bytes.');
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: AppColors.neonEmerald),
+        ),
+      );
+
+      final parser = ref.read(portfolioParserServiceProvider);
+      List<Holding> holdings;
+
+      if (broker == 'zerodha') {
+        holdings = await parser.parseZerodha(fileBytes, file.name);
+      } else {
+        holdings = await parser.parseCoin(fileBytes, file.name);
+      }
+
+      if (holdings.isEmpty) {
+        Navigator.pop(context); // close loader
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No valid holdings found in the selected file.')),
+        );
+        return;
+      }
+
+      await parser.importHoldings(holdings);
+      await ref.read(holdingsProvider.notifier).loadHoldings();
+
+      Navigator.pop(context); // close loader
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Imported ${holdings.length} holdings successfully!'),
+          backgroundColor: AppColors.neonEmerald.withOpacity(0.8),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to import holdings: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Future<void> _refreshPrices(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            child: const Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Row(
+                children: [
+                  CircularProgressIndicator(color: AppColors.neonEmerald),
+                  SizedBox(width: 20),
+                  Expanded(
+                    child: Text(
+                      'Fetching latest market prices from Yahoo Finance & AMFI...',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    try {
+      final syncService = ref.read(investmentSyncServiceProvider);
+      final count = await syncService.syncAllPrices();
+      
+      // Reload holdings provider
+      await ref.read(holdingsProvider.notifier).loadHoldings();
+
+      Navigator.pop(context); // close loader
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Successfully updated $count asset prices!'),
+          backgroundColor: AppColors.neonEmerald.withOpacity(0.8),
+        ),
+      );
+    } catch (e) {
+      Navigator.pop(context); // close loader
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update prices: ${e.toString()}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Widget _buildLegendItem(String label, String value, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      ],
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
 // VIEW 4: AI FINANCIAL ADVISOR (Quant Engine + LLM Chat)
 // ---------------------------------------------------------------------------
-class AdvisorView extends StatefulWidget {
+class AdvisorView extends ConsumerStatefulWidget {
   const AdvisorView({super.key});
 
   @override
-  State<AdvisorView> createState() => _AdvisorViewState();
+  ConsumerState<AdvisorView> createState() => _AdvisorViewState();
 }
 
-class _AdvisorViewState extends State<AdvisorView> with SingleTickerProviderStateMixin {
+class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProviderStateMixin {
   late TabController _advisorTabController;
   final TextEditingController _chatInputController = TextEditingController();
-  final List<Map<String, String>> _messages = [
-    {
-      'sender': 'AI',
-      'text': 'Hello Akshat! I am your local privacy-first financial advisor. Based on your current profile: Net Worth is ₹12.45L, Credit outstanding is ₹60k, and you have EMIs totaling ₹56,600. How can I help you invest or manage debt today?'
-    }
-  ];
+  final List<Map<String, String>> _messages = [];
+  bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
     _advisorTabController = TabController(length: 2, vsync: this);
+    // Initialize welcome message
+    _messages.add({
+      'sender': 'AI',
+      'text': 'Hello Akshat! I am your local privacy-first financial advisor. Ask me anything about rebalancing your portfolio, check your emergency fund status, or ask for home/car loan pre-payment guidance!'
+    });
   }
 
   @override
@@ -935,77 +2004,118 @@ class _AdvisorViewState extends State<AdvisorView> with SingleTickerProviderStat
   }
 
   Widget _buildQuantDashboard(BuildContext context) {
-    return ListView(
-      physics: const BouncingScrollPhysics(),
-      children: [
-        // Forecaster card
-        GlassBlur(
-          borderRadius: 20,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.timeline_rounded, color: AppColors.neonTeal),
-                    SizedBox(width: 8),
-                    Text('Cash Flow Forecast (June 2026)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Projected Spend: ₹1,20,500',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Based on current velocity (spending ₹2,300/day) + recurring HDFC regalia EMI (₹38.2k) + rent (₹25k).',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: 0.65,
-                  backgroundColor: Colors.white.withOpacity(0.05),
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.neonTeal),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
+    final forecastState = ref.watch(quantForecastResultProvider);
 
-        // Allocation advice card
-        GlassBlur(
-          borderRadius: 20,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
+    return forecastState.when(
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonPurple)),
+      error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+      data: (forecast) {
+        String formatCurrency(double val) {
+          final sign = val < 0 ? '-' : '';
+          final absVal = val.abs();
+          final str = absVal.toStringAsFixed(0);
+          String result = str;
+          if (str.length > 3) {
+            final last3 = str.substring(str.length - 3);
+            final rest = str.substring(0, str.length - 3);
+            final restGrouped = rest.replaceAllMapped(
+              RegExp(r'(\d+?)(?=(\d{2})+(?!\d))'),
+              (Match m) => '${m[1]},',
+            );
+            result = '$restGrouped,$last3';
+          }
+          return '$sign₹$result';
+        }
+
+        double progress = forecast.projectedSpend > 0 ? (forecast.dailyVelocity * forecast.remainingDays) / 100000.0 : 0.0;
+        if (progress > 1.0) progress = 1.0;
+        if (progress < 0.0) progress = 0.0;
+
+        return ListView(
+          physics: const BouncingScrollPhysics(),
+          children: [
+            // Forecaster card
+            GlassBlur(
+              borderRadius: 20,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.pie_chart_outline_rounded, color: AppColors.neonEmerald),
-                    SizedBox(width: 8),
-                    Text('Rebalancing Recommendations', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const Row(
+                      children: [
+                        Icon(Icons.timeline_rounded, color: AppColors.neonTeal),
+                        SizedBox(width: 8),
+                        Text('Cash Flow Forecast', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Projected Spend: ${formatCurrency(forecast.projectedSpend)}',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Based on current velocity (${formatCurrency(forecast.dailyVelocity)}/day) over ${forecast.remainingDays} remaining days + monthly EMIs (${formatCurrency(forecast.recurringEmis)}) + rent (${formatCurrency(forecast.detectedRent)}).',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 12),
+                    LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.white.withOpacity(0.05),
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.neonTeal),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                _buildRecommendationBullet(
-                  'Asset Allocation mismatch',
-                  'Your current holdings are 80% Stocks and 20% Mutual Funds. Standard aggressive recommendation is 70% Equity / 30% Debt/Hybrid. Consider shifting ₹50k to index funds.',
-                ),
-                const SizedBox(height: 8),
-                _buildRecommendationBullet(
-                  'Emergency Fund status',
-                  'Emergency fund (₹3.25L in Bank) currently covers 2.7 months of EMIs + basic spends. We recommend building this up to ₹6.0L to cover 6 months.',
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ],
+            const SizedBox(height: 16),
+
+            // Allocation advice card
+            GlassBlur(
+              borderRadius: 20,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.pie_chart_outline_rounded, color: AppColors.neonEmerald),
+                        SizedBox(width: 8),
+                        Text('Advisor Recommendations', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (forecast.rebalanceAmount > 0)
+                      _buildRecommendationBullet(
+                        'Asset Allocation Rebalancing',
+                        'Your current holdings are ${forecast.stocksPercentage.toStringAsFixed(0)}% Stocks and ${forecast.mfsPercentage.toStringAsFixed(0)}% Mutual Funds. Consider shifting ${formatCurrency(forecast.rebalanceAmount)} to Mutual Funds to align with a balanced 70% direct stocks / 30% mutual funds allocation.',
+                      )
+                    else
+                      _buildRecommendationBullet(
+                        'Asset Allocation Healthy',
+                        'Your direct stocks (${forecast.stocksPercentage.toStringAsFixed(0)}%) and mutual funds (${forecast.mfsPercentage.toStringAsFixed(0)}%) ratio is healthy. SIP inputs are recommended to grow your portfolio.',
+                      ),
+                    const SizedBox(height: 8),
+                    if (forecast.emergencyFundMonths < 6.0)
+                      _buildRecommendationBullet(
+                        'Emergency Fund Shortfall',
+                        'Your savings of ${formatCurrency(forecast.cashAndBank)} cover ${forecast.emergencyFundMonths.toStringAsFixed(1)} months of outflow. We recommend building this up to ${formatCurrency(forecast.recommendedEmergencyFund)} to cover 6 months of basic living needs.',
+                      )
+                    else
+                      _buildRecommendationBullet(
+                        'Emergency Fund Secure',
+                        'Your savings cover ${forecast.emergencyFundMonths.toStringAsFixed(1)} months of monthly outflow. This is a very secure buffer.',
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1044,8 +2154,28 @@ class _AdvisorViewState extends State<AdvisorView> with SingleTickerProviderStat
         Expanded(
           child: ListView.builder(
             physics: const BouncingScrollPhysics(),
-            itemCount: _messages.length,
+            itemCount: _messages.length + (_isTyping ? 1 : 0),
             itemBuilder: (context, index) {
+              if (index == _messages.length) {
+                // Show typing bubble
+                return Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
+                    child: GlassBlur(
+                      borderRadius: 16,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Text(
+                          'Typing advisor recommendations...',
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
               final msg = _messages[index];
               final isAI = msg['sender'] == 'AI';
               return Align(
@@ -1102,40 +2232,115 @@ class _AdvisorViewState extends State<AdvisorView> with SingleTickerProviderStat
     );
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _chatInputController.text.trim();
     if (text.isEmpty) return;
 
     setState(() {
       _messages.add({'sender': 'User', 'text': text});
+      _isTyping = true;
       _chatInputController.clear();
     });
 
-    // Mock response trigger
-    Timer(const Duration(milliseconds: 1000), () {
+    try {
+      final forecastState = ref.read(quantForecastResultProvider);
+
+      if (forecastState.hasValue) {
+        final forecast = forecastState.value!;
+        final txs = ref.read(transactionsProvider).value ?? [];
+        final cards = ref.read(creditCardsProvider).value ?? [];
+        final loans = ref.read(loansProvider).value ?? [];
+        final holdings = ref.read(holdingsProvider).value ?? [];
+
+        double totalHoldingsVal = forecast.stocksVal + forecast.mfVal;
+        double totalCardOutstanding = 0.0;
+        for (final c in cards) {
+          totalCardOutstanding += c.balance;
+        }
+        double totalDebts = 0.0;
+        double totalReceivables = 0.0;
+        for (final l in loans) {
+          if (l.isLent) {
+            totalReceivables += l.remainingBalance;
+          } else {
+            totalDebts += l.remainingBalance;
+          }
+        }
+        double netWorth = totalHoldingsVal + forecast.cashAndBank + totalReceivables - totalCardOutstanding - totalDebts;
+
+        final advisorService = ref.read(aiAdvisorServiceProvider);
+
+        final sanitizedProfile = advisorService.generateSanitizedProfile(
+          transactions: txs,
+          cards: cards,
+          loans: loans,
+          holdings: holdings,
+          netWorth: netWorth,
+          cashAndBank: forecast.cashAndBank,
+          forecast: forecast,
+        );
+
+        final reply = await advisorService.queryAdvisor(
+          userQuery: text,
+          sanitizedProfile: sanitizedProfile,
+          forecast: forecast,
+        );
+
+        setState(() {
+          _messages.add({'sender': 'AI', 'text': reply});
+          _isTyping = false;
+        });
+      } else {
+        setState(() {
+          _messages.add({
+            'sender': 'AI',
+            'text': 'I am still loading your financial profile. Please wait a moment.'
+          });
+          _isTyping = false;
+        });
+      }
+    } catch (e) {
       setState(() {
         _messages.add({
           'sender': 'AI',
-          'text': 'Analyzing your request locally... As a quantitative engine fallback, I advise reviewing your SBI home loan interest rate (8.5%). Pre-paying the principal saves long-term compounding interest if you don\'t expect your stock holdings to beat a net 10% annual return.'
+          'text': 'Sorry, I encountered an error while processing your request: $e'
         });
+        _isTyping = false;
       });
-    });
+    }
   }
 }
 
 // ---------------------------------------------------------------------------
 // VIEW 5: SETTINGS SCREEN
 // ---------------------------------------------------------------------------
-class SettingsView extends StatefulWidget {
+class SettingsView extends ConsumerStatefulWidget {
   const SettingsView({super.key});
 
   @override
-  State<SettingsView> createState() => _SettingsViewState();
+  ConsumerState<SettingsView> createState() => _SettingsViewState();
 }
 
-class _SettingsViewState extends State<SettingsView> {
+class _SettingsViewState extends ConsumerState<SettingsView> {
   bool _biometricsEnabled = true;
   bool _localLLMEnabled = false;
+
+  final _storage = const FlutterSecureStorage();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final bio = await _storage.read(key: 'settings_biometrics') ?? 'true';
+    final localLLM = await _storage.read(key: 'ai_use_local') ?? 'false';
+    setState(() {
+      _biometricsEnabled = bio == 'true';
+      _localLLMEnabled = localLLM == 'true';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1161,14 +2366,17 @@ class _SettingsViewState extends State<SettingsView> {
                   subtitle: const Text('Lock app using Fingerprint / FaceID', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   value: _biometricsEnabled,
                   activeColor: AppColors.neonTeal,
-                  onChanged: (val) => setState(() => _biometricsEnabled = val),
+                  onChanged: (val) async {
+                    setState(() => _biometricsEnabled = val);
+                    await _storage.write(key: 'settings_biometrics', value: val.toString());
+                  },
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
                   title: const Text('Manage PDF Passwords', style: TextStyle(fontSize: 14)),
                   subtitle: const Text('Add decryption keys for CC Statements', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   trailing: const Icon(Icons.vpn_key_outlined, size: 20, color: AppColors.textSecondary),
-                  onTap: () {},
+                  onTap: () => _showManagePasswordsDialog(context),
                 ),
               ],
             ),
@@ -1185,14 +2393,21 @@ class _SettingsViewState extends State<SettingsView> {
                   title: const Text('Configure Gmail IMAP', style: TextStyle(fontSize: 14)),
                   subtitle: const Text('Store email fetch credentials locally', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   trailing: const Icon(Icons.mail_outline_rounded, size: 20, color: AppColors.textSecondary),
-                  onTap: () {},
+                  onTap: () => _showImapConfigDialog(context),
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
-                  title: const Text('Google Drive Sync Setup', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Configure client OAuth credentials', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.cloud_queue_rounded, size: 20, color: AppColors.textSecondary),
-                  onTap: () {},
+                  title: const Text('WebDAV Backup & Sync', style: TextStyle(fontSize: 14)),
+                  subtitle: const Text('Configure encrypted Nextcloud or WebDAV backups', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.sync_alt_rounded, size: 20, color: AppColors.textSecondary),
+                  onTap: () => _showSyncConfigDialog(context),
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
+                  title: const Text('Sync All Accounts Now', style: TextStyle(fontSize: 14, color: AppColors.neonTeal)),
+                  subtitle: const Text('Directly fetch transactions from Gmail & SMS', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.sync_rounded, size: 20, color: AppColors.neonTeal),
+                  onTap: () => _triggerAccountSync(context),
                 ),
               ],
             ),
@@ -1210,14 +2425,17 @@ class _SettingsViewState extends State<SettingsView> {
                   subtitle: const Text('Run Gemma-2B locally (needs 1.5GB file download)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   value: _localLLMEnabled,
                   activeColor: AppColors.neonPurple,
-                  onChanged: (val) => setState(() => _localLLMEnabled = val),
+                  onChanged: (val) async {
+                    setState(() => _localLLMEnabled = val);
+                    await _storage.write(key: 'ai_use_local', value: val.toString());
+                  },
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
                   title: const Text('Cloud AI API Keys', style: TextStyle(fontSize: 14)),
                   subtitle: const Text('Configure personal Gemini or OpenAI keys', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   trailing: const Icon(Icons.api_rounded, size: 20, color: AppColors.textSecondary),
-                  onTap: () {},
+                  onTap: () => _showApiKeysDialog(context),
                 ),
               ],
             ),
@@ -1249,6 +2467,571 @@ class _SettingsViewState extends State<SettingsView> {
           letterSpacing: 0.8,
         ),
       ),
+    );
+  }
+
+  void _showImapConfigDialog(BuildContext context) {
+    final emailController = TextEditingController();
+    final pwdController = TextEditingController();
+    final hostController = TextEditingController(text: 'imap.gmail.com');
+    final portController = TextEditingController(text: '993');
+
+    // Pre-populate if exists
+    _storage.read(key: 'imap_email').then((val) => emailController.text = val ?? '');
+    _storage.read(key: 'imap_host').then((val) => hostController.text = val ?? 'imap.gmail.com');
+    _storage.read(key: 'imap_port').then((val) => portController.text = val ?? '993');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            blurX: 30,
+            blurY: 30,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Configure Gmail IMAP', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'For Gmail, use a 16-digit Google App Password rather than your standard login password.',
+                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: emailController,
+                      decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: pwdController,
+                      decoration: const InputDecoration(labelText: 'Google App Password', border: OutlineInputBorder()),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: hostController,
+                            decoration: const InputDecoration(labelText: 'IMAP Host', border: OutlineInputBorder()),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: portController,
+                            decoration: const InputDecoration(labelText: 'Port', border: OutlineInputBorder()),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                          onPressed: () async {
+                            final email = emailController.text.trim();
+                            final pwd = pwdController.text.trim();
+                            final host = hostController.text.trim();
+                            final port = int.tryParse(portController.text.trim()) ?? 993;
+
+                            if (email.isEmpty || pwd.isEmpty || host.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please fill email and password')),
+                              );
+                              return;
+                            }
+
+                            await ref.read(emailSyncServiceProvider).saveCredentials(email, pwd, host, port);
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('IMAP credentials saved locally')),
+                            );
+                          },
+                          child: const Text('Save Config'),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showManagePasswordsDialog(BuildContext context) {
+    int? selectedCardId;
+    final passwordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final cardsState = ref.watch(creditCardsProvider);
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: GlassBlur(
+                borderRadius: 24,
+                blurX: 30,
+                blurY: 30,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Credit Card PDF Passwords', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Stored locally to decrypt downloaded bank statement PDFs at month-end.',
+                        style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<int>(
+                        value: selectedCardId,
+                        decoration: const InputDecoration(labelText: 'Select Credit Card', border: OutlineInputBorder()),
+                        dropdownColor: AppColors.obsidianSurface,
+                        items: cardsState.maybeWhen(
+                          data: (cards) => cards.map(
+                            (card) => DropdownMenuItem<int>(
+                              value: card.id,
+                              child: Text('${card.cardName} (..${card.last4})'),
+                            ),
+                          ).toList(),
+                          orElse: () => [],
+                        ),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => selectedCardId = val);
+                            // Read existing if any
+                            _storage.read(key: 'card_password_$val').then((pw) {
+                              if (pw != null) passwordController.text = pw;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: passwordController,
+                        decoration: const InputDecoration(labelText: 'Statement PDF Password', border: OutlineInputBorder()),
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                            onPressed: () async {
+                              final pwd = passwordController.text.trim();
+                              if (selectedCardId == null || pwd.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Please select card and enter password')),
+                                );
+                                return;
+                              }
+
+                              await _storage.write(key: 'card_password_$selectedCardId', value: pwd);
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('PDF statement password saved securely')),
+                              );
+                            },
+                            child: const Text('Save Password'),
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _triggerAccountSync(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            child: const Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Row(
+                children: [
+                  CircularProgressIndicator(color: AppColors.neonTeal),
+                  SizedBox(width: 20),
+                  Expanded(
+                    child: Text(
+                      'Fetching transactions from SMS inbox & Gmail folder...',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    try {
+      int smsCount = 0;
+      if (Platform.isAndroid) {
+        smsCount = await ref.read(smsSyncServiceProvider).syncSmsInbox();
+      }
+
+      int emailCount = 0;
+      final hasEmailCreds = await ref.read(emailSyncServiceProvider).hasCredentials();
+      if (hasEmailCreds) {
+        emailCount = await ref.read(emailSyncServiceProvider).syncEmails();
+      }
+
+      // Reload database providers
+      ref.read(transactionsProvider.notifier).loadTransactions();
+      ref.read(creditCardsProvider.notifier).loadCreditCards();
+      ref.read(loansProvider.notifier).loadLoans();
+
+      Navigator.pop(context); // Close loading dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Sync Complete! Imported $smsCount SMS alerts & $emailCount email transactions.',
+          ),
+          backgroundColor: AppColors.neonEmerald.withOpacity(0.9),
+        ),
+      );
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sync failed: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  void _showApiKeysDialog(BuildContext context) {
+    final geminiController = TextEditingController();
+    final openaiController = TextEditingController();
+    final ollamaController = TextEditingController(text: 'http://localhost:11434');
+
+    // Pre-populate if exists
+    _storage.read(key: 'ai_gemini_key').then((val) => geminiController.text = val ?? '');
+    _storage.read(key: 'ai_openai_key').then((val) => openaiController.text = val ?? '');
+    _storage.read(key: 'ai_ollama_host').then((val) => ollamaController.text = val ?? 'http://localhost:11434');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            blurX: 30,
+            blurY: 30,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('AI Advisor API Keys', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Provide keys for local Ollama host or cloud API fallbacks. Stored securely on-device.',
+                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: ollamaController,
+                      decoration: const InputDecoration(labelText: 'Local Ollama Host', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: geminiController,
+                      decoration: const InputDecoration(labelText: 'Gemini API Key', border: OutlineInputBorder()),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: openaiController,
+                      decoration: const InputDecoration(labelText: 'OpenAI API Key (Optional)', border: OutlineInputBorder()),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonPurple, foregroundColor: Colors.white),
+                          onPressed: () async {
+                            final gemini = geminiController.text.trim();
+                            final openai = openaiController.text.trim();
+                            final ollama = ollamaController.text.trim();
+
+                            await _storage.write(key: 'ai_gemini_key', value: gemini);
+                            await _storage.write(key: 'ai_openai_key', value: openai);
+                            await _storage.write(key: 'ai_ollama_host', value: ollama);
+
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('AI Advisor configuration saved locally')),
+                            );
+                          },
+                          child: const Text('Save Config'),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSyncConfigDialog(BuildContext context) {
+    final passwordController = TextEditingController();
+    final urlController = TextEditingController(text: 'https://');
+    final userController = TextEditingController();
+    final tokenController = TextEditingController();
+
+    // Pre-populate config
+    ref.read(syncServiceProvider).getSyncConfig().then((config) {
+      passwordController.text = config['masterPassword'] ?? '';
+      urlController.text = config['webdavUrl'] ?? 'https://';
+      userController.text = config['webdavUser'] ?? '';
+      tokenController.text = config['webdavPassword'] ?? '';
+    });
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            blurX: 30,
+            blurY: 30,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('WebDAV Sync & Backup', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'All exports are fully encrypted locally using AES-256 with your master password before upload.',
+                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: passwordController,
+                      decoration: const InputDecoration(labelText: 'Master Encryption Password', border: OutlineInputBorder()),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: urlController,
+                      decoration: const InputDecoration(labelText: 'WebDAV Server URL', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: userController,
+                      decoration: const InputDecoration(labelText: 'WebDAV Username', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tokenController,
+                      decoration: const InputDecoration(labelText: 'WebDAV App Password / Token', border: OutlineInputBorder()),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonPurple, foregroundColor: Colors.white),
+                          onPressed: () async {
+                            final pw = passwordController.text.trim();
+                            final url = urlController.text.trim();
+                            final user = userController.text.trim();
+                            final token = tokenController.text.trim();
+
+                            if (pw.isEmpty || url.isEmpty || user.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please fill master password, URL and username')),
+                              );
+                              return;
+                            }
+
+                            await ref.read(syncServiceProvider).saveSyncConfig(
+                              masterPassword: pw,
+                              webdavUrl: url,
+                              webdavUser: user,
+                              webdavPassword: token,
+                            );
+
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Sync configuration saved locally')),
+                            );
+                          },
+                          child: const Text('Save Settings'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(color: AppColors.glassBorder),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.cloud_upload_rounded, size: 16),
+                            label: const Text('Backup Now', style: TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                            onPressed: () async {
+                              final pw = passwordController.text.trim();
+                              final url = urlController.text.trim();
+                              final user = userController.text.trim();
+
+                              if (pw.isEmpty || url.isEmpty || user.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Please configure and save settings first')),
+                                );
+                                return;
+                              }
+
+                              Navigator.pop(context); // close config dialog
+                              
+                              // Show progress loader
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+                              );
+
+                              try {
+                                await ref.read(syncServiceProvider).uploadBackup();
+                                Navigator.pop(context); // close loader
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('AES-256 encrypted database backup uploaded successfully!')),
+                                );
+                              } catch (e) {
+                                Navigator.pop(context); // close loader
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Backup failed: $e'), backgroundColor: Colors.redAccent),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.cloud_download_rounded, size: 16),
+                            label: const Text('Restore Now', style: TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
+                            onPressed: () async {
+                              final pw = passwordController.text.trim();
+                              final url = urlController.text.trim();
+                              final user = userController.text.trim();
+
+                              if (pw.isEmpty || url.isEmpty || user.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Please configure and save settings first')),
+                                );
+                                return;
+                              }
+
+                              Navigator.pop(context); // close config dialog
+
+                              // Show progress loader
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.amber)),
+                              );
+
+                              try {
+                                await ref.read(syncServiceProvider).restoreBackup();
+                                
+                                // Reload all providers
+                                await ref.read(transactionsProvider.notifier).loadTransactions();
+                                await ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                await ref.read(loansProvider.notifier).loadLoans();
+                                await ref.read(holdingsProvider.notifier).loadHoldings();
+
+                                Navigator.pop(context); // close loader
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Encrypted backup successfully restored and database re-initialized!')),
+                                );
+                              } catch (e) {
+                                Navigator.pop(context); // close loader
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Restore failed: $e'), backgroundColor: Colors.redAccent),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

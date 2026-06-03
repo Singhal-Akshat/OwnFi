@@ -93,9 +93,26 @@ To match and exceed the functionality of commercial trackers, the app will inclu
     *   Extract transaction data and active EMIs using the PDF parser library (`syncfusion_flutter_pdf`), and save them directly to Isar.
 
 #### Phase 4: Investment Tracker (Zerodha/Coin)
-*   Implement CSV/XLSX file pickers.
-*   Write parsers for Zerodha Console Holdings export sheet and Coin mutual fund holding sheets.
-*   Integrate Yahoo Finance API (for stocks) and AMFI API (for Indian mutual funds) to fetch current prices on app open.
+We will build local parser services and real-time public API price fetchers:
+*   **Holding File Import Service**:
+    *   Create [portfolio_parser_service.dart](file:///e:/Projects/Money_Tracker/lib/features/investments/services/portfolio_parser_service.dart) using `file_picker` and `excel` libraries.
+    *   Implement CSV/XLSX parser for **Zerodha Console holdings**:
+        *   Supports CSV and Excel (`.xlsx`, `.xls`) formats.
+        *   Extracts Symbol/Instrument (e.g., `RELIANCE`), Quantity, Buy Average price, and ISIN.
+    *   Implement CSV/XLSX parser for **Coin Mutual Fund holdings**:
+        *   Extracts Scheme Name, Units/Quantity, Average NAV/Buy Price, and ISIN.
+    *   Inserts or updates records dynamically in the local Isar database.
+*   **Public Price Sync Service**:
+    *   Create [investment_sync_service.dart](file:///e:/Projects/Money_Tracker/lib/features/investments/services/investment_sync_service.dart) to fetch live valuations:
+        *   **Stocks**: Calls Yahoo Finance API (`https://query1.finance.yahoo.com/v8/finance/chart/{symbol}.NS`) to retrieve the live regular market price (regularMarketPrice).
+        *   **Mutual Funds**: Searches by scheme name/ISIN using AMFI Search API (`https://api.mfapi.in/mf/search?q={schemeName}`) to map the scheme code, then fetches the latest NAV (`https://api.mfapi.in/mf/{schemeCode}/latest`).
+        *   Updates the `currentPrice` and `lastUpdated` timestamp in Isar.
+*   **Premium Holdings & Asset Allocation Dashboard**:
+    *   Modify `InvestmentsView` in [main.dart](file:///e:/Projects/Money_Tracker/lib/main.dart) to:
+        *   Expose a file upload flow using the new `PortfolioParserService`.
+        *   Add a live "Refresh Prices" loading button wired to `InvestmentSyncService`.
+        *   Integrate a premium glassmorphic PieChart using `fl_chart` displaying Stock vs. Mutual Fund asset allocation.
+        *   List individual holding cards with dynamic return calculations (absolute profit/loss and total return percentages).
 
 #### Phase 5: Mid-Month Forecasting & Advisor Engine
 *   **Quant Engine**: Modern portfolio theory analytics, asset allocation charts, future spend projection (velocity engine + recurring EMI schedule).
