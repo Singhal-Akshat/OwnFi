@@ -1417,50 +1417,110 @@ class CardsLoansView extends ConsumerWidget {
     return months[targetDate.month - 1];
   }
 
+  Widget _buildSecureFieldCompact(BuildContext context, String label, String value, bool copyable) {
+    final displayValue = value.isEmpty ? 'N/A' : value;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(), style: const TextStyle(color: AppColors.textMuted, fontSize: 8, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                displayValue,
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (copyable && value.isNotEmpty)
+              GestureDetector(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: value));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Copied to clipboard'), backgroundColor: AppColors.obsidianSurface, duration: Duration(seconds: 1)),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.copy_rounded, color: AppColors.neonTeal, size: 14),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildCreditCardItem(BuildContext context, WidgetRef ref, CreditCard card) {
     bool showSpent = true; // State for toggle
     bool isLongPressed = false; // State for edit/delete
+    bool isFlipped = false; // State for flip
 
     return StatefulBuilder(
       builder: (context, setState) {
-        return GestureDetector(
-          onLongPress: () => setState(() => isLongPressed = true),
-          onTap: () {
-            if (isLongPressed) setState(() => isLongPressed = false);
-          },
-          child: Container(
-            width: 220,
-            margin: const EdgeInsets.only(right: 16),
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
-              gradient: card.imageUrl.isEmpty
-                  ? LinearGradient(
-                      colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-            ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Background Image layer (supports SVG and raster images)
-                if (card.imageUrl.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: card.imageUrl.toLowerCase().endsWith('.svg')
-                        ? SvgPicture.asset(
-                            'assets/credit_card_images/${card.imageUrl}',
-                            fit: BoxFit.fill,
-                          )
-                        : Image.asset(
-                            'assets/credit_card_images/${card.imageUrl}',
-                            fit: BoxFit.cover,
-                          ),
-                  ),
-              
+        Future<void> authenticateAndFlipCard() async {
+          final LocalAuthentication auth = LocalAuthentication();
+          try {
+            final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
+            final bool canAuthenticate = canAuthenticateWithBiometrics || await auth.isDeviceSupported();
+            
+            if (!canAuthenticate) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Biometric auth not available')));
+              return;
+            }
+            
+            final bool didAuthenticate = await auth.authenticate(
+              localizedReason: 'Authenticate to view secure card details',
+              options: const AuthenticationOptions(biometricOnly: true),
+            );
+            
+            if (didAuthenticate) {
+              setState(() => isFlipped = true);
+            }
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Auth error: $e')));
+          }
+        }
+
+        final frontSide = Container(
+          key: const ValueKey('front'),
+          width: 220,
+          margin: const EdgeInsets.only(right: 16),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
+            gradient: card.imageUrl.isEmpty
+                ? LinearGradient(
+                    colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background Image layer (supports SVG and raster images)
+              if (card.imageUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: card.imageUrl.toLowerCase().endsWith('.svg')
+                      ? SvgPicture.asset(
+                          'assets/credit_card_images/${card.imageUrl}',
+                          fit: BoxFit.fill,
+                       )
+                      : Image.asset(
+                          'assets/credit_card_images/${card.imageUrl}',
+                          fit: BoxFit.cover,
+                        ),
+                ),
+            
               // Foreground content
               if (isLongPressed)
                 GlassBlur(
@@ -1505,195 +1565,206 @@ class CardsLoansView extends ConsumerWidget {
                     color: Colors.black.withOpacity(0.15), // Gentle global dimming
                   ),
                   padding: const EdgeInsets.all(20.0),
-                child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                GestureDetector(
-                  onTap: () => _authenticateAndShowCardDetails(context, card),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Text(
-                        card.last4.isNotEmpty ? card.last4 : "****",
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 22, 
-                          color: Colors.white, 
-                          fontWeight: FontWeight.bold, 
-                          letterSpacing: 2.0,
+                      GestureDetector(
+                        onTap: authenticateAndFlipCard,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              card.last4.isNotEmpty ? card.last4 : "****",
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 22, 
+                                color: Colors.white, 
+                                fontWeight: FontWeight.bold, 
+                                letterSpacing: 2.0,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.visibility_rounded, color: Colors.white70, size: 24),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.visibility_rounded, color: Colors.white70, size: 24),
+                      
+                      const SizedBox(height: 100),
+                      
+                      // Bottom area: Spent/Statement Toggle
+                      GestureDetector(
+                        onTap: () => setState(() => showSpent = !showSpent),
+                        child: GlassBlur(
+                          borderRadius: 16.0,
+                          blurX: 12.0,
+                          blurY: 12.0,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.35),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.swap_horiz_rounded, color: AppColors.neonTeal, size: 16),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      showSpent ? 'SPENT' : 'STATEMENT',
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 12, 
+                                        color: AppColors.neonTeal, 
+                                        fontWeight: FontWeight.bold, 
+                                        letterSpacing: 1.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  showSpent ? '₹${card.currentSpendings.toStringAsFixed(0)}' : '₹${card.statementAmount.toStringAsFixed(0)}',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 22, 
+                                    fontWeight: FontWeight.w700, 
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  showSpent 
+                                      ? '${card.statementDay} ${_getMonthName(card.statementDay)}'
+                                      : '${card.dueDay} ${_getMonthName(card.dueDay)}',
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 14, 
+                                    color: AppColors.textSecondary, 
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
-                
-                const SizedBox(height: 100),
-                
-                // Bottom area: Spent/Statement Toggle
-                GestureDetector(
-                  onTap: () => setState(() => showSpent = !showSpent),
-                  child: GlassBlur(
-                    borderRadius: 16.0,
-                    blurX: 12.0,
-                    blurY: 12.0,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.35),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+            ],
+          ),
+        );
+
+        final backSide = Container(
+          key: const ValueKey('back'),
+          width: 220,
+          margin: const EdgeInsets.only(right: 16),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
+            gradient: card.imageUrl.isEmpty
+                ? LinearGradient(
+                    colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background Image layer (supports SVG and raster images)
+              if (card.imageUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: card.imageUrl.toLowerCase().endsWith('.svg')
+                      ? SvgPicture.asset(
+                          'assets/credit_card_images/${card.imageUrl}',
+                          fit: BoxFit.fill,
+                        )
+                      : Image.asset(
+                          'assets/credit_card_images/${card.imageUrl}',
+                          fit: BoxFit.cover,
+                        ),
+                ),
+              GlassBlur(
+                borderRadius: 20,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.65), // slightly darker for visibility on back
+                  ),
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.swap_horiz_rounded, color: AppColors.neonTeal, size: 16),
-                              const SizedBox(width: 8),
-                              Text(
-                                showSpent ? 'SPENT' : 'STATEMENT',
-                                style: GoogleFonts.montserrat(
-                                  fontSize: 12, 
-                                  color: AppColors.neonTeal, 
-                                  fontWeight: FontWeight.bold, 
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
                           Text(
-                            showSpent ? '₹${card.currentSpendings.toStringAsFixed(0)}' : '₹${card.statementAmount.toStringAsFixed(0)}',
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 22, 
-                              fontWeight: FontWeight.w700, 
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            showSpent 
-                                ? '${card.statementDay} ${_getMonthName(card.statementDay)}'
-                                : '${card.dueDay} ${_getMonthName(card.dueDay)}',
+                            'SECURE DETAILS',
                             style: GoogleFonts.montserrat(
-                              fontSize: 14, 
-                              color: AppColors.textSecondary, 
-                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.neonTeal,
+                              letterSpacing: 1.0,
                             ),
+                          ),
+                          GestureDetector(
+                            onTap: () => setState(() => isFlipped = false),
+                            child: const Icon(Icons.visibility_off_rounded, color: Colors.white70, size: 22),
                           ),
                         ],
                       ),
-                    ),
+                      const Spacer(),
+                      _buildSecureFieldCompact(context, 'Card Number', card.fullCardNumber, true),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: _buildSecureFieldCompact(context, 'Expiry Date', card.expiryDate, false)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildSecureFieldCompact(context, 'CVV', card.cvv, false)),
+                        ],
+                      ),
+                      const Spacer(),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        ],
-        ),
-          ),
-        );
-      }
-    );
-  }
-
-  Future<void> _authenticateAndShowCardDetails(BuildContext context, CreditCard card) async {
-    final LocalAuthentication auth = LocalAuthentication();
-    try {
-      final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
-      final bool canAuthenticate = canAuthenticateWithBiometrics || await auth.isDeviceSupported();
-      
-      if (!canAuthenticate) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Biometric auth not available')));
-        return;
-      }
-      
-      final bool didAuthenticate = await auth.authenticate(
-        localizedReason: 'Authenticate to view secure card details',
-        options: const AuthenticationOptions(biometricOnly: true),
-      );
-      
-      if (didAuthenticate) {
-        if (!context.mounted) return;
-        _showSecureCardBottomSheet(context, card);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Auth error: $e')));
-      }
-    }
-  }
-
-  void _showSecureCardBottomSheet(BuildContext context, CreditCard card) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return GlassBlur(
-          borderRadius: 24,
-          blurX: 30,
-          blurY: 30,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.obsidianSurface.withOpacity(0.7),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              border: const Border(top: BorderSide(color: AppColors.glassBorder, width: 1)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Secure Card Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 24),
-                _buildSecureField(context, 'Card Number', card.fullCardNumber, true),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(child: _buildSecureField(context, 'Expiry Date', card.expiryDate, false)),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildSecureField(context, 'CVV', card.cvv, false)),
-                  ],
-                ),
-                const SizedBox(height: 32),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSecureField(BuildContext context, String label, String value, bool copyable) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                value.isEmpty ? 'Not set' : value,
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500, letterSpacing: 2),
               ),
-            ),
-            if (copyable && value.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.copy, color: AppColors.neonTeal, size: 20),
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: value));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard'), backgroundColor: AppColors.neonTeal));
+            ],
+          ),
+        );
+
+        return GestureDetector(
+          onLongPress: () => setState(() => isLongPressed = true),
+          onTap: () {
+            if (isLongPressed) setState(() => isLongPressed = false);
+          },
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              final flipAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+              );
+              return AnimatedBuilder(
+                animation: flipAnimation,
+                child: child,
+                builder: (context, child) {
+                  return Transform(
+                    transform: Matrix4.identity()..scale(flipAnimation.value, 1.0),
+                    alignment: Alignment.center,
+                    child: child,
+                  );
                 },
-              ),
-          ],
-        ),
-      ],
+              );
+            },
+            child: isFlipped ? backSide : frontSide,
+          ),
+        );
+      }
     );
   }
 
@@ -4656,7 +4727,8 @@ class _BankAccountCardState extends State<BankAccountCard> {
     }
 
     return Container(
-      width: 290,
+      width: 165,
+      height: 165,
       margin: const EdgeInsets.only(right: 16),
       child: GestureDetector(
         onLongPress: () => widget.onOptionsPressed(context, widget.ref, widget.account),
@@ -4698,7 +4770,7 @@ class _BankAccountCardState extends State<BankAccountCard> {
       borderRadius: 20,
       cardColor: cardColor,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -4712,70 +4784,74 @@ class _BankAccountCardState extends State<BankAccountCard> {
                       Text(
                         widget.account.bankName.toUpperCase(),
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
-                          letterSpacing: 1.0,
+                          letterSpacing: 0.8,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         '•••• ${widget.account.last4}',
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           color: AppColors.textSecondary,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 if (widget.account.logoAsset.isNotEmpty)
                   SvgPicture.asset(
                     'assets/bank_logos/${widget.account.logoAsset}',
-                    width: 24,
-                    height: 24,
+                    width: 20,
+                    height: 20,
                   )
                 else
-                  const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 24),
+                  const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 20),
               ],
             ),
             const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const Text(
+                  'BALANCE',
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textMuted,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'BALANCE',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textMuted,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        widget.formatCurrency(widget.account.balance),
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          widget.formatCurrency(widget.account.balance),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.visibility_rounded, color: AppColors.neonTeal, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: _authenticateAndFlip,
+                    ),
                   ],
-                ),
-                IconButton(
-                  icon: const Icon(Icons.visibility_rounded, color: AppColors.neonTeal, size: 22),
-                  onPressed: _authenticateAndFlip,
                 ),
               ],
             ),
@@ -4790,39 +4866,39 @@ class _BankAccountCardState extends State<BankAccountCard> {
       key: const ValueKey('back'),
       borderRadius: 20,
       cardColor: cardColor,
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'SECURE DETAILS',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.neonTeal,
-                      letterSpacing: 1.0,
-                    ),
+      child: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'DETAILS',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.neonTeal,
+                    letterSpacing: 0.8,
                   ),
-                  GestureDetector(
-                    onTap: () => setState(() => _isFlipped = false),
-                    child: const Icon(Icons.visibility_off_rounded, color: AppColors.textSecondary, size: 18),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              _buildBackDetailRow('Holder', widget.account.accountHolderName),
-              const SizedBox(height: 6),
-              _buildBackDetailRow('A/C No', widget.account.fullAccountNumber),
-              const SizedBox(height: 6),
-              _buildBackDetailRow('IFSC', widget.account.ifscCode),
-              const Spacer(),
-            ],
-          ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _isFlipped = false),
+                  child: const Icon(Icons.visibility_off_rounded, color: AppColors.textSecondary, size: 16),
+                ),
+              ],
+            ),
+            const Spacer(),
+            _buildBackDetailRow('Holder', widget.account.accountHolderName),
+            const SizedBox(height: 4),
+            _buildBackDetailRow('A/C No', widget.account.fullAccountNumber),
+            const SizedBox(height: 4),
+            _buildBackDetailRow('IFSC', widget.account.ifscCode),
+            const Spacer(),
+          ],
         ),
+      ),
     );
   }
 
