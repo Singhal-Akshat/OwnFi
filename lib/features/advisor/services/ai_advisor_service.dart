@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:gemini_nano_android/gemini_nano_android.dart';
 import '../../expenses/models/transaction_model.dart';
 import '../../cards_loans/models/card_loan_models.dart';
 import '../../investments/models/holding_model.dart';
@@ -103,8 +105,27 @@ User's Question: "$userQuery"
 Provide a concise, professional financial assessment in 2-3 paragraphs. Discuss budgeting, debt consolidation, investment rebalancing, or emergency savings where relevant.
 """;
 
-    // 1. Try Local Ollama if enabled
+    // 1. Try Local on-device LLM if enabled
     if (useLocal) {
+      if (Platform.isAndroid) {
+        try {
+          final geminiNano = GeminiNanoAndroid();
+          final isAvailable = await geminiNano.isAvailable();
+          if (isAvailable) {
+            final results = await geminiNano.generate(
+              prompt: prompt,
+              temperature: 0.7,
+            );
+            if (results.isNotEmpty && results.first.isNotEmpty) {
+              return results.first.trim();
+            }
+          }
+        } catch (e) {
+          print('Local Gemini Nano failed: $e');
+        }
+      }
+
+      // Fallback/Default for Windows or if Gemini Nano not ready: Try Local Ollama
       try {
         final url = Uri.parse('$ollamaHost/api/generate');
         final response = await http.post(
@@ -154,39 +175,38 @@ Provide a concise, professional financial assessment in 2-3 paragraphs. Discuss 
   // Generates a robust, intelligent quantitative response locally based on user data
   String _generateRuleBasedResponse(String query, QuantForecastResult forecast) {
     final lowerQuery = query.toLowerCase();
+    String responseText = "";
     
     if (lowerQuery.contains('rebalance') || lowerQuery.contains('holdings') || lowerQuery.contains('portfolio') || lowerQuery.contains('invest')) {
       if (forecast.rebalanceAmount > 0) {
-        return "Based on your holdings of ${forecast.stocksPercentage.toStringAsFixed(0)}% Stocks and ${forecast.mfsPercentage.toStringAsFixed(0)}% Mutual Funds, you have an equity allocation skew. "
+        responseText = "Based on your holdings of ${forecast.stocksPercentage.toStringAsFixed(0)}% Stocks and ${forecast.mfsPercentage.toStringAsFixed(0)}% Mutual Funds, you have an equity allocation skew. "
             "To align with a standard balanced portfolio (70% direct stocks / 30% diversified mutual funds), we recommend shifting ₹${forecast.rebalanceAmount.toStringAsFixed(0)} from stocks into mutual/hybrid funds. "
             "This reduces single-stock exposure and ensures automated index diversification.";
       } else {
-        return "Your portfolio allocation is well-balanced with ${forecast.stocksPercentage.toStringAsFixed(0)}% Stocks and ${forecast.mfsPercentage.toStringAsFixed(0)}% Mutual Funds. "
+        responseText = "Your portfolio allocation is well-balanced with ${forecast.stocksPercentage.toStringAsFixed(0)}% Stocks and ${forecast.mfsPercentage.toStringAsFixed(0)}% Mutual Funds. "
             "No active rebalancing is required. Maintain your current SIP schedules to compound wealth steadily.";
       }
-    }
-
-    if (lowerQuery.contains('emergency') || lowerQuery.contains('save') || lowerQuery.contains('buffer') || lowerQuery.contains('cash')) {
+    } else if (lowerQuery.contains('emergency') || lowerQuery.contains('save') || lowerQuery.contains('buffer') || lowerQuery.contains('cash')) {
       if (forecast.emergencyFundMonths < 6.0) {
         final shortAmt = forecast.recommendedEmergencyFund - forecast.cashAndBank;
-        return "Your current emergency buffer (₹${forecast.cashAndBank.toStringAsFixed(0)}) covers only ${forecast.emergencyFundMonths.toStringAsFixed(1)} months of cash outflows (including rent and EMIs). "
+        responseText = "Your current emergency buffer (₹${forecast.cashAndBank.toStringAsFixed(0)}) covers only ${forecast.emergencyFundMonths.toStringAsFixed(1)} months of cash outflows (including rent and EMIs). "
             "We strongly recommend building this up to ₹${forecast.recommendedEmergencyFund.toStringAsFixed(0)} (6 months of coverage). "
             "Consider allocating ₹${shortAmt.toStringAsFixed(0)} from future savings before making further high-risk equity investments.";
       } else {
-        return "Your emergency savings of ₹${forecast.cashAndBank.toStringAsFixed(0)} are excellent, covering ${forecast.emergencyFundMonths.toStringAsFixed(1)} months of total cash outflows. "
+        responseText = "Your emergency savings of ₹${forecast.cashAndBank.toStringAsFixed(0)} are excellent, covering ${forecast.emergencyFundMonths.toStringAsFixed(1)} months of total cash outflows. "
             "This provides a solid safety net. You can confidently deploy surplus monthly cash flow into long-term equity SIPs or debt pre-payments.";
       }
-    }
-
-    if (lowerQuery.contains('emi') || lowerQuery.contains('debt') || lowerQuery.contains('loan') || lowerQuery.contains('prepay')) {
-      return "Your active monthly EMI burden is ₹${forecast.recurringEmis.toStringAsFixed(0)}. "
+    } else if (lowerQuery.contains('emi') || lowerQuery.contains('debt') || lowerQuery.contains('loan') || lowerQuery.contains('prepay')) {
+      responseText = "Your active monthly EMI burden is ₹${forecast.recurringEmis.toStringAsFixed(0)}. "
           "If you have low-interest debts like a home loan (~8.5%), standard long-term returns from index mutual funds (~12%) will outperform the interest savings from pre-payment. "
           "However, prepaying high-interest liabilities or credit card outstandings is guaranteed risk-free savings. Always pay card balances in full before month-end.";
+    } else {
+      // Default response
+      responseText = "Analyzing your local portfolio: Net Worth is ₹${(forecast.cashAndBank + forecast.stocksVal + forecast.mfVal).toStringAsFixed(0)} (Cash: ₹${forecast.cashAndBank.toStringAsFixed(0)}, Portfolio: ₹${(forecast.stocksVal + forecast.mfVal).toStringAsFixed(0)}). "
+          "Your projected spending for this month is ₹${forecast.projectedSpend.toStringAsFixed(0)} with a daily spending velocity of ₹${forecast.dailyVelocity.toStringAsFixed(0)}/day. "
+          "To get tailored advice, please ask about 'rebalancing portfolio', 'emergency fund status', or 'debt pre-payment guidance'.";
     }
 
-    // Default response
-    return "Analyzing your local portfolio: Net Worth is ₹${(forecast.cashAndBank + forecast.stocksVal + forecast.mfVal).toStringAsFixed(0)} (Cash: ₹${forecast.cashAndBank.toStringAsFixed(0)}, Portfolio: ₹${(forecast.stocksVal + forecast.mfVal).toStringAsFixed(0)}). "
-        "Your projected spending for this month is ₹${forecast.projectedSpend.toStringAsFixed(0)} with a daily spending velocity of ₹${forecast.dailyVelocity.toStringAsFixed(0)}/day. "
-        "To get tailored advice, please ask about 'rebalancing portfolio', 'emergency fund status', or 'debt pre-payment guidance'.";
+    return "⚠️ [Quant Fallback] I am just a quantifiable algorithm, not a proper AI. Integrate AI in Settings to get better answers.\n\n$responseText";
   }
 }

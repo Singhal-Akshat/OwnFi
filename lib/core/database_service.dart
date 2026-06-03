@@ -278,4 +278,13 @@ class DatabaseService {
       await isar.holdings.clear();
     });
   }
+
+  Future<void> clearAllData() async {
+    await isar.writeTxn(() async {
+      await isar.transactions.clear();
+      await isar.creditCards.clear();
+      await isar.loans.clear();
+      await isar.holdings.clear();
+    });
+  }
 }

@@ -25,11 +25,49 @@ class SmsSyncService {
       }
     }
 
-    // 2. Fetch last sync timestamp (default to 7 days ago if first time)
+    // 2. Fetch last sync timestamp
     final lastSyncStr = await _storage.read(key: 'last_sms_sync_time');
-    DateTime lastSyncTime = lastSyncStr != null
-        ? DateTime.parse(lastSyncStr)
-        : DateTime.now().subtract(const Duration(days: 7));
+    DateTime lastSyncTime;
+    if (lastSyncStr != null) {
+      lastSyncTime = DateTime.parse(lastSyncStr);
+    } else {
+      // Calculate dynamic lookback time based on user settings
+      String? lookbackValueStr = await _storage.read(key: 'settings_sms_lookback_value');
+      String? lookbackUnit = await _storage.read(key: 'settings_sms_lookback_unit');
+
+      if (lookbackValueStr == null) {
+        // Fallback to legacy key settings_sms_lookback_days
+        final legacyDays = await _storage.read(key: 'settings_sms_lookback_days');
+        if (legacyDays != null) {
+          lookbackValueStr = legacyDays;
+          lookbackUnit = 'days';
+        }
+      }
+
+      final lookbackValue = int.tryParse(lookbackValueStr ?? '180') ?? 180;
+      final unit = lookbackUnit ?? 'days';
+
+      if (unit == 'months') {
+        final now = DateTime.now();
+        int years = lookbackValue ~/ 12;
+        int months = lookbackValue % 12;
+        int targetYear = now.year - years;
+        int targetMonth = now.month - months;
+        if (targetMonth <= 0) {
+          targetYear -= 1;
+          targetMonth += 12;
+        }
+        int targetDay = now.day;
+        final daysInMonth = DateTime(targetYear, targetMonth + 1, 0).day;
+        if (targetDay > daysInMonth) {
+          targetDay = daysInMonth;
+        }
+        lastSyncTime = DateTime(targetYear, targetMonth, targetDay, now.hour, now.minute, now.second);
+      } else {
+        // days
+        lastSyncTime = DateTime.now().subtract(Duration(days: lookbackValue));
+      }
+    }
 
     // 3. Query all inbox messages
     List<SmsMessage> messages = [];

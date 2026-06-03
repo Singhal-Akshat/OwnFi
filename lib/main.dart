@@ -15,6 +15,9 @@ import 'features/investments/models/holding_model.dart';
 import 'features/advisor/services/quant_forecast_service.dart';
 import 'features/advisor/services/ai_advisor_service.dart';
 import 'features/advisor/providers/advisor_providers.dart';
+import 'package:gemini_nano_android/gemini_nano_android.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:local_auth/local_auth.dart';
 import 'core/lock_screen.dart';
 import 'core/sync_service.dart';
 
@@ -2003,6 +2006,31 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
     );
   }
 
+  Future<String> _getActiveEngineStatus() async {
+    final useLocalStr = await const FlutterSecureStorage().read(key: 'ai_use_local');
+    final useLocal = useLocalStr == 'true';
+    if (useLocal) {
+      if (Platform.isAndroid) {
+        try {
+          final geminiNano = GeminiNanoAndroid();
+          final isAvailable = await geminiNano.isAvailable();
+          if (isAvailable) {
+            return 'Gemini Nano (100% Offline NPU - Ready)';
+          } else {
+            return 'Ollama Fallback (Gemini Nano is downloading in background)';
+          }
+        } catch (_) {}
+      }
+      final host = await const FlutterSecureStorage().read(key: 'ai_ollama_host') ?? 'http://localhost:11434';
+      return 'Ollama Local Host ($host)';
+    }
+    final geminiKey = await const FlutterSecureStorage().read(key: 'ai_gemini_key');
+    if (geminiKey != null && geminiKey.isNotEmpty) {
+      return 'Gemini Cloud API (Online)';
+    }
+    return 'Offline Rule-based Quant Advisor';
+  }
+
   Widget _buildQuantDashboard(BuildContext context) {
     final forecastState = ref.watch(quantForecastResultProvider);
 
@@ -2150,6 +2178,41 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
   Widget _buildChatInterface(BuildContext context) {
     return Column(
       children: [
+        // Active AI Engine Status
+        FutureBuilder<String>(
+          future: _getActiveEngineStatus(),
+          builder: (context, snapshot) {
+            final engine = snapshot.data ?? 'Checking active engine...';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.neonPurple.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.neonPurple.withOpacity(0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: AppColors.neonPurple,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Active Engine: $engine',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
         // Chat History
         Expanded(
           child: ListView.builder(
@@ -2324,6 +2387,8 @@ class SettingsView extends ConsumerStatefulWidget {
 class _SettingsViewState extends ConsumerState<SettingsView> {
   bool _biometricsEnabled = true;
   bool _localLLMEnabled = false;
+  int _smsLookbackValue = 180;
+  String _smsLookbackUnit = 'days';
 
   final _storage = const FlutterSecureStorage();
 
@@ -2336,9 +2401,26 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
   Future<void> _loadSettings() async {
     final bio = await _storage.read(key: 'settings_biometrics') ?? 'true';
     final localLLM = await _storage.read(key: 'ai_use_local') ?? 'false';
+    
+    String? lookbackValStr = await _storage.read(key: 'settings_sms_lookback_value');
+    String? lookbackUnitStr = await _storage.read(key: 'settings_sms_lookback_unit');
+    
+    if (lookbackValStr == null) {
+      final legacy = await _storage.read(key: 'settings_sms_lookback_days');
+      if (legacy != null) {
+        lookbackValStr = legacy;
+        lookbackUnitStr = 'days';
+      } else {
+        lookbackValStr = '180';
+        lookbackUnitStr = 'days';
+      }
+    }
+    
     setState(() {
       _biometricsEnabled = bio == 'true';
       _localLLMEnabled = localLLM == 'true';
+      _smsLookbackValue = int.tryParse(lookbackValStr!) ?? 180;
+      _smsLookbackUnit = lookbackUnitStr ?? 'days';
     });
   }
 
@@ -2404,6 +2486,13 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
+                  title: const Text('SMS Sync Lookback Window', style: TextStyle(fontSize: 14)),
+                  subtitle: Text('Scan window: $_smsLookbackValue $_smsLookbackUnit', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.edit_calendar_rounded, size: 20, color: AppColors.textSecondary),
+                  onTap: () => _showSmsLookbackDialog(context),
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
                   title: const Text('Sync All Accounts Now', style: TextStyle(fontSize: 14, color: AppColors.neonTeal)),
                   subtitle: const Text('Directly fetch transactions from Gmail & SMS', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   trailing: const Icon(Icons.sync_rounded, size: 20, color: AppColors.neonTeal),
@@ -2422,12 +2511,23 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               children: [
                 SwitchListTile(
                   title: const Text('Enable On-Device LLM', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Run Gemma-2B locally (needs 1.5GB file download)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  subtitle: const Text('Run Gemini Nano locally on mobile NPU (Ollama on desktop)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   value: _localLLMEnabled,
                   activeColor: AppColors.neonPurple,
                   onChanged: (val) async {
                     setState(() => _localLLMEnabled = val);
                     await _storage.write(key: 'ai_use_local', value: val.toString());
+                    if (val && Platform.isAndroid) {
+                      try {
+                        final geminiNano = GeminiNanoAndroid();
+                        bool isAvailable = await geminiNano.isAvailable();
+                        if (!isAvailable && mounted) {
+                          _showGeminiNanoInfoDialog(context);
+                        }
+                      } catch (e) {
+                        print('Error checking Gemini Nano availability: $e');
+                      }
+                    }
                   },
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
@@ -2436,6 +2536,23 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   subtitle: const Text('Configure personal Gemini or OpenAI keys', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   trailing: const Icon(Icons.api_rounded, size: 20, color: AppColors.textSecondary),
                   onTap: () => _showApiKeysDialog(context),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+
+          // Danger Zone
+          _buildGroupTitle('Danger Zone'),
+          GlassBlur(
+            borderRadius: 20,
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('Clear All Data', style: TextStyle(fontSize: 14, color: Colors.redAccent)),
+                  subtitle: const Text('Permanently erase all credit cards, loans, holdings, and transactions', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.delete_forever_rounded, size: 20, color: Colors.redAccent),
+                  onTap: () => _showClearDataConfirmDialog(context),
                 ),
               ],
             ),
@@ -2577,6 +2694,187 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     );
   }
 
+  void _showSmsLookbackDialog(BuildContext context) {
+    String selectedUnit = _smsLookbackUnit;
+    final valueController = TextEditingController(text: _smsLookbackValue.toString());
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: GlassBlur(
+                borderRadius: 24,
+                blurX: 30,
+                blurY: 30,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SMS Lookback Window',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Define how far back the app will scan your SMS inbox for transactions. Changing this resets the last sync time to perform a full scan.',
+                        style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      ),
+                      const SizedBox(height: 20),
+                      // Unit Selector (Days vs Months)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => selectedUnit = 'days'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: selectedUnit == 'days'
+                                      ? AppColors.neonTeal.withOpacity(0.15)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: selectedUnit == 'days'
+                                        ? AppColors.neonTeal
+                                        : AppColors.glassBorder,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Days',
+                                    style: TextStyle(
+                                      color: selectedUnit == 'days' ? Colors.white : AppColors.textSecondary,
+                                      fontWeight: selectedUnit == 'days' ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => selectedUnit = 'months'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: selectedUnit == 'months'
+                                      ? AppColors.neonTeal.withOpacity(0.15)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: selectedUnit == 'months'
+                                        ? AppColors.neonTeal
+                                        : AppColors.glassBorder,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Months',
+                                    style: TextStyle(
+                                      color: selectedUnit == 'months' ? Colors.white : AppColors.textSecondary,
+                                      fontWeight: selectedUnit == 'months' ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Value Input
+                      TextField(
+                        controller: valueController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: selectedUnit == 'days' ? 'Number of Days' : 'Number of Months',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          enabledBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(color: AppColors.glassBorder),
+                          ),
+                          focusedBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(color: AppColors.neonTeal),
+                          ),
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.date_range_rounded, color: AppColors.textSecondary),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.neonTeal,
+                              foregroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () async {
+                              final text = valueController.text.trim();
+                              final val = int.tryParse(text);
+                              if (val == null || val <= 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please enter a valid positive number'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              // Update secure storage
+                              await _storage.write(key: 'settings_sms_lookback_value', value: val.toString());
+                              await _storage.write(key: 'settings_sms_lookback_unit', value: selectedUnit);
+                              // Force full scan on next sync
+                              await _storage.delete(key: 'last_sms_sync_time');
+
+                              // Update screen state
+                              this.setState(() {
+                                _smsLookbackValue = val;
+                                _smsLookbackUnit = selectedUnit;
+                              });
+
+                              Navigator.pop(context);
+                              
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Lookback set to $val $selectedUnit. Next SMS sync will perform a full scan.'),
+                                  backgroundColor: AppColors.neonEmerald.withOpacity(0.9),
+                                ),
+                              );
+                            },
+                            child: const Text('Save Window'),
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showManagePasswordsDialog(BuildContext context) {
     int? selectedCardId;
     final passwordController = TextEditingController();
@@ -2663,6 +2961,243 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                               );
                             },
                             child: const Text('Save Password'),
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _authenticateUserForClear(BuildContext context) async {
+    final auth = LocalAuthentication();
+    try {
+      final isAvailable = await auth.canCheckBiometrics || await auth.isDeviceSupported();
+      final bioEnabled = await _storage.read(key: 'settings_biometrics') ?? 'true';
+      if (isAvailable && bioEnabled == 'true') {
+        final didAuth = await auth.authenticate(
+          localizedReason: 'Confirm authentication to permanently delete all data',
+          options: const AuthenticationOptions(
+            biometricOnly: false,
+            stickyAuth: true,
+          ),
+        );
+        if (didAuth) return true;
+      }
+    } catch (e) {
+      print('Biometrics failed: $e');
+    }
+
+    // Fallback to PIN dialog
+    final storedPin = await _storage.read(key: 'settings_backup_pin') ?? '1234';
+    final pinController = TextEditingController();
+    
+    final pinMatched = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_outline_rounded, color: AppColors.neonPurple, size: 40),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Enter Backup PIN',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Please enter your 4-digit security PIN to authorize database wipe.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: pinController,
+                    keyboardType: TextInputType.number,
+                    obscureText: true,
+                    maxLength: 4,
+                    style: const TextStyle(color: Colors.white, fontSize: 22, letterSpacing: 12),
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      counterText: '',
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: AppColors.neonTeal),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.neonTeal,
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: () {
+                          if (pinController.text.trim() == storedPin) {
+                            Navigator.pop(context, true);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Incorrect PIN. Please try again.'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Confirm'),
+                      )
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    return pinMatched ?? false;
+  }
+
+  void _showClearDataConfirmDialog(BuildContext context) {
+    final textController = TextEditingController();
+    bool canDelete = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: GlassBlur(
+                borderRadius: 24,
+                blurX: 30,
+                blurY: 30,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Erase All Data',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'This will permanently delete all transactions, credit cards, active loans, and portfolios from this device. This operation cannot be undone.',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Type the word CLEAR below in uppercase to confirm:',
+                        style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: textController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          hintText: 'CLEAR',
+                          hintStyle: TextStyle(color: AppColors.textMuted),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: AppColors.glassBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.redAccent),
+                          ),
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (val) {
+                          setState(() {
+                            canDelete = val == 'CLEAR';
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: canDelete ? Colors.redAccent : Colors.redAccent.withOpacity(0.2),
+                              foregroundColor: canDelete ? Colors.white : Colors.white.withOpacity(0.3),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: !canDelete
+                                ? null
+                                : () async {
+                                    Navigator.pop(context); // Close confirm dialog
+                                    
+                                    // Trigger security authentication layer
+                                    final authenticated = await _authenticateUserForClear(context);
+                                    if (authenticated) {
+                                      // Clear DB
+                                      await ref.read(databaseServiceProvider).clearAllData();
+                                      
+                                      // Clear sync timestamps
+                                      await _storage.delete(key: 'last_sms_sync_time');
+                                      await _storage.delete(key: 'last_email_sync_time');
+                                      
+                                      // Reload providers to refresh UI immediately
+                                      ref.read(transactionsProvider.notifier).loadTransactions();
+                                      ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                      ref.read(loansProvider.notifier).loadLoans();
+                                      ref.read(holdingsProvider.notifier).loadHoldings();
+                                      
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('All data successfully cleared from the database.'),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Authentication failed. Data was not deleted.'),
+                                          backgroundColor: Colors.orangeAccent,
+                                        ),
+                                      );
+                                    }
+                                  },
+                            child: const Text('Authenticate & Delete'),
                           ),
                         ],
                       )
@@ -2808,14 +3343,47 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             final openai = openaiController.text.trim();
                             final ollama = ollamaController.text.trim();
 
+                            if (gemini.isNotEmpty) {
+                              // Show progress loader
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.neonPurple)),
+                              );
+
+                              try {
+                                final model = GenerativeModel(
+                                  model: 'gemini-1.5-flash',
+                                  apiKey: gemini,
+                                );
+                                final content = [Content.text("Ping")];
+                                final response = await model.generateContent(content).timeout(const Duration(seconds: 5));
+                                if (response.text == null || response.text!.isEmpty) {
+                                  throw Exception("Verification failed");
+                                }
+                                Navigator.pop(context); // Close loader
+                              } catch (e) {
+                                Navigator.pop(context); // Close loader
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Invalid Gemini API Key: ${e.toString().replaceAll('Exception: ', '')}'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+
                             await _storage.write(key: 'ai_gemini_key', value: gemini);
                             await _storage.write(key: 'ai_openai_key', value: openai);
                             await _storage.write(key: 'ai_ollama_host', value: ollama);
 
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('AI Advisor configuration saved locally')),
-                            );
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('AI Advisor configuration saved locally')),
+                              );
+                            }
                           },
                           child: const Text('Save Config'),
                         ),
@@ -3027,6 +3595,74 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     )
                   ],
                 ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showGeminiNanoInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            blurX: 30,
+            blurY: 30,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: AppColors.neonPurple, size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'On-Device LLM Preparing',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Your Samsung S24 Ultra supports running Gemini Nano locally on-device. Google AI Core is now preparing the model in the background.',
+                    style: TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.4),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '• AI Core will automatically download model files (~1GB) in the background.\n'
+                    '• Please keep your device connected to Wi-Fi and power.\n'
+                    '• The local AI advisor will automatically activate as soon as the system finishes downloading the model.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                  ),
+                  const SizedBox(height: 24),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.neonPurple,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
