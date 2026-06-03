@@ -1267,69 +1267,74 @@ class CardsLoansView extends ConsumerWidget {
     final cardsState = ref.watch(creditCardsProvider);
     final loansState = ref.watch(loansProvider);
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Cards & Debts',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 16),
-
-          // Cards horizontal scroll list
-          SizedBox(
-            height: 340,
-            child: cardsState.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
-              error: (err, _) => Center(child: Text('Error: $err')),
-              data: (cards) {
-                return ListView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    ...cards.map((card) {
-                      return _buildCreditCardItem(context, ref, card);
-                    }),
-                    _buildAddCardButton(context, ref),
-                  ],
-                );
-              },
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Cards & Debts',
+              style: Theme.of(context).textTheme.headlineMedium,
             ),
-          ),
-          const SizedBox(height: 24),
-
-          // Loans section header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Active Loans & Ledgers',
-                style: Theme.of(context).textTheme.titleLarge,
+            const SizedBox(height: 16),
+  
+            // Cards horizontal scroll list
+            SizedBox(
+              height: 340,
+              child: cardsState.when(
+                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+                error: (err, _) => Center(child: Text('Error: $err')),
+                data: (cards) {
+                  return ListView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    children: [
+                      ...cards.map((card) {
+                        return _buildCreditCardItem(context, ref, card);
+                      }),
+                      _buildAddCardButton(context, ref),
+                    ],
+                  );
+                },
               ),
-              TextButton.icon(
-                icon: const Icon(Icons.add, size: 16, color: AppColors.neonTeal),
-                label: const Text('Add Loan', style: TextStyle(color: AppColors.neonTeal, fontSize: 13)),
-                onPressed: () => _showAddLoanDialog(context, ref),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Loans items list
-          Expanded(
-            child: loansState.when(
+            ),
+            const SizedBox(height: 24),
+  
+            // Loans section header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Active Loans & Ledgers',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.add, size: 16, color: AppColors.neonTeal),
+                  label: const Text('Add Loan', style: TextStyle(color: AppColors.neonTeal, fontSize: 13)),
+                  onPressed: () => _showAddLoanDialog(context, ref),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+  
+            // Loans items list
+            loansState.when(
               loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
               error: (err, _) => Center(child: Text('Error: $err')),
               data: (loans) {
                 if (loans.isEmpty) {
                   return const Center(
-                    child: Text('No active loans. Click Add Loan to track!', style: TextStyle(color: AppColors.textMuted)),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text('No active loans. Click Add Loan to track!', style: TextStyle(color: AppColors.textMuted)),
+                    ),
                   );
                 }
                 return ListView.builder(
-                  physics: const BouncingScrollPhysics(),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: loans.length,
                   itemBuilder: (context, index) {
                     final loan = loans[index];
@@ -1338,7 +1343,7 @@ class CardsLoansView extends ConsumerWidget {
                     final String emiInfo = loan.emiAmount > 0
                         ? 'EMI: ₹${loan.emiAmount.toStringAsFixed(0)} (${loan.interestRate}%)'
                         : 'Friendly Loan (${loan.interestRate}%)';
-
+  
                      return Dismissible(
                       key: ValueKey(loan.id),
                       direction: DismissDirection.endToStart,
@@ -1375,8 +1380,8 @@ class CardsLoansView extends ConsumerWidget {
                 );
               },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -2151,105 +2156,107 @@ class CardsLoansView extends ConsumerWidget {
                 blurY: 30,
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        existingLoan != null ? 'Edit Loan / Debt' : 'Track Loan / Debt',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<bool>(
-                        value: isLent,
-                        decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
-                        dropdownColor: AppColors.obsidianSurface,
-                        items: const [
-                          DropdownMenuItem(value: false, child: Text('Borrowed (Debt)')),
-                          DropdownMenuItem(value: true, child: Text('Lent (Receivable)')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) setState(() => isLent = val);
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: contactController,
-                        decoration: const InputDecoration(labelText: 'Contact / Lender Name', border: OutlineInputBorder()),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: amountController,
-                        decoration: const InputDecoration(labelText: 'Amount (INR)', border: OutlineInputBorder()),
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: rateController,
-                              decoration: const InputDecoration(labelText: 'Interest Rate (%)', border: OutlineInputBorder()),
-                              keyboardType: TextInputType.number,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          existingLoan != null ? 'Edit Loan / Debt' : 'Track Loan / Debt',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<bool>(
+                          value: isLent,
+                          decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
+                          dropdownColor: AppColors.obsidianSurface,
+                          items: const [
+                            DropdownMenuItem(value: false, child: Text('Borrowed (Debt)')),
+                            DropdownMenuItem(value: true, child: Text('Lent (Receivable)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => isLent = val);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: contactController,
+                          decoration: const InputDecoration(labelText: 'Contact / Lender Name', border: OutlineInputBorder()),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: amountController,
+                          decoration: const InputDecoration(labelText: 'Amount (INR)', border: OutlineInputBorder()),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: rateController,
+                                decoration: const InputDecoration(labelText: 'Interest Rate (%)', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: emiController,
-                              decoration: const InputDecoration(labelText: 'Monthly EMI (0 if none)', border: OutlineInputBorder()),
-                              keyboardType: TextInputType.number,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: emiController,
+                                decoration: const InputDecoration(labelText: 'Monthly EMI (0 if none)', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
-                            onPressed: () {
-                              final contact = contactController.text.trim();
-                              final amount = double.tryParse(amountController.text) ?? 0.0;
-                              final rate = double.tryParse(rateController.text) ?? 0.0;
-                              final emi = double.tryParse(emiController.text) ?? 0.0;
-
-                              if (contact.isEmpty || amount <= 0) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please enter name and valid amount')),
-                                );
-                                return;
-                              }
-
-                              final loan = existingLoan ?? Loan();
-                              loan.contactName = contact;
-                              loan.isLent = isLent;
-                              loan.amount = amount;
-                              if (existingLoan == null) {
-                                loan.remainingBalance = amount;
-                                loan.startDate = DateTime.now();
-                              } else {
-                                if (existingLoan.amount == existingLoan.remainingBalance) {
-                                  loan.remainingBalance = amount;
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                              onPressed: () {
+                                final contact = contactController.text.trim();
+                                final amount = double.tryParse(amountController.text) ?? 0.0;
+                                final rate = double.tryParse(rateController.text) ?? 0.0;
+                                final emi = double.tryParse(emiController.text) ?? 0.0;
+  
+                                if (contact.isEmpty || amount <= 0) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter name and valid amount')),
+                                  );
+                                  return;
                                 }
-                              }
-                              loan.interestRate = rate;
-                              loan.emiAmount = emi;
-
-                              ref.read(loansProvider.notifier).addLoan(loan);
-                              Navigator.pop(context);
-                            },
-                            child: Text(existingLoan != null ? 'Save Changes' : 'Add Loan'),
-                          ),
-                        ],
-                      )
-                    ],
+  
+                                final loan = existingLoan ?? Loan();
+                                loan.contactName = contact;
+                                loan.isLent = isLent;
+                                loan.amount = amount;
+                                if (existingLoan == null) {
+                                  loan.remainingBalance = amount;
+                                  loan.startDate = DateTime.now();
+                                } else {
+                                  if (existingLoan.amount == existingLoan.remainingBalance) {
+                                    loan.remainingBalance = amount;
+                                  }
+                                }
+                                loan.interestRate = rate;
+                                loan.emiAmount = emi;
+  
+                                ref.read(loansProvider.notifier).addLoan(loan);
+                                Navigator.pop(context);
+                              },
+                              child: Text(existingLoan != null ? 'Save Changes' : 'Add Loan'),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -5303,6 +5310,7 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
