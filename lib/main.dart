@@ -19,9 +19,11 @@ import 'ui/settings/model_download_page.dart';
 import 'ui/chat/model_selector.dart';
 import 'services/model_repository.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:flutter/services.dart';
 import 'core/lock_screen.dart';
 import 'core/sync_service.dart';
 import 'core/animated_gradient_background.dart';
@@ -795,7 +797,7 @@ class CardsLoansView extends ConsumerWidget {
 
           // Cards horizontal scroll list
           SizedBox(
-            height: 190,
+            height: 340,
             child: cardsState.when(
               loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
               error: (err, _) => Center(child: Text('Error: $err')),
@@ -805,17 +807,7 @@ class CardsLoansView extends ConsumerWidget {
                   physics: const BouncingScrollPhysics(),
                   children: [
                     ...cards.map((card) {
-                      final limitStr = '₹${card.balance.toStringAsFixed(0)} / ₹${card.creditLimit.toStringAsFixed(0)}';
-                      final dueSuffix = _getOrdinalSuffix(card.dueDay);
-                      final stmtSuffix = _getOrdinalSuffix(card.statementDay);
-                      return _buildCreditCardItem(
-                        card.cardName,
-                        card.last4,
-                        limitStr,
-                        '${card.statementDay}$stmtSuffix',
-                        '${card.dueDay}$dueSuffix of next month',
-                        AppColors.tealBlueGradient,
-                      );
+                      return _buildCreditCardItem(context, card);
                     }),
                     _buildAddCardButton(context, ref),
                   ],
@@ -922,65 +914,266 @@ class CardsLoansView extends ConsumerWidget {
     }
   }
 
-  Widget _buildCreditCardItem(
-      String cardName, String last4, String spendText, String billDay, String dueText, List<Color> colors) {
-    return Container(
-      width: 300,
-      margin: const EdgeInsets.only(right: 16),
-      child: GlassBlur(
-        borderRadius: 20,
-        child: Container(
+  String _toTitleCase(String text) {
+    if (text.isEmpty) return text;
+    return text.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  String _getMonthName(int day) {
+    final now = DateTime.now();
+    DateTime targetDate = DateTime(now.year, now.month, day);
+    
+    if (now.day > day) {
+      targetDate = DateTime(now.year, now.month + 1, day);
+    }
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[targetDate.month - 1];
+  }
+
+  Widget _buildCreditCardItem(BuildContext context, CreditCard card) {
+    bool showSpent = true; // State for toggle
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Container(
+          width: 220,
+          margin: const EdgeInsets.only(right: 16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [colors[0].withOpacity(0.12), colors[1].withOpacity(0.02)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
+            image: card.imageUrl.isNotEmpty
+                ? DecorationImage(
+                    image: AssetImage('assets/credit_card_images/${card.imageUrl}'),
+                    fit: BoxFit.cover,
+                  )
+                : null,
+            gradient: card.imageUrl.isEmpty
+                ? LinearGradient(
+                    colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.5), // Darker at top for name readability
+                  Colors.transparent,             // Clear in middle to show card artwork
+                  Colors.black.withOpacity(0.2), // Slightly darker at bottom
+                ],
+              ),
+            ),
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Top area: Card Name and secure digits
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _toTitleCase(card.cardName),
+                      style: GoogleFonts.montserrat(
+                        fontSize: 20, 
+                        fontWeight: FontWeight.w800, 
+                        color: Colors.white, 
+                        letterSpacing: 0.5,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () => _authenticateAndShowCardDetails(context, card),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            card.last4.isNotEmpty ? card.last4 : "****",
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 22, 
+                              color: Colors.white, 
+                              fontWeight: FontWeight.bold, 
+                              letterSpacing: 2.0,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.visibility_rounded, color: Colors.white70, size: 24),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                
+                // Bottom area: Spent/Statement Toggle
+                GestureDetector(
+                  onTap: () => setState(() => showSpent = !showSpent),
+                  child: GlassBlur(
+                    borderRadius: 16.0,
+                    blurX: 12.0,
+                    blurY: 12.0,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.swap_horiz_rounded, color: AppColors.neonTeal, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                showSpent ? 'SPENT' : 'STATEMENT',
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 12, 
+                                  color: AppColors.neonTeal, 
+                                  fontWeight: FontWeight.bold, 
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            showSpent ? '₹${card.currentSpendings.toStringAsFixed(0)}' : '₹${card.statementAmount.toStringAsFixed(0)}',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 22, 
+                              fontWeight: FontWeight.w700, 
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            showSpent 
+                                ? '${card.statementDay} ${_getMonthName(card.statementDay)}'
+                                : '${card.dueDay} ${_getMonthName(card.dueDay)}',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 14, 
+                              color: AppColors.textSecondary, 
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        cardName,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '•••• •••• •••• $last4',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                  const Icon(Icons.contactless, color: AppColors.textSecondary, size: 24),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('SPENT / LIMIT', style: TextStyle(fontSize: 9, color: AppColors.textMuted, letterSpacing: 0.8)),
-                  const SizedBox(height: 4),
-                  Text(spendText, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildCardFooter('Statement Day', billDay),
-                  _buildCardFooter('Due Date', dueText),
-                ],
-              ),
-            ],
+        );
+      }
+    );
+  }
+
+  Future<void> _authenticateAndShowCardDetails(BuildContext context, CreditCard card) async {
+    final LocalAuthentication auth = LocalAuthentication();
+    try {
+      final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
+      final bool canAuthenticate = canAuthenticateWithBiometrics || await auth.isDeviceSupported();
+      
+      if (!canAuthenticate) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Biometric auth not available')));
+        return;
+      }
+      
+      final bool didAuthenticate = await auth.authenticate(
+        localizedReason: 'Authenticate to view secure card details',
+        options: const AuthenticationOptions(biometricOnly: true),
+      );
+      
+      if (didAuthenticate) {
+        if (!context.mounted) return;
+        _showSecureCardBottomSheet(context, card);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Auth error: $e')));
+      }
+    }
+  }
+
+  void _showSecureCardBottomSheet(BuildContext context, CreditCard card) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return GlassBlur(
+          borderRadius: 24,
+          blurX: 30,
+          blurY: 30,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.obsidianSurface.withOpacity(0.7),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: const Border(top: BorderSide(color: AppColors.glassBorder, width: 1)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Secure Card Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 24),
+                _buildSecureField(context, 'Card Number', card.fullCardNumber, true),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(child: _buildSecureField(context, 'Expiry Date', card.expiryDate, false)),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildSecureField(context, 'CVV', card.cvv, false)),
+                  ],
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSecureField(BuildContext context, String label, String value, bool copyable) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                value.isEmpty ? 'Not set' : value,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500, letterSpacing: 2),
+              ),
+            ),
+            if (copyable && value.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.copy, color: AppColors.neonTeal, size: 20),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: value));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard'), backgroundColor: AppColors.neonTeal));
+                },
+              ),
+          ],
         ),
-      ),
+      ],
     );
   }
 
@@ -997,7 +1190,7 @@ class CardsLoansView extends ConsumerWidget {
 
   Widget _buildAddCardButton(BuildContext context, WidgetRef ref) {
     return Container(
-      width: 150,
+      width: 220,
       margin: const EdgeInsets.only(right: 16),
       child: GestureDetector(
         onTap: () => _showAddCardDialog(context, ref),
@@ -1049,148 +1242,248 @@ class CardsLoansView extends ConsumerWidget {
 
   void _showAddCardDialog(BuildContext context, WidgetRef ref) {
     final nameController = TextEditingController();
-    final limitController = TextEditingController();
     final last4Controller = TextEditingController();
     final stmtDayController = TextEditingController(text: '15');
     final dueDayController = TextEditingController(text: '5');
-    final balanceController = TextEditingController(text: '0');
+    
+    // Secure Fields
+    final fullCardNumberController = TextEditingController();
+    final expiryDateController = TextEditingController();
+    final cvvController = TextEditingController();
+    
+    // Financial metrics for card
+    final currentSpendingsController = TextEditingController(text: '0');
+    final statementAmountController = TextEditingController(text: '0');
+
+    String selectedBrand = 'Visa';
+    String selectedImage = '';
+    
+    final imageOptions = [
+      '',
+      'IDFC_Millennia_HQ.avif',
+      'LIC_Axis_Cropped_Vector.svg',
+      'SBI_SimplySave_Mobile.avif',
+      'Scapia_Rupay.avif',
+      'Scapia_Visa.avif',
+      'Tata_NeuCard_FullFrame.avif',
+      'UNI_YesBank_Vertical.avif',
+      'hsbc_vertical_card_final.avif'
+    ];
 
     showDialog(
       context: context,
       builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: GlassBlur(
-            borderRadius: 24,
-            blurX: 30,
-            blurY: 30,
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: GlassBlur(
+                borderRadius: 24,
+                blurX: 30,
+                blurY: 30,
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            'Register Credit Card',
-                            style: Theme.of(context).textTheme.titleLarge,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton.icon(
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.neonTeal,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          ),
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => NfcScanDialog(
-                                nameController: nameController,
-                                last4Controller: last4Controller,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Register Credit Card',
+                                style: Theme.of(context).textTheme.titleLarge,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            );
-                          },
-                          icon: const Icon(Icons.nfc_rounded, size: 18),
-                          label: const Text('Scan', style: TextStyle(fontSize: 13)),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.neonTeal,
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              ),
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => NfcScanDialog(
+                                    nameController: nameController,
+                                    last4Controller: last4Controller,
+                                    fullCardNumberController: fullCardNumberController,
+                                    expiryDateController: expiryDateController,
+                                    onBrandDetected: (brand) {
+                                      setState(() => selectedBrand = brand);
+                                    },
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.nfc_rounded, size: 18),
+                              label: const Text('Scan', style: TextStyle(fontSize: 13)),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: nameController,
+                          decoration: const InputDecoration(labelText: 'Card Name (e.g. HDFC Regalia)', border: OutlineInputBorder()),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextField(
+                                controller: fullCardNumberController,
+                                decoration: const InputDecoration(labelText: 'Full Card Number', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                                onChanged: (val) {
+                                  if (val.length >= 4) {
+                                    last4Controller.text = val.substring(val.length - 4);
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 1,
+                              child: TextField(
+                                controller: last4Controller,
+                                decoration: const InputDecoration(labelText: 'Last 4', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                                maxLength: 4,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: expiryDateController,
+                                decoration: const InputDecoration(labelText: 'Expiry (MM/YY)', border: OutlineInputBorder()),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: cvvController,
+                                decoration: const InputDecoration(labelText: 'CVV', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                                obscureText: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: selectedBrand,
+                          decoration: const InputDecoration(labelText: 'Brand', border: OutlineInputBorder()),
+                          items: ['Visa', 'Mastercard', 'RuPay', 'Amex'].map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+                          onChanged: (val) => setState(() => selectedBrand = val!),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: selectedImage,
+                          decoration: const InputDecoration(labelText: 'Card Background Image', border: OutlineInputBorder()),
+                          isExpanded: true,
+                          items: imageOptions.map((i) => DropdownMenuItem(value: i, child: Text(i.isEmpty ? 'None' : i, overflow: TextOverflow.ellipsis))).toList(),
+                          onChanged: (val) => setState(() => selectedImage = val!),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: currentSpendingsController,
+                                decoration: const InputDecoration(labelText: 'Current Spendings', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: statementAmountController,
+                                decoration: const InputDecoration(labelText: 'Statement Amount', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: stmtDayController,
+                                decoration: const InputDecoration(labelText: 'Statement Day (1-28)', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: dueDayController,
+                                decoration: const InputDecoration(labelText: 'Due Day (1-28)', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                              onPressed: () {
+                                final name = nameController.text.trim();
+                                final last4 = last4Controller.text.trim();
+                                final stmt = int.tryParse(stmtDayController.text) ?? 15;
+                                final due = int.tryParse(dueDayController.text) ?? 5;
+                                final curSp = double.tryParse(currentSpendingsController.text) ?? 0.0;
+                                final stmAm = double.tryParse(statementAmountController.text) ?? 0.0;
+
+                                if (name.isEmpty || last4.length != 4) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please fill Name and Last 4 digits accurately')),
+                                  );
+                                  return;
+                                }
+
+                                final card = CreditCard()
+                                  ..cardName = name
+                                  ..last4 = last4
+                                  ..statementDay = stmt
+                                  ..dueDay = due
+                                  ..fullCardNumber = fullCardNumberController.text.trim()
+                                  ..expiryDate = expiryDateController.text.trim()
+                                  ..cvv = cvvController.text.trim()
+                                  ..brand = selectedBrand
+                                  ..imageUrl = selectedImage
+                                  ..currentSpendings = curSp
+                                  ..statementAmount = stmAm;
+
+                                ref.read(creditCardsProvider.notifier).addCreditCard(card);
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Add Card'),
+                            ),
+                          ],
+                        )
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Card Name (e.g. HDFC Regalia)', border: OutlineInputBorder()),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: last4Controller,
-                      decoration: const InputDecoration(labelText: 'Last 4 digits', border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                      maxLength: 4,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: limitController,
-                      decoration: const InputDecoration(labelText: 'Credit Limit (INR)', border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: balanceController,
-                      decoration: const InputDecoration(labelText: 'Current Outstanding Balance (INR)', border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: stmtDayController,
-                            decoration: const InputDecoration(labelText: 'Statement Day (1-28)', border: OutlineInputBorder()),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: dueDayController,
-                            decoration: const InputDecoration(labelText: 'Due Day (1-28)', border: OutlineInputBorder()),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
-                          onPressed: () {
-                            final name = nameController.text.trim();
-                            final limit = double.tryParse(limitController.text) ?? 0.0;
-                            final last4 = last4Controller.text.trim();
-                            final balance = double.tryParse(balanceController.text) ?? 0.0;
-                            final stmt = int.tryParse(stmtDayController.text) ?? 15;
-                            final due = int.tryParse(dueDayController.text) ?? 5;
-
-                            if (name.isEmpty || limit <= 0 || last4.length != 4) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please fill all fields accurately')),
-                              );
-                              return;
-                            }
-
-                            final card = CreditCard()
-                              ..cardName = name
-                              ..last4 = last4
-                              ..creditLimit = limit
-                              ..balance = balance
-                              ..statementDay = stmt
-                              ..dueDay = due;
-
-                            ref.read(creditCardsProvider.notifier).addCreditCard(card);
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Add Card'),
-                        ),
-                      ],
-                    )
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          }
         );
       },
     );

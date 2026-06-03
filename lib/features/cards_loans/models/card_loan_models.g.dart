@@ -28,28 +28,63 @@ const CreditCardSchema = CollectionSchema(
       name: r'balance',
       type: IsarType.double,
     ),
-    r'cardName': PropertySchema(
+    r'brand': PropertySchema(
       id: 2,
+      name: r'brand',
+      type: IsarType.string,
+    ),
+    r'cardName': PropertySchema(
+      id: 3,
       name: r'cardName',
       type: IsarType.string,
     ),
     r'creditLimit': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'creditLimit',
       type: IsarType.double,
     ),
+    r'currentSpendings': PropertySchema(
+      id: 5,
+      name: r'currentSpendings',
+      type: IsarType.double,
+    ),
+    r'cvv': PropertySchema(
+      id: 6,
+      name: r'cvv',
+      type: IsarType.string,
+    ),
     r'dueDay': PropertySchema(
-      id: 4,
+      id: 7,
       name: r'dueDay',
       type: IsarType.long,
     ),
+    r'expiryDate': PropertySchema(
+      id: 8,
+      name: r'expiryDate',
+      type: IsarType.string,
+    ),
+    r'fullCardNumber': PropertySchema(
+      id: 9,
+      name: r'fullCardNumber',
+      type: IsarType.string,
+    ),
+    r'imageUrl': PropertySchema(
+      id: 10,
+      name: r'imageUrl',
+      type: IsarType.string,
+    ),
     r'last4': PropertySchema(
-      id: 5,
+      id: 11,
       name: r'last4',
       type: IsarType.string,
     ),
+    r'statementAmount': PropertySchema(
+      id: 12,
+      name: r'statementAmount',
+      type: IsarType.double,
+    ),
     r'statementDay': PropertySchema(
-      id: 6,
+      id: 13,
       name: r'statementDay',
       type: IsarType.long,
     )
@@ -83,7 +118,12 @@ int _creditCardEstimateSize(
           CreditCardEmiSchema.estimateSize(value, offsets, allOffsets);
     }
   }
+  bytesCount += 3 + object.brand.length * 3;
   bytesCount += 3 + object.cardName.length * 3;
+  bytesCount += 3 + object.cvv.length * 3;
+  bytesCount += 3 + object.expiryDate.length * 3;
+  bytesCount += 3 + object.fullCardNumber.length * 3;
+  bytesCount += 3 + object.imageUrl.length * 3;
   bytesCount += 3 + object.last4.length * 3;
   return bytesCount;
 }
@@ -101,11 +141,18 @@ void _creditCardSerialize(
     object.activeEmis,
   );
   writer.writeDouble(offsets[1], object.balance);
-  writer.writeString(offsets[2], object.cardName);
-  writer.writeDouble(offsets[3], object.creditLimit);
-  writer.writeLong(offsets[4], object.dueDay);
-  writer.writeString(offsets[5], object.last4);
-  writer.writeLong(offsets[6], object.statementDay);
+  writer.writeString(offsets[2], object.brand);
+  writer.writeString(offsets[3], object.cardName);
+  writer.writeDouble(offsets[4], object.creditLimit);
+  writer.writeDouble(offsets[5], object.currentSpendings);
+  writer.writeString(offsets[6], object.cvv);
+  writer.writeLong(offsets[7], object.dueDay);
+  writer.writeString(offsets[8], object.expiryDate);
+  writer.writeString(offsets[9], object.fullCardNumber);
+  writer.writeString(offsets[10], object.imageUrl);
+  writer.writeString(offsets[11], object.last4);
+  writer.writeDouble(offsets[12], object.statementAmount);
+  writer.writeLong(offsets[13], object.statementDay);
 }
 
 CreditCard _creditCardDeserialize(
@@ -123,12 +170,19 @@ CreditCard _creditCardDeserialize(
       ) ??
       [];
   object.balance = reader.readDouble(offsets[1]);
-  object.cardName = reader.readString(offsets[2]);
-  object.creditLimit = reader.readDouble(offsets[3]);
-  object.dueDay = reader.readLong(offsets[4]);
+  object.brand = reader.readString(offsets[2]);
+  object.cardName = reader.readString(offsets[3]);
+  object.creditLimit = reader.readDouble(offsets[4]);
+  object.currentSpendings = reader.readDouble(offsets[5]);
+  object.cvv = reader.readString(offsets[6]);
+  object.dueDay = reader.readLong(offsets[7]);
+  object.expiryDate = reader.readString(offsets[8]);
+  object.fullCardNumber = reader.readString(offsets[9]);
   object.id = id;
-  object.last4 = reader.readString(offsets[5]);
-  object.statementDay = reader.readLong(offsets[6]);
+  object.imageUrl = reader.readString(offsets[10]);
+  object.last4 = reader.readString(offsets[11]);
+  object.statementAmount = reader.readDouble(offsets[12]);
+  object.statementDay = reader.readLong(offsets[13]);
   return object;
 }
 
@@ -152,12 +206,26 @@ P _creditCardDeserializeProp<P>(
     case 2:
       return (reader.readString(offset)) as P;
     case 3:
-      return (reader.readDouble(offset)) as P;
-    case 4:
-      return (reader.readLong(offset)) as P;
-    case 5:
       return (reader.readString(offset)) as P;
+    case 4:
+      return (reader.readDouble(offset)) as P;
+    case 5:
+      return (reader.readDouble(offset)) as P;
     case 6:
+      return (reader.readString(offset)) as P;
+    case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
+      return (reader.readString(offset)) as P;
+    case 10:
+      return (reader.readString(offset)) as P;
+    case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
+      return (reader.readDouble(offset)) as P;
+    case 13:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -407,6 +475,137 @@ extension CreditCardQueryFilter
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> brandEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'brand',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> brandGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'brand',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> brandLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'brand',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> brandBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'brand',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> brandStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'brand',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> brandEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'brand',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> brandContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'brand',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> brandMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'brand',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> brandIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'brand',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      brandIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'brand',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cardNameEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -607,6 +806,202 @@ extension CreditCardQueryFilter
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      currentSpendingsEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'currentSpendings',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      currentSpendingsGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'currentSpendings',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      currentSpendingsLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'currentSpendings',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      currentSpendingsBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'currentSpendings',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cvv',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cvv',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cvv',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cvv',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'cvv',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'cvv',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'cvv',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'cvv',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cvv',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> cvvIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'cvv',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> dueDayEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -660,6 +1055,277 @@ extension CreditCardQueryFilter
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> expiryDateEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'expiryDate',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      expiryDateGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'expiryDate',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      expiryDateLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'expiryDate',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> expiryDateBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'expiryDate',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      expiryDateStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'expiryDate',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      expiryDateEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'expiryDate',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      expiryDateContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'expiryDate',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> expiryDateMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'expiryDate',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      expiryDateIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'expiryDate',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      expiryDateIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'expiryDate',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'fullCardNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'fullCardNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'fullCardNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'fullCardNumber',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'fullCardNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'fullCardNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'fullCardNumber',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'fullCardNumber',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'fullCardNumber',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      fullCardNumberIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'fullCardNumber',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> idEqualTo(
       Id value) {
     return QueryBuilder.apply(this, (query) {
@@ -709,6 +1375,140 @@ extension CreditCardQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> imageUrlEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      imageUrlGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'imageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> imageUrlLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'imageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> imageUrlBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'imageUrl',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      imageUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'imageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> imageUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'imageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> imageUrlContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'imageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition> imageUrlMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'imageUrl',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      imageUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imageUrl',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      imageUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'imageUrl',
+        value: '',
       ));
     });
   }
@@ -845,6 +1645,72 @@ extension CreditCardQueryFilter
   }
 
   QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      statementAmountEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'statementAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      statementAmountGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'statementAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      statementAmountLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'statementAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
+      statementAmountBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'statementAmount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterFilterCondition>
       statementDayEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -928,6 +1794,18 @@ extension CreditCardQuerySortBy
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByBrand() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'brand', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByBrandDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'brand', Sort.desc);
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByCardName() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'cardName', Sort.asc);
@@ -952,6 +1830,31 @@ extension CreditCardQuerySortBy
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByCurrentSpendings() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currentSpendings', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy>
+      sortByCurrentSpendingsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currentSpendings', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByCvv() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cvv', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByCvvDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cvv', Sort.desc);
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByDueDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dueDay', Sort.asc);
@@ -964,6 +1867,43 @@ extension CreditCardQuerySortBy
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByExpiryDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'expiryDate', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByExpiryDateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'expiryDate', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByFullCardNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fullCardNumber', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy>
+      sortByFullCardNumberDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fullCardNumber', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByImageUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imageUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByImageUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imageUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByLast4() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'last4', Sort.asc);
@@ -973,6 +1913,19 @@ extension CreditCardQuerySortBy
   QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByLast4Desc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'last4', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> sortByStatementAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'statementAmount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy>
+      sortByStatementAmountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'statementAmount', Sort.desc);
     });
   }
 
@@ -1003,6 +1956,18 @@ extension CreditCardQuerySortThenBy
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByBrand() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'brand', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByBrandDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'brand', Sort.desc);
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByCardName() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'cardName', Sort.asc);
@@ -1027,6 +1992,31 @@ extension CreditCardQuerySortThenBy
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByCurrentSpendings() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currentSpendings', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy>
+      thenByCurrentSpendingsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'currentSpendings', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByCvv() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cvv', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByCvvDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cvv', Sort.desc);
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByDueDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dueDay', Sort.asc);
@@ -1036,6 +2026,31 @@ extension CreditCardQuerySortThenBy
   QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByDueDayDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dueDay', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByExpiryDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'expiryDate', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByExpiryDateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'expiryDate', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByFullCardNumber() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fullCardNumber', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy>
+      thenByFullCardNumberDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'fullCardNumber', Sort.desc);
     });
   }
 
@@ -1051,6 +2066,18 @@ extension CreditCardQuerySortThenBy
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByImageUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imageUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByImageUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imageUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByLast4() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'last4', Sort.asc);
@@ -1060,6 +2087,19 @@ extension CreditCardQuerySortThenBy
   QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByLast4Desc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'last4', Sort.desc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy> thenByStatementAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'statementAmount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QAfterSortBy>
+      thenByStatementAmountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'statementAmount', Sort.desc);
     });
   }
 
@@ -1084,6 +2124,13 @@ extension CreditCardQueryWhereDistinct
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QDistinct> distinctByBrand(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'brand', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QDistinct> distinctByCardName(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1097,9 +2144,44 @@ extension CreditCardQueryWhereDistinct
     });
   }
 
+  QueryBuilder<CreditCard, CreditCard, QDistinct> distinctByCurrentSpendings() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'currentSpendings');
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QDistinct> distinctByCvv(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'cvv', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<CreditCard, CreditCard, QDistinct> distinctByDueDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'dueDay');
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QDistinct> distinctByExpiryDate(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'expiryDate', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QDistinct> distinctByFullCardNumber(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'fullCardNumber',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QDistinct> distinctByImageUrl(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'imageUrl', caseSensitive: caseSensitive);
     });
   }
 
@@ -1107,6 +2189,12 @@ extension CreditCardQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'last4', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<CreditCard, CreditCard, QDistinct> distinctByStatementAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'statementAmount');
     });
   }
 
@@ -1138,6 +2226,12 @@ extension CreditCardQueryProperty
     });
   }
 
+  QueryBuilder<CreditCard, String, QQueryOperations> brandProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'brand');
+    });
+  }
+
   QueryBuilder<CreditCard, String, QQueryOperations> cardNameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'cardName');
@@ -1150,15 +2244,52 @@ extension CreditCardQueryProperty
     });
   }
 
+  QueryBuilder<CreditCard, double, QQueryOperations>
+      currentSpendingsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'currentSpendings');
+    });
+  }
+
+  QueryBuilder<CreditCard, String, QQueryOperations> cvvProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'cvv');
+    });
+  }
+
   QueryBuilder<CreditCard, int, QQueryOperations> dueDayProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'dueDay');
     });
   }
 
+  QueryBuilder<CreditCard, String, QQueryOperations> expiryDateProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'expiryDate');
+    });
+  }
+
+  QueryBuilder<CreditCard, String, QQueryOperations> fullCardNumberProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'fullCardNumber');
+    });
+  }
+
+  QueryBuilder<CreditCard, String, QQueryOperations> imageUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'imageUrl');
+    });
+  }
+
   QueryBuilder<CreditCard, String, QQueryOperations> last4Property() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'last4');
+    });
+  }
+
+  QueryBuilder<CreditCard, double, QQueryOperations> statementAmountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'statementAmount');
     });
   }
 

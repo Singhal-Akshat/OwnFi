@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="944" height="1558" viewBox="0 0 944 1558">
+<defs>
+  <radialGradient id="bg" cx="28%" cy="40%">
+    <stop offset="0%" stop-color="#8f0062"/>
+    <stop offset="100%" stop-color="#2b002e"/>
+  </radialGradient>
+  <linearGradient id="chip" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#f5e18b"/>
+    <stop offset="100%" stop-color="#d6af3f"/>
+  </linearGradient>
+</defs>
+
+<rect x="0" y="0" width="944" height="1558" rx="40" fill="url(#bg)"/>
+
+<text x="40" y="110" fill="white" font-size="86" font-family="Arial">LIC</text>
+<text x="40" y="170" fill="white" font-size="48" font-family="Arial">CARDS</text>
+
+<text x="610" y="120" fill="white" font-size="38" font-family="Arial">AXIS BANK</text>
+
+<rect x="400" y="360" width="160" height="130" rx="16" fill="url(#chip)"/>
+<path d="M760 390 q20 25 0 50 M790 370 q35 45 0 90 M825 345 q50 70 0 140"
+      fill="none" stroke="white" stroke-width="10" stroke-linecap="round"/>
+
+<path d="M150 1020 C260 900,420 960,430 820 C440 700,360 760,460 520
+         C560 760,470 700,500 840 C520 950,680 930,740 1010
+         C650 1090,360 1100,150 1020 Z"
+      fill="#aa006f" opacity="0.45"/>
+
+<text transform="rotate(-90 70 1260)" x="70" y="1260"
+      fill="white" font-size="32" font-family="Arial">Credit Card</text>
+
+<text x="230" y="1290" fill="white" font-size="28">VALID</text>
+<text x="230" y="1325" fill="white" font-size="28">FROM</text>
+
+<text x="560" y="1290" fill="white" font-size="28">VALID</text>
+<text x="560" y="1325" fill="white" font-size="28">THRU</text>
+
+<text x="530" y="1460" fill="white" font-size="120" font-weight="bold">VISA</text>
+<text x="650" y="1515" fill="white" font-size="42">Signature</text>
+</svg>

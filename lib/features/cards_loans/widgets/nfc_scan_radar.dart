@@ -6,11 +6,17 @@ import '../services/nfc_card_reader_service.dart';
 class NfcScanDialog extends StatefulWidget {
   final TextEditingController nameController;
   final TextEditingController last4Controller;
+  final TextEditingController fullCardNumberController;
+  final TextEditingController expiryDateController;
+  final Function(String)? onBrandDetected;
 
   const NfcScanDialog({
     super.key,
     required this.nameController,
     required this.last4Controller,
+    required this.fullCardNumberController,
+    required this.expiryDateController,
+    this.onBrandDetected,
   });
 
   @override
@@ -60,6 +66,9 @@ class _NfcScanDialogState extends State<NfcScanDialog> with SingleTickerProvider
         // Pre-fill controllers
         widget.nameController.text = card.cardName;
         widget.last4Controller.text = card.last4;
+        widget.fullCardNumberController.text = card.fullCardNumber;
+        widget.expiryDateController.text = card.expiry;
+        if (widget.onBrandDetected != null) widget.onBrandDetected!(card.cardBrand);
 
         // Automatically close after a delay
         Future.delayed(const Duration(milliseconds: 1500), () {
@@ -96,6 +105,9 @@ class _NfcScanDialogState extends State<NfcScanDialog> with SingleTickerProvider
       // Pre-fill controllers
       widget.nameController.text = card.cardName;
       widget.last4Controller.text = card.last4;
+      widget.fullCardNumberController.text = card.fullCardNumber;
+      widget.expiryDateController.text = card.expiry;
+      if (widget.onBrandDetected != null) widget.onBrandDetected!(card.cardBrand);
 
       // Automatically close after a delay
       Future.delayed(const Duration(milliseconds: 1500), () {

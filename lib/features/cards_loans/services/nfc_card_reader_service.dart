@@ -6,12 +6,14 @@ import 'package:nfc_manager/platform_tags.dart';
 
 class ScannedCard {
   final String cardName;
+  final String fullCardNumber;
   final String last4;
   final String expiry; // MM/YY
   final String cardBrand; // Visa, Mastercard, Amex, RuPay, Unknown
 
   ScannedCard({
     required this.cardName,
+    required this.fullCardNumber,
     required this.last4,
     required this.expiry,
     required this.cardBrand,
@@ -248,6 +250,7 @@ class NfcCardReaderService {
       
       return ScannedCard(
         cardName: displayName,
+        fullCardNumber: pan,
         last4: last4Digits,
         expiry: expiry ?? '12/30', // Default backup expiry
         cardBrand: brand,
@@ -283,11 +286,11 @@ class NfcCardReaderService {
 
     // List of premium cards to cycle in simulation
     final mockCards = [
-      ScannedCard(cardName: 'HDFC Regalia Gold', last4: '4392', expiry: '09/29', cardBrand: 'Visa'),
-      ScannedCard(cardName: 'ICICI Rubyx MC', last4: '8720', expiry: '11/30', cardBrand: 'Mastercard'),
-      ScannedCard(cardName: 'SBI Card Prime', last4: '1903', expiry: '04/28', cardBrand: 'Visa'),
-      ScannedCard(cardName: 'Amex Platinum Travel', last4: '2005', expiry: '07/31', cardBrand: 'Amex'),
-      ScannedCard(cardName: 'BOI RuPay Select', last4: '5541', expiry: '12/29', cardBrand: 'RuPay'),
+      ScannedCard(cardName: 'HDFC Regalia Gold', fullCardNumber: '4392000000004392', last4: '4392', expiry: '09/29', cardBrand: 'Visa'),
+      ScannedCard(cardName: 'ICICI Rubyx MC', fullCardNumber: '5222000000008720', last4: '8720', expiry: '11/30', cardBrand: 'Mastercard'),
+      ScannedCard(cardName: 'SBI Card Prime', fullCardNumber: '4111000000001903', last4: '1903', expiry: '04/28', cardBrand: 'Visa'),
+      ScannedCard(cardName: 'Amex Platinum Travel', fullCardNumber: '340000000002005', last4: '2005', expiry: '07/31', cardBrand: 'Amex'),
+      ScannedCard(cardName: 'BOI RuPay Select', fullCardNumber: '6000000000005541', last4: '5541', expiry: '12/29', cardBrand: 'RuPay'),
     ];
 
     // Pick a card randomly

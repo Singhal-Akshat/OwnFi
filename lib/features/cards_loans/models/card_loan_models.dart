@@ -13,6 +13,15 @@ class CreditCard {
   int dueDay = 5;
   double balance = 0.0;
 
+  String fullCardNumber = '';
+  String expiryDate = '';
+  String cvv = '';
+  String brand = '';
+  String imageUrl = '';
+
+  double currentSpendings = 0.0;
+  double statementAmount = 0.0;
+
   List<CreditCardEmi> activeEmis = [];
 }
 
