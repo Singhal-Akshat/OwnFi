@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  disk_space_2
   flutter_gemma
   flutter_secure_storage_windows
   isar_flutter_libs

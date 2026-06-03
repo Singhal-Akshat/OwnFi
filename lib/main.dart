@@ -16,6 +16,8 @@ import 'features/advisor/services/quant_forecast_service.dart';
 import 'features/advisor/services/ai_advisor_service.dart';
 import 'features/advisor/providers/advisor_providers.dart';
 import 'ui/settings/model_download_page.dart';
+import 'ui/chat/model_selector.dart';
+import 'services/model_repository.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 
 import 'package:google_generative_ai/google_generative_ai.dart';
@@ -24,6 +26,8 @@ import 'core/lock_screen.dart';
 import 'core/sync_service.dart';
 import 'core/animated_gradient_background.dart';
 import 'features/cards_loans/widgets/nfc_scan_radar.dart';
+import 'ui/onboarding/model_onboarding.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -94,6 +98,24 @@ class MainNavigationShell extends StatefulWidget {
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkOnboarding();
+    });
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeen = prefs.getBool('hasSeenModelOnboarding') ?? false;
+    if (!hasSeen) {
+      await prefs.setBool('hasSeenModelOnboarding', true);
+      if (!mounted) return;
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ModelOnboardingScreen()));
+    }
+  }
 
   final List<Widget> _screens = const [
     DashboardView(),
@@ -1949,16 +1971,23 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
     final useLocalStr = await const FlutterSecureStorage().read(key: 'ai_use_local');
     final useLocal = useLocalStr == 'true';
     if (useLocal) {
-        // Local LLM via FlutterGemma is enabled.
-        return 'Flutter Gemma Local Model';
+      final prefs = await SharedPreferences.getInstance();
+      final selectedId = prefs.getString('selectedModelId') ?? 'gemma2_turbo_2b';
+      final meta = await ModelRepository.instance.getMeta(selectedId);
+      if (meta != null) {
+        final localPath = await ModelRepository.instance.localModelPath(meta.assetPath);
+        if (await File(localPath).exists()) {
+          return 'Local LLM: ${meta.displayName}';
+        }
+      }
+      return 'Local LLM (No downloaded model, using Quant Fallback)';
     }
-    final host = await const FlutterSecureStorage().read(key: 'ai_ollama_host') ?? 'http://localhost:11434';
-    return 'Ollama Local Host ($host)';
     final geminiKey = await const FlutterSecureStorage().read(key: 'ai_gemini_key');
     if (geminiKey != null && geminiKey.isNotEmpty) {
       return 'Gemini Cloud API (Online)';
     }
-    return 'Offline Rule-based Quant Advisor';
+    final host = await const FlutterSecureStorage().read(key: 'ai_ollama_host') ?? 'http://localhost:11434';
+    return 'Ollama Local Host ($host)';
   }
 
   Widget _buildQuantDashboard(BuildContext context) {
@@ -2113,6 +2142,7 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
           future: _getActiveEngineStatus(),
           builder: (context, snapshot) {
             final engine = snapshot.data ?? 'Checking active engine...';
+            final isLocal = engine.contains('Local LLM');
             return Container(
               margin: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -2140,6 +2170,19 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (isLocal) ...[
+                    const SizedBox(width: 8),
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        canvasColor: Colors.grey[900],
+                      ),
+                      child: ModelSelector(
+                        onChanged: () {
+                          setState(() {});
+                        },
+                      ),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -2473,6 +2516,13 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   subtitle: const Text('Configure personal Gemini or OpenAI keys', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   trailing: const Icon(Icons.api_rounded, size: 20, color: AppColors.textSecondary),
                   onTap: () => _showApiKeysDialog(context),
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
+                  title: const Text('HuggingFace Token', style: TextStyle(fontSize: 14)),
+                  subtitle: const Text('Configure HuggingFace access token for gated models', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.key_rounded, size: 20, color: AppColors.textSecondary),
+                  onTap: () => _showHuggingFaceDialog(context),
                 ),
               ],
             ),
@@ -2907,6 +2957,63 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               ),
             );
           },
+        );
+      },
+    );
+  }
+
+  void _showHuggingFaceDialog(BuildContext context) {
+    final tokenController = TextEditingController();
+    _storage.read(key: 'huggingface_token').then((val) => tokenController.text = val ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassBlur(
+            borderRadius: 24,
+            blurX: 30,
+            blurY: 30,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('HuggingFace Token', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  const Text('Enter your HuggingFace API key to download gated models.', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: tokenController,
+                    decoration: const InputDecoration(labelText: 'HuggingFace Token', border: OutlineInputBorder()),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                        onPressed: () async {
+                          await _storage.write(key: 'huggingface_token', value: tokenController.text.trim());
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('HuggingFace Token saved.')));
+                        },
+                        child: const Text('Save Token'),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
         );
       },
     );

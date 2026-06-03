@@ -41,9 +41,24 @@ class AiAdvisorService {
     required String sanitizedProfile,
     required QuantForecastResult forecast,
   }) async {
+    final useLocalStr = await _storage.read(key: 'ai_use_local') ?? 'false';
+    if (useLocalStr != 'true') {
+      return _generateRuleBasedResponse(userQuery, forecast);
+    }
+
     // Determine which model to use.
     final modelId = await _getSelectedModelId();
-    final modelPath = await _resolveModelPath(modelId);
+    final meta = await ModelRepository.instance.getMeta(modelId);
+    if (meta == null) {
+      return _generateRuleBasedResponse(userQuery, forecast);
+    }
+
+    final modelPath = await ModelRepository.instance.localModelPath(meta.assetPath);
+    final file = File(modelPath);
+    if (!await file.exists()) {
+      return _generateRuleBasedResponse(userQuery, forecast);
+    }
+
     final systemInstruction =
         "You are a professional wealth advisor and financial analyst. "
         "Answer the user's financial questions based on their sanitized profile. "

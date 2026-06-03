@@ -67,6 +67,7 @@ dependencies:
   file_picker: ^11.0.2
   flutter_gemma: ^0.13.6
   shared_preferences: ^2.5.5
+  disk_space_2: ^1.0.12
 
 dev_dependencies:
   flutter_test:

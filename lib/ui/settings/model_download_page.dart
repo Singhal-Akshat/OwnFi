@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:disk_space_2/disk_space_2.dart';
 import '../../services/model_repository.dart';
 import '../../services/model_downloader.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 /// Settings page that lists available models and lets the user download/delete them.
@@ -19,6 +19,7 @@ class _ModelDownloadPageState extends State<ModelDownloadPage> {
   List<ModelMeta> _largeModels = [];
   bool _isLoading = true;
   int _freeMb = 0;
+
 
   @override
   void initState() {
@@ -40,10 +41,15 @@ class _ModelDownloadPageState extends State<ModelDownloadPage> {
   }
 
   Future<int> _freeStorageMb() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final used = await _directorySize(dir) ~/ (1024 * 1024);
-    const total = 8 * 1024; // 8 GB assumed total.
-    return total - used;
+    try {
+      final freeSpaceMb = await DiskSpace.getFreeDiskSpace;
+      if (freeSpaceMb != null) {
+        return freeSpaceMb.toInt();
+      }
+    } catch (e) {
+      debugPrint('Failed to get disk space: $e');
+    }
+    return 8000;
   }
 
   Future<int> _directorySize(Directory dir) async {
@@ -64,9 +70,45 @@ class _ModelDownloadPageState extends State<ModelDownloadPage> {
       future: _isDownloaded(meta),
       builder: (ctx, snap) {
         final downloaded = snap.data ?? false;
+        final progressNotifier = ModelDownloader.instance.activeDownloads[meta.id];
+        
         return ListTile(
           title: Text(meta.displayName),
-          subtitle: Text('\${meta.sizeMb} MB'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${meta.sizeMb} MB'),
+              if (progressNotifier != null)
+                ValueListenableBuilder<double>(
+                  valueListenable: progressNotifier,
+                  builder: (ctx, progress, child) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12.0, bottom: 4.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 12,
+                                backgroundColor: Colors.grey.withOpacity(0.3),
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            '${(progress * 100).toStringAsFixed(1)}%',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
           trailing: downloaded
               ? TextButton(
                   onPressed: () async {
@@ -76,11 +118,27 @@ class _ModelDownloadPageState extends State<ModelDownloadPage> {
                   child: const Text('Delete'),
                 )
               : ElevatedButton(
-                  onPressed: () async {
-                    await ModelDownloader.instance.downloadModel(context, meta);
-                    _loadData();
-                  },
-                  child: const Text('Download'),
+                  onPressed: progressNotifier != null 
+                    ? () {
+                        // User clicked cancel
+                        ModelDownloader.instance.activeCancelTokens[meta.id]?.cancel();
+                        setState(() {});
+                      } 
+                    : () async {
+                        // Start the download
+                        ModelDownloader.instance.downloadModel(context, meta).then((_) {
+                          _loadData();
+                        });
+                        // Rebuild to show the progress bar immediately
+                        setState(() {});
+                      },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: progressNotifier != null ? Colors.redAccent : null,
+                  ),
+                  child: Text(
+                    progressNotifier != null ? 'Cancel' : 'Download',
+                    style: TextStyle(color: progressNotifier != null ? Colors.white : null),
+                  ),
                 ),
         );
       },
@@ -98,7 +156,7 @@ class _ModelDownloadPageState extends State<ModelDownloadPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Free storage: \${_freeMb} MB'),
+                  Text('Free storage: ${_freeMb} MB'),
                   const SizedBox(height: 12),
                   const Text('Light‑weight Models', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ..._lightModels.map(_buildModelRow).toList(),
