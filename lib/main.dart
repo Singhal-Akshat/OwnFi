@@ -949,34 +949,35 @@ class CardsLoansView extends ConsumerWidget {
           child: Container(
             width: 220,
             margin: const EdgeInsets.only(right: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
-            gradient: card.imageUrl.isEmpty
-                ? LinearGradient(
-                    colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Background Image layer (supports SVG and raster images)
-              if (card.imageUrl.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: card.imageUrl.toLowerCase().endsWith('.svg')
-                      ? SvgPicture.asset(
-                          'assets/credit_card_images/${card.imageUrl}',
-                          fit: BoxFit.cover,
-                        )
-                      : Image.asset(
-                          'assets/credit_card_images/${card.imageUrl}',
-                          fit: BoxFit.cover,
-                        ),
-                ),
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
+              gradient: card.imageUrl.isEmpty
+                  ? LinearGradient(
+                      colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Background Image layer (supports SVG and raster images)
+                if (card.imageUrl.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: card.imageUrl.toLowerCase().endsWith('.svg')
+                        ? SvgPicture.asset(
+                            'assets/credit_card_images/${card.imageUrl}',
+                            fit: BoxFit.fill,
+                          )
+                        : Image.asset(
+                            'assets/credit_card_images/${card.imageUrl}',
+                            fit: BoxFit.cover,
+                          ),
+                  ),
               
               // Foreground content
               if (isLongPressed)
@@ -1488,8 +1489,19 @@ class CardsLoansView extends ConsumerWidget {
                                 final stmAm = double.tryParse(statementAmountController.text) ?? 0.0;
 
                                 if (name.isEmpty || last4.length != 4) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please fill Name and Last 4 digits accurately')),
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      backgroundColor: AppColors.obsidianSurface,
+                                      title: const Text('Invalid Input', style: TextStyle(color: Colors.white)),
+                                      content: const Text('Please fill Name and Last 4 digits accurately.', style: TextStyle(color: Colors.white70)),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: const Text('OK', style: TextStyle(color: AppColors.neonTeal)),
+                                        ),
+                                      ],
+                                    ),
                                   );
                                   return;
                                 }
@@ -1501,8 +1513,19 @@ class CardsLoansView extends ConsumerWidget {
                                   if (cardNumber.isNotEmpty) {
                                     final isDuplicate = existingCards.any((c) => c.fullCardNumber == cardNumber);
                                     if (isDuplicate) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Duplicate error: A card with this number already exists!')),
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          backgroundColor: AppColors.obsidianSurface,
+                                          title: const Text('Duplicate Card', style: TextStyle(color: Colors.white)),
+                                          content: const Text('A card with this number already exists!', style: TextStyle(color: Colors.white70)),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: const Text('OK', style: TextStyle(color: AppColors.neonTeal)),
+                                            ),
+                                          ],
+                                        ),
                                       );
                                       return;
                                     }
