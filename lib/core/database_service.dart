@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
@@ -13,6 +14,7 @@ final databaseServiceProvider = Provider<DatabaseService>(
 
 class DatabaseService {
   Isar? _isar;
+  VoidCallback? onChanged;
 
   Isar get isar {
     if (_isar == null) {
@@ -138,97 +140,88 @@ class DatabaseService {
         ..timestamp = DateTime.now().subtract(const Duration(days: 1))
         ..transactionType = 'expense'
         ..category = 'Entertainment'
-        ..source = 'manual'
-        ..accountName = 'Cash';
+        ..source = 'card:1';
 
       final tx2 = Transaction()
         ..amount = 1200.0
-        ..description = 'Zerodha Dividend'
+        ..description = 'Dinner at restaurant'
         ..timestamp = DateTime.now().subtract(const Duration(days: 2))
-        ..transactionType = 'income'
-        ..category = 'Investment'
-        ..source = 'manual'
-        ..accountName = 'Bank';
+        ..transactionType = 'expense'
+        ..category = 'Food'
+        ..source = 'cash';
 
       final tx3 = Transaction()
-        ..amount = 15000.0
-        ..description = 'Amazon Purchase'
-        ..timestamp = DateTime.now().subtract(const Duration(days: 3))
-        ..transactionType = 'expense'
-        ..category = 'Electronics'
-        ..source = 'manual'
-        ..accountName = 'Cash';
+        ..amount = 75000.0
+        ..description = 'Monthly Salary'
+        ..timestamp = DateTime.now().subtract(const Duration(days: 5))
+        ..transactionType = 'income'
+        ..category = 'Salary'
+        ..source = 'bank:1';
 
       await isar.transactions.putAll([tx1, tx2, tx3]);
+
+      // 5. Bank Accounts
+      final bank1 = BankAccount()
+        ..bankName = 'HDFC Bank'
+        ..accountHolderName = 'Akshat Singhal'
+        ..last4 = '9876'
+        ..fullAccountNumber = '50100234567890'
+        ..ifscCode = 'HDFC0000123'
+        ..balance = 125430.0
+        ..logoAsset = 'HDB.svg'
+        ..colorHex = '#003366';
+
+      final bank2 = BankAccount()
+        ..bankName = 'State Bank of India'
+        ..accountHolderName = 'Akshat Singhal'
+        ..last4 = '4321'
+        ..fullAccountNumber = '30012345678'
+        ..ifscCode = 'SBIN0000301'
+        ..balance = 45320.0
+        ..logoAsset = 'SBI.svg'
+        ..colorHex = '#2196F3';
+
+      await isar.bankAccounts.putAll([bank1, bank2]);
     });
   }
 
   // ----------------- TRANSACTIONS CRUD -----------------
-  Future<List<Transaction>> getAllTransactions() async {
+  Future<List<Transaction>> getActiveTransactions() async {
     return isar.transactions.filter().isDeletedEqualTo(false).sortByTimestampDesc().findAll();
   }
 
+  Future<List<Transaction>> getAllTransactions() async {
+    return getActiveTransactions();
+  }
+
   Future<List<Transaction>> getDeletedTransactions() async {
-    final list = await isar.transactions.filter().isDeletedEqualTo(true).findAll();
-    list.sort((a, b) {
-      if (a.deletedAt == null && b.deletedAt == null) return 0;
-      if (a.deletedAt == null) return 1;
-      if (b.deletedAt == null) return -1;
-      return b.deletedAt!.compareTo(a.deletedAt!);
-    });
-    return list;
+    return isar.transactions.filter().isDeletedEqualTo(true).sortByDeletedAtDesc().findAll();
   }
 
   Future<void> saveTransaction(Transaction transaction) async {
     await isar.writeTxn(() async {
-      // If editing an existing transaction, revert its old effect on card balance first
-      if (transaction.id != Isar.autoIncrement) {
-        final oldTx = await isar.transactions.get(transaction.id);
-        if (oldTx != null && oldTx.cardId != null) {
-          final cardIdInt = int.tryParse(oldTx.cardId!);
-          if (cardIdInt != null) {
-            final card = await isar.creditCards.get(cardIdInt);
-            if (card != null) {
-              if (oldTx.transactionType == 'expense') {
-                card.balance -= oldTx.amount;
-              } else if (oldTx.transactionType == 'transfer') {
-                card.balance += oldTx.amount;
-              }
-              await isar.creditCards.put(card);
-            }
-          }
-        }
-      }
-
       await isar.transactions.put(transaction);
 
-      // If it's linked to a credit card, update card balance!
-      if (transaction.cardId != null &&
-          transaction.transactionType == 'expense') {
+      // Adjust credit card balance if transaction is linked to a card
+      if (transaction.cardId != null && !transaction.isDeleted) {
         final cardIdInt = int.tryParse(transaction.cardId!);
         if (cardIdInt != null) {
           final card = await isar.creditCards.get(cardIdInt);
           if (card != null) {
-            card.balance += transaction.amount;
-            await isar.creditCards.put(card);
-          }
-        }
-      } else if (transaction.cardId != null &&
-          transaction.transactionType == 'transfer') {
-        // Paying credit card bill
-        final cardIdInt = int.tryParse(transaction.cardId!);
-        if (cardIdInt != null) {
-          final card = await isar.creditCards.get(cardIdInt);
-          if (card != null) {
-            card.balance -= transaction.amount;
+            if (transaction.transactionType == 'expense') {
+              card.balance += transaction.amount;
+            } else if (transaction.transactionType == 'transfer') {
+              card.balance -= transaction.amount;
+            }
             await isar.creditCards.put(card);
           }
         }
       }
     });
+    onChanged?.call();
   }
 
-  Future<void> deleteTransaction(int id) async {
+  Future<void> softDeleteTransaction(int id) async {
     await isar.writeTxn(() async {
       final transaction = await isar.transactions.get(id);
       if (transaction != null) {
@@ -253,6 +246,11 @@ class DatabaseService {
         }
       }
     });
+    onChanged?.call();
+  }
+
+  Future<void> deleteTransaction(int id) async {
+    await softDeleteTransaction(id);
   }
 
   Future<void> restoreTransaction(int id) async {
@@ -280,24 +278,28 @@ class DatabaseService {
         }
       }
     });
+    onChanged?.call();
   }
 
   Future<void> permanentlyDeleteTransaction(int id) async {
     await isar.writeTxn(() async {
       await isar.transactions.delete(id);
     });
+    onChanged?.call();
   }
 
   Future<void> clearAllTransactions() async {
     await isar.writeTxn(() async {
       await isar.transactions.clear();
     });
+    onChanged?.call();
   }
 
   Future<void> clearAllLoans() async {
     await isar.writeTxn(() async {
       await isar.loans.clear();
     });
+    onChanged?.call();
   }
 
   // ----------------- CREDIT CARDS CRUD -----------------
@@ -309,12 +311,14 @@ class DatabaseService {
     await isar.writeTxn(() async {
       await isar.creditCards.put(card);
     });
+    onChanged?.call();
   }
 
   Future<void> deleteCreditCard(int id) async {
     await isar.writeTxn(() async {
       await isar.creditCards.delete(id);
     });
+    onChanged?.call();
   }
 
   // ----------------- LOANS CRUD -----------------
@@ -326,12 +330,14 @@ class DatabaseService {
     await isar.writeTxn(() async {
       await isar.loans.put(loan);
     });
+    onChanged?.call();
   }
 
   Future<void> deleteLoan(int id) async {
     await isar.writeTxn(() async {
       await isar.loans.delete(id);
     });
+    onChanged?.call();
   }
 
   // ----------------- HOLDINGS CRUD -----------------
@@ -343,12 +349,14 @@ class DatabaseService {
     await isar.writeTxn(() async {
       await isar.holdings.put(holding);
     });
+    onChanged?.call();
   }
 
   Future<void> clearHoldings() async {
     await isar.writeTxn(() async {
       await isar.holdings.clear();
     });
+    onChanged?.call();
   }
 
   // ----------------- BANK ACCOUNTS CRUD -----------------
@@ -360,12 +368,14 @@ class DatabaseService {
     await isar.writeTxn(() async {
       await isar.bankAccounts.put(account);
     });
+    onChanged?.call();
   }
 
   Future<void> deleteBankAccount(int id) async {
     await isar.writeTxn(() async {
       await isar.bankAccounts.delete(id);
     });
+    onChanged?.call();
   }
 
   Future<void> clearAllData() async {
@@ -379,5 +389,6 @@ class DatabaseService {
       await isar.holdings.clear();
       await isar.bankAccounts.clear();
     });
+    onChanged?.call();
   }
 }

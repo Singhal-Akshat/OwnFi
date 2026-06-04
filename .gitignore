@@ -46,3 +46,4 @@ app.*.map.json
 
 # files
 client_secret.json
+client_secret_windows.json

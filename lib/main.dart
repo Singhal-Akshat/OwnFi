@@ -76,6 +76,19 @@ void main() async {
   final dbService = DatabaseService();
   await dbService.init();
 
+  // Perform startup cloud sync pull check
+  final syncService = GoogleSyncService();
+  try {
+    await syncService.syncOnStartup(dbService);
+  } catch (e) {
+    debugPrint('Cloud sync on startup failed: $e');
+  }
+
+  // Hook up automatic backups on database changes
+  dbService.onChanged = () {
+    syncService.triggerAutoBackup(dbService);
+  };
+
   runApp(
     ProviderScope(
       overrides: [
@@ -4502,11 +4515,11 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     IconButton(
                                       icon: const Icon(Icons.cloud_upload_rounded, color: AppColors.neonTeal),
                                       onPressed: () async {
-                                        final success = await ref.read(googleSyncServiceProvider).backupToCloud(ref.read(databaseServiceProvider));
+                                        final error = await ref.read(googleSyncServiceProvider).backupToCloud(ref.read(databaseServiceProvider));
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
-                                            content: Text(success ? 'Backup saved successfully to Google Drive' : 'Backup failed'),
-                                            backgroundColor: success ? AppColors.neonEmerald : Colors.redAccent,
+                                            content: Text(error == null ? 'Backup saved successfully to Google Drive' : 'Backup failed: $error'),
+                                            backgroundColor: error == null ? AppColors.neonEmerald : Colors.redAccent,
                                           ),
                                         );
                                       },
@@ -4514,17 +4527,18 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     IconButton(
                                       icon: const Icon(Icons.cloud_download_rounded, color: AppColors.neonPurple),
                                       onPressed: () async {
-                                        final success = await ref.read(googleSyncServiceProvider).restoreFromCloud(ref.read(databaseServiceProvider));
-                                        if (success) {
+                                        final error = await ref.read(googleSyncServiceProvider).restoreFromCloud(ref.read(databaseServiceProvider));
+                                        if (error == null) {
                                           ref.read(transactionsProvider.notifier).loadTransactions();
                                           ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                          ref.read(bankAccountsProvider.notifier).loadBankAccounts();
                                           ref.read(loansProvider.notifier).loadLoans();
                                           ref.read(holdingsProvider.notifier).loadHoldings();
                                         }
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
-                                            content: Text(success ? 'Database restored from Google Drive' : 'Restore failed'),
-                                            backgroundColor: success ? AppColors.neonEmerald : Colors.redAccent,
+                                            content: Text(error == null ? 'Database restored from Google Drive' : 'Restore failed: $error'),
+                                            backgroundColor: error == null ? AppColors.neonEmerald : Colors.redAccent,
                                           ),
                                         );
                                       },
