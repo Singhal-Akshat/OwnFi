@@ -4482,9 +4482,18 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       ),
                                       onPressed: () async {
-                                        final acc = await ref.read(googleSyncServiceProvider).authenticateAccount(true);
-                                        if (acc != null) {
-                                          setState(() {});
+                                        try {
+                                          final acc = await ref.read(googleSyncServiceProvider).authenticateAccount(true);
+                                          if (acc != null) {
+                                            setState(() {});
+                                          }
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Google Sign-In failed: $e'),
+                                              backgroundColor: Colors.redAccent,
+                                            ),
+                                          );
                                         }
                                       },
                                       child: const Text('Link', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
@@ -4547,9 +4556,18 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
                                 onPressed: () async {
-                                  final acc = await ref.read(googleSyncServiceProvider).authenticateAccount(false);
-                                  if (acc != null) {
-                                    setState(() {});
+                                  try {
+                                    final acc = await ref.read(googleSyncServiceProvider).authenticateAccount(false);
+                                    if (acc != null) {
+                                      setState(() {});
+                                    }
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Google Sign-In failed: $e'),
+                                        backgroundColor: Colors.redAccent,
+                                      ),
+                                    );
                                   }
                                 },
                               ),
