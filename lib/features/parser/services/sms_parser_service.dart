@@ -4,6 +4,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/model_repository.dart';
+import '../../cards_loans/models/card_loan_models.dart';
 import 'dart:io';
 
 class ParsedSmsTransaction {
@@ -16,6 +17,7 @@ class ParsedSmsTransaction {
   final String merchant;
   final String? parserSource;
   final String? aiComparisonNotes;
+  final String? matchedAccountId;
 
   ParsedSmsTransaction({
     required this.amount,
@@ -27,27 +29,73 @@ class ParsedSmsTransaction {
     required this.merchant,
     this.parserSource,
     this.aiComparisonNotes,
+    this.matchedAccountId,
   });
 
   @override
   String toString() {
-    return 'ParsedSmsTransaction(amount: $amount, desc: $description, type: $transactionType, cat: $category, card: $cardLast4, acct: $accountLast4, merchant: $merchant, src: $parserSource)';
+    return 'ParsedSmsTransaction(amount: $amount, desc: $description, type: $transactionType, cat: $category, card: $cardLast4, acct: $accountLast4, merchant: $merchant, src: $parserSource, matchedAcc: $matchedAccountId)';
   }
 }
 
 class SmsParserService {
   final _storage = const FlutterSecureStorage();
 
+  Future<void> logDebug(String message) async {
+    print('[SMS_PARSER_DEBUG] $message');
+    try {
+      if (Platform.isWindows) {
+        final logFile = File('e:/Projects/Money_Tracker/sms_parser_debug.log');
+        final timestamp = DateTime.now().toIso8601String();
+        await logFile.writeAsString(
+          '[$timestamp] $message\n',
+          mode: FileMode.append,
+          flush: true,
+        );
+      }
+    } catch (_) {}
+  }
+
   // Common keywords to identify financial transactions
   static final RegExp _financialKeywords = RegExp(
-    r'(debited|spent|charged|withdrawn|sent|paid|credited|received|deposited|added)',
+    r'(debited|spent|charged|withdrawn|sent|paid|payment|credited|received|deposited|added|txn\s+of)',
+    caseSensitive: false,
+  );
+
+  // Keywords to identify OTPs, authorization codes, and bank promotions to exclude them
+  static final RegExp _otpOrPromotionalKeywords = RegExp(
+    r'(otp|one-time password|one time password|verification code|verify|security code|auth code|passcode|pre-approved|pre approved|apply now|win|offer|eligible|rate of interest|subscrib|bonus)',
     caseSensitive: false,
   );
 
   Future<ParsedSmsTransaction?> parseAsync(String smsBody, {bool isBulk = false}) async {
     final body = smsBody.trim();
-    if (!_financialKeywords.hasMatch(body)) {
-      return null; // Not a financial transaction SMS
+    await logDebug('Parsing SMS Body: "$body"');
+
+    final prefs = await SharedPreferences.getInstance();
+    final customRedList = prefs.getStringList('custom_red_flags') ?? [];
+    final customGreenList = prefs.getStringList('custom_green_flags') ?? [];
+
+    RegExp financialKeywords = _financialKeywords;
+    if (customGreenList.isNotEmpty) {
+      final escaped = customGreenList.map((e) => RegExp.escape(e)).join('|');
+      financialKeywords = RegExp(
+        '(${_financialKeywords.pattern}|$escaped)',
+        caseSensitive: false,
+      );
+    }
+
+    RegExp otpOrPromotionalKeywords = _otpOrPromotionalKeywords;
+    if (customRedList.isNotEmpty) {
+      final escaped = customRedList.map((e) => RegExp.escape(e)).join('|');
+      otpOrPromotionalKeywords = RegExp(
+        '(${_otpOrPromotionalKeywords.pattern}|$escaped)',
+        caseSensitive: false,
+      );
+    }
+
+    if (!financialKeywords.hasMatch(body) || otpOrPromotionalKeywords.hasMatch(body)) {
+      return null; // Not a financial transaction SMS or is an OTP/Promo
     }
 
     final regexResult = _parseRegex(body);
@@ -124,6 +172,71 @@ class SmsParserService {
     }
   }
 
+  Future<Map<String, dynamic>> previewParse(String smsBody) async {
+    final body = smsBody.trim();
+    final regexResult = _parseRegex(body);
+    final key = await _storage.read(key: 'ai_gemini_key');
+    ParsedSmsTransaction? geminiResult;
+    String? geminiRaw;
+    if (key != null && key.isNotEmpty) {
+      geminiRaw = await _parseWithGeminiRaw(body, key);
+      geminiResult = _decodeAiJson(geminiRaw);
+    }
+    return {
+      'regex': regexResult,
+      'gemini': geminiResult,
+      'geminiRaw': geminiRaw,
+    };
+  }
+
+  ParsedSmsTransaction? parseRegexOnly(String smsBody) {
+    return _parseRegex(smsBody);
+  }
+
+  Future<ParsedSmsTransaction?> parseGeminiOnly(
+    String smsBody, {
+    List<CreditCard>? cards,
+    List<BankAccount>? bankAccounts,
+  }) async {
+    final body = smsBody.trim();
+    await logDebug('parseGeminiOnly SMS Body: "$body"');
+    final key = await _storage.read(key: 'ai_gemini_key');
+    if (key == null || key.isEmpty) return null;
+    final geminiRaw = await _parseWithGeminiRaw(body, key, cards: cards, bankAccounts: bankAccounts);
+    return _decodeAiJson(geminiRaw);
+  }
+
+  Future<bool> isTransactionalSms(String smsBody) async {
+    final body = smsBody.trim();
+    final prefs = await SharedPreferences.getInstance();
+    final customRedList = prefs.getStringList('custom_red_flags') ?? [];
+    final customGreenList = prefs.getStringList('custom_green_flags') ?? [];
+
+    RegExp financialKeywords = _financialKeywords;
+    if (customGreenList.isNotEmpty) {
+      final escaped = customGreenList.map((e) => RegExp.escape(e)).join('|');
+      financialKeywords = RegExp(
+        '(${_financialKeywords.pattern}|$escaped)',
+        caseSensitive: false,
+      );
+    }
+
+    RegExp otpOrPromotionalKeywords = _otpOrPromotionalKeywords;
+    if (customRedList.isNotEmpty) {
+      final escaped = customRedList.map((e) => RegExp.escape(e)).join('|');
+      otpOrPromotionalKeywords = RegExp(
+        '(${_otpOrPromotionalKeywords.pattern}|$escaped)',
+        caseSensitive: false,
+      );
+    }
+
+    if (!financialKeywords.hasMatch(body) || otpOrPromotionalKeywords.hasMatch(body)) {
+      return false;
+    }
+
+    return _parseRegex(body) != null;
+  }
+
   ParsedSmsTransaction? _decodeAiJson(String? jsonStr) {
     if (jsonStr == null || jsonStr.isEmpty) return null;
     try {
@@ -136,17 +249,23 @@ class SmsParserService {
       final double amt = (map['amount'] is num) ? (map['amount'] as num).toDouble() : double.tryParse(map['amount'].toString()) ?? 0.0;
       if (amt <= 0) return null;
 
-      final type = map['transactionType']?.toString().toLowerCase() == 'income' ? 'income' : 'expense';
+      final rawType = map['transactionType']?.toString().toLowerCase();
+      final type = (rawType == 'income') ? 'income' : (rawType == 'transfer' ? 'transfer' : 'expense');
       final merchant = map['merchant']?.toString() ?? 'Unknown Merchant';
+      
+      final description = type == 'income'
+          ? 'Received from $merchant'
+          : (type == 'transfer' ? 'Transfer to $merchant' : 'Spent at $merchant');
 
       return ParsedSmsTransaction(
         amount: amt,
-        description: type == 'income' ? 'Received from $merchant' : 'Spent at $merchant',
+        description: description,
         transactionType: type,
         category: map['category']?.toString() ?? 'Other',
         cardLast4: map['cardLast4']?.toString(),
         accountLast4: map['accountLast4']?.toString(),
         merchant: merchant,
+        matchedAccountId: map['matchedAccountId']?.toString(),
       );
     } catch (e) {
       print("JSON Decode Error: $e");
@@ -154,17 +273,24 @@ class SmsParserService {
     }
   }
 
-  Future<String?> _parseWithGeminiRaw(String sms, String apiKey) async {
+  Future<String?> _parseWithGeminiRaw(
+    String sms,
+    String apiKey, {
+    List<CreditCard>? cards,
+    List<BankAccount>? bankAccounts,
+  }) async {
     try {
       final model = GenerativeModel(
         model: 'gemini-3.1-flash-lite',
         apiKey: apiKey,
       );
-      final prompt = _buildParserPrompt(sms);
+      final prompt = await _buildParserPrompt(sms, cards: cards, bankAccounts: bankAccounts);
+      await logDebug('Gemini Prompt:\n$prompt');
       final response = await model.generateContent([Content.text(prompt)]);
+      await logDebug('Gemini Response:\n${response.text}');
       return response.text;
     } catch (e) {
-      print("Gemini API Error: $e");
+      await logDebug("Gemini API Error: $e");
       return null;
     }
   }
@@ -188,7 +314,7 @@ class SmsParserService {
 
       final model = await FlutterGemma.getActiveModel(maxTokens: 512);
       final session = await model.createSession();
-      final prompt = _buildParserPrompt(sms);
+      final prompt = await _buildParserPrompt(sms);
       await session.addQueryChunk(Message(text: prompt, isUser: true));
       final response = await session.getResponse();
       await session.close();
@@ -199,18 +325,50 @@ class SmsParserService {
     }
   }
 
-  String _buildParserPrompt(String sms) {
+  Future<String> _buildParserPrompt(
+    String sms, {
+    List<CreditCard>? cards,
+    List<BankAccount>? bankAccounts,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final expenseCats = prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Investment', 'Health', 'Education', 'Other'];
+    final incomeCats = prefs.getStringList('categories_income') ?? ['Salary', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
+    final transferCats = prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Other'];
+
+    String cardListText = '';
+    if (cards != null && cards.isNotEmpty) {
+      cardListText = '\nAvailable Credit Cards:\n' +
+          cards.map((c) => '- "${c.cardName}" (Last 4: ${c.last4}, ID: "card:${c.id}")').join('\n') +
+          '\n';
+    }
+
+    String bankListText = '';
+    if (bankAccounts != null && bankAccounts.isNotEmpty) {
+      bankListText = '\nAvailable Bank Accounts:\n' +
+          bankAccounts.map((b) => '- "${b.bankName}" (Last 4: ${b.last4}, ID: "bank:${b.id}")').join('\n') +
+          '\n';
+    }
+
     return '''
 You are a financial SMS parser. Extract the details of the transaction and output ONLY valid JSON format.
 Do NOT include markdown formatting or backticks. Only output the raw JSON object.
 
-Fields required:
+Available Accounts/Cards to match:
+$cardListText$bankListText
+Fields required in the JSON:
 - "amount": numeric value of the transaction
-- "transactionType": "expense" or "income"
-- "merchant": the name of the store or person
-- "category": choose from (Food, Shopping, Travel, Entertainment, Utilities, Investment, Salary, Other)
+- "transactionType": "expense", "income", or "transfer" (use "transfer" if the SMS indicates a transfer between own accounts/self-transfer, sending money to a contact/person, or a payment/deposit credited to a credit card to pay its bill).
+- "merchant": the name of the store, person, or beneficiary. Note: The user of this app is "Akshat Singhal" (so any transfer sent to "Akshat Singhal" is a self-transfer to himself). For self-transfers (where transactionType is "transfer" and the beneficiary is "Akshat Singhal" or yourself), the merchant MUST be the destination bank account (e.g. if sent from HDFC Bank, the merchant should be "SBI Account" or "SBI Bank", and vice versa). Do NOT return "Akshat Singhal" as the merchant for self-transfers.
+- "category": choose from these based on transactionType:
+  * For "expense": choose from (${expenseCats.join(', ')})
+  * For "income": choose from (${incomeCats.join(', ')})
+  * For "transfer": choose from (${transferCats.join(', ')})
 - "cardLast4": last 4 digits of credit card if present, else null
 - "accountLast4": last 4 digits of bank account if present, else null
+- "matchedAccountId": Look at the SMS body and match it against the "Available Accounts/Cards" listed above. You must perform a fuzzy match on card/bank names, bank name keywords, and payment networks (Visa, RuPay, Mastercard). For example:
+  1) If the SMS says "Scapia Federal RuPay credit card" and the list contains "Scapia Rupay" (ID: "card:11"), they both refer to Scapia and RuPay, so you MUST output "card:11".
+  2) If the SMS mentions "HDFC Bank A/C *3558" and the list has "hdfc" (ID: "bank:2") with a different last 4, you MUST match it to "bank:2" because the bank name "HDFC" matches.
+  Do NOT return null if a name, bank keyword, or network match is found in the SMS. Output the matched ID (e.g., "card:11" or "bank:2"). Only output null if there is absolutely no matching bank, account, or card brand/name in the list.
 
 SMS: "$sms"
 ''';
@@ -227,7 +385,7 @@ SMS: "$sms"
 
     // 1. EXTRACT AMOUNT
     final amountReg = RegExp(
-      r'(?:rs\.?|inr|rs)\s*([0-9,]+(?:\.[0-9]{2})?)',
+      r'(?:rs\.?|inr|₹)\s*([0-9,]+(?:\.[0-9]{2})?)',
       caseSensitive: false,
     );
     final amtMatch = amountReg.firstMatch(body);
@@ -240,13 +398,23 @@ SMS: "$sms"
       return null; 
     }
 
-    // 2. DETECT TRANSACTION TYPE (Income vs Expense)
-    final creditReg = RegExp(
-      r'(credited|received|deposited|added|refunded)',
-      caseSensitive: false,
-    );
-    if (creditReg.hasMatch(body)) {
-      transactionType = 'income';
+    // 2. DETECT TRANSACTION TYPE (Income vs Expense vs Transfer)
+    final bodyLower = body.toLowerCase();
+    final bool isTransfer = bodyLower.contains('self transfer') ||
+        bodyLower.contains('transfer to') ||
+        (bodyLower.contains('payment') && (bodyLower.contains('credited to') || bodyLower.contains('received for') || bodyLower.contains('paid to') || bodyLower.contains('towards'))) ||
+        (bodyLower.contains('sent') && (bodyLower.contains('to akshat') || bodyLower.contains('self')));
+
+    if (isTransfer) {
+      transactionType = 'transfer';
+    } else {
+      final creditReg = RegExp(
+        r'(credited|received|deposited|added|refunded)',
+        caseSensitive: false,
+      );
+      if (creditReg.hasMatch(body)) {
+        transactionType = 'income';
+      }
     }
 
     // 3. EXTRACT CREDIT CARD / ACCOUNT DETAILS
@@ -269,12 +437,23 @@ SMS: "$sms"
     }
 
     // 4. DETECT MERCHANT & CATEGORY
-    merchant = _extractMerchant(body);
+    if (transactionType == 'transfer') {
+      final bodyLower = body.toLowerCase();
+      if (bodyLower.contains('hdfc')) {
+        merchant = 'SBI Account';
+      } else if (bodyLower.contains('sbi')) {
+        merchant = 'HDFC Account';
+      } else {
+        merchant = 'Self Transfer';
+      }
+    } else {
+      merchant = _extractMerchant(body);
+    }
     final category = _detectCategory(merchant, body);
 
     final description = transactionType == 'income'
         ? 'Received from $merchant'
-        : 'Spent at $merchant';
+        : (transactionType == 'transfer' ? 'Transfer to $merchant' : 'Spent at $merchant');
 
     return ParsedSmsTransaction(
       amount: amount,

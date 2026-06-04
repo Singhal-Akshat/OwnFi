@@ -210,16 +210,29 @@ class DatabaseService {
 
       // Adjust credit card balance if transaction is linked to a card
       if (transaction.cardId != null && !transaction.isDeleted) {
-        final cardIdInt = int.tryParse(transaction.cardId!);
-        if (cardIdInt != null) {
-          final card = await isar.creditCards.get(cardIdInt);
-          if (card != null) {
-            if (transaction.transactionType == 'expense') {
-              card.balance += transaction.amount;
-            } else if (transaction.transactionType == 'transfer') {
-              card.balance -= transaction.amount;
+        if (transaction.cardId!.startsWith('bank:')) {
+          final toBankIdInt = int.tryParse(transaction.cardId!.substring(5));
+          if (toBankIdInt != null) {
+            final toBank = await isar.bankAccounts.get(toBankIdInt);
+            if (toBank != null) {
+              if (transaction.transactionType == 'transfer') {
+                toBank.balance += transaction.amount;
+              }
+              await isar.bankAccounts.put(toBank);
             }
-            await isar.creditCards.put(card);
+          }
+        } else {
+          final cardIdInt = int.tryParse(transaction.cardId!);
+          if (cardIdInt != null) {
+            final card = await isar.creditCards.get(cardIdInt);
+            if (card != null) {
+              if (transaction.transactionType == 'expense') {
+                card.balance += transaction.amount;
+              } else if (transaction.transactionType == 'transfer') {
+                card.balance -= transaction.amount;
+              }
+              await isar.creditCards.put(card);
+            }
           }
         }
       }
@@ -252,17 +265,30 @@ class DatabaseService {
         await isar.transactions.put(transaction);
 
         if (transaction.cardId != null) {
-          // Revert card balance adjustment
-          final cardIdInt = int.tryParse(transaction.cardId!);
-          if (cardIdInt != null) {
-            final card = await isar.creditCards.get(cardIdInt);
-            if (card != null) {
-              if (transaction.transactionType == 'expense') {
-                card.balance -= transaction.amount;
-              } else if (transaction.transactionType == 'transfer') {
-                card.balance += transaction.amount;
+          if (transaction.cardId!.startsWith('bank:')) {
+            final toBankIdInt = int.tryParse(transaction.cardId!.substring(5));
+            if (toBankIdInt != null) {
+              final toBank = await isar.bankAccounts.get(toBankIdInt);
+              if (toBank != null) {
+                if (transaction.transactionType == 'transfer') {
+                  toBank.balance -= transaction.amount;
+                }
+                await isar.bankAccounts.put(toBank);
               }
-              await isar.creditCards.put(card);
+            }
+          } else {
+            // Revert card balance adjustment
+            final cardIdInt = int.tryParse(transaction.cardId!);
+            if (cardIdInt != null) {
+              final card = await isar.creditCards.get(cardIdInt);
+              if (card != null) {
+                if (transaction.transactionType == 'expense') {
+                  card.balance -= transaction.amount;
+                } else if (transaction.transactionType == 'transfer') {
+                  card.balance += transaction.amount;
+                }
+                await isar.creditCards.put(card);
+              }
             }
           }
         }
@@ -300,17 +326,30 @@ class DatabaseService {
         await isar.transactions.put(transaction);
 
         if (transaction.cardId != null) {
-          // Re-apply card balance adjustment
-          final cardIdInt = int.tryParse(transaction.cardId!);
-          if (cardIdInt != null) {
-            final card = await isar.creditCards.get(cardIdInt);
-            if (card != null) {
-              if (transaction.transactionType == 'expense') {
-                card.balance += transaction.amount;
-              } else if (transaction.transactionType == 'transfer') {
-                card.balance -= transaction.amount;
+          if (transaction.cardId!.startsWith('bank:')) {
+            final toBankIdInt = int.tryParse(transaction.cardId!.substring(5));
+            if (toBankIdInt != null) {
+              final toBank = await isar.bankAccounts.get(toBankIdInt);
+              if (toBank != null) {
+                if (transaction.transactionType == 'transfer') {
+                  toBank.balance += transaction.amount;
+                }
+                await isar.bankAccounts.put(toBank);
               }
-              await isar.creditCards.put(card);
+            }
+          } else {
+            // Re-apply card balance adjustment
+            final cardIdInt = int.tryParse(transaction.cardId!);
+            if (cardIdInt != null) {
+              final card = await isar.creditCards.get(cardIdInt);
+              if (card != null) {
+                if (transaction.transactionType == 'expense') {
+                  card.balance += transaction.amount;
+                } else if (transaction.transactionType == 'transfer') {
+                  card.balance -= transaction.amount;
+                }
+                await isar.creditCards.put(card);
+              }
             }
           }
         }

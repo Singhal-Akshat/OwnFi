@@ -48,6 +48,7 @@ class Loan {
   double interestRate = 0.0; // annual percentage rate (APR)
   String compoundInterval = 'none'; // none, monthly, quarterly, yearly
   DateTime startDate = DateTime.now();
+  DateTime? paybackDate;
 
   double emiAmount = 0.0;
   double remainingBalance = 0.0;

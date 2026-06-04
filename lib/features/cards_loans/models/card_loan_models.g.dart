@@ -2346,13 +2346,18 @@ const LoanSchema = CollectionSchema(
       name: r'linkedTransactionId',
       type: IsarType.long,
     ),
-    r'remainingBalance': PropertySchema(
+    r'paybackDate': PropertySchema(
       id: 7,
+      name: r'paybackDate',
+      type: IsarType.dateTime,
+    ),
+    r'remainingBalance': PropertySchema(
+      id: 8,
       name: r'remainingBalance',
       type: IsarType.double,
     ),
     r'startDate': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'startDate',
       type: IsarType.dateTime,
     )
@@ -2395,8 +2400,9 @@ void _loanSerialize(
   writer.writeDouble(offsets[4], object.interestRate);
   writer.writeBool(offsets[5], object.isLent);
   writer.writeLong(offsets[6], object.linkedTransactionId);
-  writer.writeDouble(offsets[7], object.remainingBalance);
-  writer.writeDateTime(offsets[8], object.startDate);
+  writer.writeDateTime(offsets[7], object.paybackDate);
+  writer.writeDouble(offsets[8], object.remainingBalance);
+  writer.writeDateTime(offsets[9], object.startDate);
 }
 
 Loan _loanDeserialize(
@@ -2414,8 +2420,9 @@ Loan _loanDeserialize(
   object.interestRate = reader.readDouble(offsets[4]);
   object.isLent = reader.readBool(offsets[5]);
   object.linkedTransactionId = reader.readLongOrNull(offsets[6]);
-  object.remainingBalance = reader.readDouble(offsets[7]);
-  object.startDate = reader.readDateTime(offsets[8]);
+  object.paybackDate = reader.readDateTimeOrNull(offsets[7]);
+  object.remainingBalance = reader.readDouble(offsets[8]);
+  object.startDate = reader.readDateTime(offsets[9]);
   return object;
 }
 
@@ -2441,8 +2448,10 @@ P _loanDeserializeProp<P>(
     case 6:
       return (reader.readLongOrNull(offset)) as P;
     case 7:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 8:
+      return (reader.readDouble(offset)) as P;
+    case 9:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -3115,6 +3124,75 @@ extension LoanQueryFilter on QueryBuilder<Loan, Loan, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Loan, Loan, QAfterFilterCondition> paybackDateIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'paybackDate',
+      ));
+    });
+  }
+
+  QueryBuilder<Loan, Loan, QAfterFilterCondition> paybackDateIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'paybackDate',
+      ));
+    });
+  }
+
+  QueryBuilder<Loan, Loan, QAfterFilterCondition> paybackDateEqualTo(
+      DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'paybackDate',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Loan, Loan, QAfterFilterCondition> paybackDateGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'paybackDate',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Loan, Loan, QAfterFilterCondition> paybackDateLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'paybackDate',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Loan, Loan, QAfterFilterCondition> paybackDateBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'paybackDate',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Loan, Loan, QAfterFilterCondition> remainingBalanceEqualTo(
     double value, {
     double epsilon = Query.epsilon,
@@ -3320,6 +3398,18 @@ extension LoanQuerySortBy on QueryBuilder<Loan, Loan, QSortBy> {
     });
   }
 
+  QueryBuilder<Loan, Loan, QAfterSortBy> sortByPaybackDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paybackDate', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Loan, Loan, QAfterSortBy> sortByPaybackDateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paybackDate', Sort.desc);
+    });
+  }
+
   QueryBuilder<Loan, Loan, QAfterSortBy> sortByRemainingBalance() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'remainingBalance', Sort.asc);
@@ -3442,6 +3532,18 @@ extension LoanQuerySortThenBy on QueryBuilder<Loan, Loan, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Loan, Loan, QAfterSortBy> thenByPaybackDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paybackDate', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Loan, Loan, QAfterSortBy> thenByPaybackDateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paybackDate', Sort.desc);
+    });
+  }
+
   QueryBuilder<Loan, Loan, QAfterSortBy> thenByRemainingBalance() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'remainingBalance', Sort.asc);
@@ -3513,6 +3615,12 @@ extension LoanQueryWhereDistinct on QueryBuilder<Loan, Loan, QDistinct> {
     });
   }
 
+  QueryBuilder<Loan, Loan, QDistinct> distinctByPaybackDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'paybackDate');
+    });
+  }
+
   QueryBuilder<Loan, Loan, QDistinct> distinctByRemainingBalance() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'remainingBalance');
@@ -3572,6 +3680,12 @@ extension LoanQueryProperty on QueryBuilder<Loan, Loan, QQueryProperty> {
   QueryBuilder<Loan, int?, QQueryOperations> linkedTransactionIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'linkedTransactionId');
+    });
+  }
+
+  QueryBuilder<Loan, DateTime?, QQueryOperations> paybackDateProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'paybackDate');
     });
   }
 

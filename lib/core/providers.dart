@@ -4,8 +4,8 @@ import 'sync_service.dart';
 import '../features/expenses/models/transaction_model.dart';
 import '../features/cards_loans/models/card_loan_models.dart';
 import '../features/investments/models/holding_model.dart';
-import '../features/parser/services/sms_sync_service.dart';
-import '../features/parser/services/email_sync_service.dart';
+import 'package:my_personal_tracker/features/parser/services/sms_sync_service.dart';
+import 'package:my_personal_tracker/features/parser/services/email_sync_service.dart';
 import '../features/investments/services/portfolio_parser_service.dart';
 import '../features/investments/services/investment_sync_service.dart';
 
