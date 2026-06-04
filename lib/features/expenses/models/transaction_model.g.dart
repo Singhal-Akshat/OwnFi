@@ -37,34 +37,44 @@ const TransactionSchema = CollectionSchema(
       name: r'category',
       type: IsarType.string,
     ),
-    r'description': PropertySchema(
+    r'deletedAt': PropertySchema(
       id: 4,
+      name: r'deletedAt',
+      type: IsarType.dateTime,
+    ),
+    r'description': PropertySchema(
+      id: 5,
       name: r'description',
       type: IsarType.string,
     ),
+    r'isDeleted': PropertySchema(
+      id: 6,
+      name: r'isDeleted',
+      type: IsarType.bool,
+    ),
     r'isSplit': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'isSplit',
       type: IsarType.bool,
     ),
     r'source': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'source',
       type: IsarType.string,
     ),
     r'splitDetails': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'splitDetails',
       type: IsarType.objectList,
       target: r'TransactionSplitDetail',
     ),
     r'timestamp': PropertySchema(
-      id: 8,
+      id: 10,
       name: r'timestamp',
       type: IsarType.dateTime,
     ),
     r'transactionType': PropertySchema(
-      id: 9,
+      id: 11,
       name: r'transactionType',
       type: IsarType.string,
     )
@@ -127,17 +137,19 @@ void _transactionSerialize(
   writer.writeDouble(offsets[1], object.amount);
   writer.writeString(offsets[2], object.cardId);
   writer.writeString(offsets[3], object.category);
-  writer.writeString(offsets[4], object.description);
-  writer.writeBool(offsets[5], object.isSplit);
-  writer.writeString(offsets[6], object.source);
+  writer.writeDateTime(offsets[4], object.deletedAt);
+  writer.writeString(offsets[5], object.description);
+  writer.writeBool(offsets[6], object.isDeleted);
+  writer.writeBool(offsets[7], object.isSplit);
+  writer.writeString(offsets[8], object.source);
   writer.writeObjectList<TransactionSplitDetail>(
-    offsets[7],
+    offsets[9],
     allOffsets,
     TransactionSplitDetailSchema.serialize,
     object.splitDetails,
   );
-  writer.writeDateTime(offsets[8], object.timestamp);
-  writer.writeString(offsets[9], object.transactionType);
+  writer.writeDateTime(offsets[10], object.timestamp);
+  writer.writeString(offsets[11], object.transactionType);
 }
 
 Transaction _transactionDeserialize(
@@ -151,19 +163,21 @@ Transaction _transactionDeserialize(
   object.amount = reader.readDouble(offsets[1]);
   object.cardId = reader.readStringOrNull(offsets[2]);
   object.category = reader.readString(offsets[3]);
-  object.description = reader.readString(offsets[4]);
+  object.deletedAt = reader.readDateTimeOrNull(offsets[4]);
+  object.description = reader.readString(offsets[5]);
   object.id = id;
-  object.isSplit = reader.readBool(offsets[5]);
-  object.source = reader.readString(offsets[6]);
+  object.isDeleted = reader.readBool(offsets[6]);
+  object.isSplit = reader.readBool(offsets[7]);
+  object.source = reader.readString(offsets[8]);
   object.splitDetails = reader.readObjectList<TransactionSplitDetail>(
-        offsets[7],
+        offsets[9],
         TransactionSplitDetailSchema.deserialize,
         allOffsets,
         TransactionSplitDetail(),
       ) ??
       [];
-  object.timestamp = reader.readDateTime(offsets[8]);
-  object.transactionType = reader.readString(offsets[9]);
+  object.timestamp = reader.readDateTime(offsets[10]);
+  object.transactionType = reader.readString(offsets[11]);
   return object;
 }
 
@@ -183,12 +197,16 @@ P _transactionDeserializeProp<P>(
     case 3:
       return (reader.readString(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 5:
-      return (reader.readBool(offset)) as P;
-    case 6:
       return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readBool(offset)) as P;
     case 7:
+      return (reader.readBool(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
       return (reader.readObjectList<TransactionSplitDetail>(
             offset,
             TransactionSplitDetailSchema.deserialize,
@@ -196,9 +214,9 @@ P _transactionDeserializeProp<P>(
             TransactionSplitDetail(),
           ) ??
           []) as P;
-    case 8:
+    case 10:
       return (reader.readDateTime(offset)) as P;
-    case 9:
+    case 11:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -802,6 +820,80 @@ extension TransactionQueryFilter
   }
 
   QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      deletedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'deletedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      deletedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'deletedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      deletedAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'deletedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      deletedAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'deletedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      deletedAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'deletedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      deletedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'deletedAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
       descriptionEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -986,6 +1078,16 @@ extension TransactionQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      isDeletedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isDeleted',
+        value: value,
       ));
     });
   }
@@ -1479,6 +1581,18 @@ extension TransactionQuerySortBy
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByDeletedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deletedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByDeletedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deletedAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByDescription() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'description', Sort.asc);
@@ -1488,6 +1602,18 @@ extension TransactionQuerySortBy
   QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByDescriptionDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'description', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByIsDeleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isDeleted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByIsDeletedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isDeleted', Sort.desc);
     });
   }
 
@@ -1591,6 +1717,18 @@ extension TransactionQuerySortThenBy
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByDeletedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deletedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByDeletedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deletedAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByDescription() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'description', Sort.asc);
@@ -1612,6 +1750,18 @@ extension TransactionQuerySortThenBy
   QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByIsDeleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isDeleted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByIsDeletedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isDeleted', Sort.desc);
     });
   }
 
@@ -1694,10 +1844,22 @@ extension TransactionQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QDistinct> distinctByDeletedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'deletedAt');
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QDistinct> distinctByDescription(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'description', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QDistinct> distinctByIsDeleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isDeleted');
     });
   }
 
@@ -1761,9 +1923,21 @@ extension TransactionQueryProperty
     });
   }
 
+  QueryBuilder<Transaction, DateTime?, QQueryOperations> deletedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'deletedAt');
+    });
+  }
+
   QueryBuilder<Transaction, String, QQueryOperations> descriptionProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'description');
+    });
+  }
+
+  QueryBuilder<Transaction, bool, QQueryOperations> isDeletedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isDeleted');
     });
   }
 

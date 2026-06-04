@@ -165,7 +165,18 @@ class DatabaseService {
 
   // ----------------- TRANSACTIONS CRUD -----------------
   Future<List<Transaction>> getAllTransactions() async {
-    return isar.transactions.where().sortByTimestampDesc().findAll();
+    return isar.transactions.filter().isDeletedEqualTo(false).sortByTimestampDesc().findAll();
+  }
+
+  Future<List<Transaction>> getDeletedTransactions() async {
+    final list = await isar.transactions.filter().isDeletedEqualTo(true).findAll();
+    list.sort((a, b) {
+      if (a.deletedAt == null && b.deletedAt == null) return 0;
+      if (a.deletedAt == null) return 1;
+      if (b.deletedAt == null) return -1;
+      return b.deletedAt!.compareTo(a.deletedAt!);
+    });
+    return list;
   }
 
   Future<void> saveTransaction(Transaction transaction) async {
@@ -220,22 +231,72 @@ class DatabaseService {
   Future<void> deleteTransaction(int id) async {
     await isar.writeTxn(() async {
       final transaction = await isar.transactions.get(id);
-      if (transaction != null && transaction.cardId != null) {
-        // Revert card balance adjustment
-        final cardIdInt = int.tryParse(transaction.cardId!);
-        if (cardIdInt != null) {
-          final card = await isar.creditCards.get(cardIdInt);
-          if (card != null) {
-            if (transaction.transactionType == 'expense') {
-              card.balance -= transaction.amount;
-            } else if (transaction.transactionType == 'transfer') {
-              card.balance += transaction.amount;
+      if (transaction != null) {
+        transaction.isDeleted = true;
+        transaction.deletedAt = DateTime.now();
+        await isar.transactions.put(transaction);
+
+        if (transaction.cardId != null) {
+          // Revert card balance adjustment
+          final cardIdInt = int.tryParse(transaction.cardId!);
+          if (cardIdInt != null) {
+            final card = await isar.creditCards.get(cardIdInt);
+            if (card != null) {
+              if (transaction.transactionType == 'expense') {
+                card.balance -= transaction.amount;
+              } else if (transaction.transactionType == 'transfer') {
+                card.balance += transaction.amount;
+              }
+              await isar.creditCards.put(card);
             }
-            await isar.creditCards.put(card);
           }
         }
       }
+    });
+  }
+
+  Future<void> restoreTransaction(int id) async {
+    await isar.writeTxn(() async {
+      final transaction = await isar.transactions.get(id);
+      if (transaction != null) {
+        transaction.isDeleted = false;
+        transaction.deletedAt = null;
+        await isar.transactions.put(transaction);
+
+        if (transaction.cardId != null) {
+          // Re-apply card balance adjustment
+          final cardIdInt = int.tryParse(transaction.cardId!);
+          if (cardIdInt != null) {
+            final card = await isar.creditCards.get(cardIdInt);
+            if (card != null) {
+              if (transaction.transactionType == 'expense') {
+                card.balance += transaction.amount;
+              } else if (transaction.transactionType == 'transfer') {
+                card.balance -= transaction.amount;
+              }
+              await isar.creditCards.put(card);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> permanentlyDeleteTransaction(int id) async {
+    await isar.writeTxn(() async {
       await isar.transactions.delete(id);
+    });
+  }
+
+  Future<void> clearAllTransactions() async {
+    await isar.writeTxn(() async {
+      await isar.transactions.clear();
+    });
+  }
+
+  Future<void> clearAllLoans() async {
+    await isar.writeTxn(() async {
+      await isar.loans.clear();
     });
   }
 

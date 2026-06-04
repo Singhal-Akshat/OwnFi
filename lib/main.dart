@@ -31,6 +31,22 @@ import 'core/animated_gradient_background.dart';
 import 'features/cards_loans/widgets/nfc_scan_radar.dart';
 import 'ui/onboarding/model_onboarding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
+import 'core/google_sync_service.dart';
+
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    try {
+      final dbService = DatabaseService();
+      await dbService.init();
+      final syncService = GoogleSyncService();
+      await syncService.backupToCloud(dbService);
+      await syncService.syncTransactionsFromGmail(dbService);
+    } catch (_) {}
+    return Future.value(true);
+  });
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +55,24 @@ void main() async {
   } catch (e) {
     print('Failed to initialize FlutterGemma: $e');
   }
+
+  try {
+    await Workmanager().initialize(
+      callbackDispatcher,
+      isInDebugMode: false,
+    );
+    await Workmanager().registerPeriodicTask(
+      "nightly-backup-task",
+      "nightlyBackupSync",
+      frequency: const Duration(hours: 24),
+      constraints: Constraints(
+        networkType: NetworkType.unmetered,
+        requiresCharging: true,
+        requiresDeviceIdle: true,
+      ),
+    );
+  } catch (_) {}
+
   final dbService = DatabaseService();
   await dbService.init();
 
@@ -950,7 +984,35 @@ class DashboardView extends ConsumerWidget {
   void _showAddExpenseDialog(BuildContext context, WidgetRef ref, {Transaction? existingTransaction}) {
     final amountController = TextEditingController(text: existingTransaction != null ? existingTransaction.amount.toStringAsFixed(0) : '');
     final descController = TextEditingController(text: existingTransaction?.description ?? '');
-    final catController = TextEditingController(text: existingTransaction?.category ?? '');
+
+    // Category setup with rich metadata
+    final List<String> categories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Salary', 'Investment', 'Health', 'Education', 'Others'];
+    final Map<String, Map<String, dynamic>> categoryMetadata = {
+      'Food': {'icon': Icons.fastfood_rounded, 'color': Colors.orangeAccent},
+      'Shopping': {'icon': Icons.shopping_bag_rounded, 'color': Colors.pinkAccent},
+      'Bills': {'icon': Icons.receipt_long_rounded, 'color': AppColors.neonTeal},
+      'Entertainment': {'icon': Icons.movie_rounded, 'color': AppColors.neonPurple},
+      'Travel': {'icon': Icons.directions_car_rounded, 'color': Colors.blueAccent},
+      'Salary': {'icon': Icons.wallet_rounded, 'color': AppColors.neonEmerald},
+      'Investment': {'icon': Icons.trending_up_rounded, 'color': Colors.amberAccent},
+      'Health': {'icon': Icons.health_and_safety_rounded, 'color': Colors.redAccent},
+      'Education': {'icon': Icons.school_rounded, 'color': Colors.indigoAccent},
+      'Others': {'icon': Icons.more_horiz_rounded, 'color': AppColors.textSecondary},
+    };
+
+    String selectedCategory = 'Others';
+    if (existingTransaction != null) {
+      if (categories.contains(existingTransaction.category)) {
+        selectedCategory = existingTransaction.category;
+      } else {
+        selectedCategory = existingTransaction.category;
+        categories.insert(0, selectedCategory);
+        categoryMetadata[selectedCategory] = {
+          'icon': Icons.category_rounded,
+          'color': AppColors.neonTeal,
+        };
+      }
+    }
 
     String selectedType = existingTransaction?.transactionType ?? 'expense';
     String selectedAccountType = 'Cash'; // Cash, Bank, CreditCard
@@ -1043,14 +1105,37 @@ class DashboardView extends ConsumerWidget {
                         ),
                         const SizedBox(height: 12),
 
-                        // Category
-                        TextField(
-                          controller: catController,
-                          decoration: const InputDecoration(
-                            labelText: 'Category',
-                            hintText: 'e.g. Electronics, Food, Bills',
-                            border: OutlineInputBorder(),
-                          ),
+                        // Category Dropdown with Rich Icons
+                        DropdownButtonFormField<String>(
+                          value: selectedCategory,
+                          decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+                          dropdownColor: AppColors.obsidianSurface,
+                          items: categories.map((cat) {
+                            final meta = categoryMetadata[cat] ?? {
+                              'icon': Icons.category_rounded,
+                              'color': AppColors.textSecondary,
+                            };
+                            return DropdownMenuItem(
+                              value: cat,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: (meta['color'] as Color).withOpacity(0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(meta['icon'] as IconData, color: meta['color'] as Color, size: 16),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(cat),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => selectedCategory = val);
+                          },
                         ),
                         const SizedBox(height: 12),
 
@@ -1059,33 +1144,111 @@ class DashboardView extends ConsumerWidget {
                           value: selectedAccountType,
                           decoration: const InputDecoration(labelText: 'Account / Card', border: OutlineInputBorder()),
                           dropdownColor: AppColors.obsidianSurface,
+                          isExpanded: true,
                           items: () {
                             final List<DropdownMenuItem<String>> menuItems = [
-                              const DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                              DropdownMenuItem(
+                                value: 'Cash',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.wallet_rounded, color: AppColors.neonEmerald, size: 18),
+                                    const SizedBox(width: 8),
+                                    const Text('Cash'),
+                                  ],
+                                ),
+                              ),
                             ];
                             
                             bankAccountsState.maybeWhen(
                               data: (accounts) {
                                 if (accounts.isEmpty) {
-                                  menuItems.add(const DropdownMenuItem(value: 'Bank', child: Text('Bank Account')));
+                                  menuItems.add(DropdownMenuItem(
+                                    value: 'Bank',
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 18),
+                                        const SizedBox(width: 8),
+                                        const Text('Bank Account'),
+                                      ],
+                                    ),
+                                  ));
                                 } else {
-                                  menuItems.addAll(accounts.map((acc) => DropdownMenuItem(
-                                    value: 'bank:${acc.id}',
-                                    child: Text('${acc.bankName} (..${acc.last4})'),
-                                  )));
+                                  menuItems.addAll(accounts.map((acc) {
+                                    Widget logoWidget = const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 18);
+                                    if (acc.logoAsset.isNotEmpty) {
+                                      logoWidget = SvgPicture.asset(
+                                        'assets/bank_logos/${acc.logoAsset}',
+                                        width: 18,
+                                        height: 18,
+                                      );
+                                    }
+                                    return DropdownMenuItem(
+                                      value: 'bank:${acc.id}',
+                                      child: Row(
+                                        children: [
+                                          logoWidget,
+                                          const SizedBox(width: 8),
+                                          Text('${acc.bankName} (..${acc.last4})'),
+                                        ],
+                                      ),
+                                    );
+                                  }));
                                 }
                               },
                               orElse: () {
-                                menuItems.add(const DropdownMenuItem(value: 'Bank', child: Text('Bank Account')));
+                                menuItems.add(DropdownMenuItem(
+                                  value: 'Bank',
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 18),
+                                      const SizedBox(width: 8),
+                                      const Text('Bank Account'),
+                                    ],
+                                  ),
+                                ));
                               },
                             );
 
                             cardsState.maybeWhen(
                               data: (cards) {
-                                menuItems.addAll(cards.map((card) => DropdownMenuItem(
-                                  value: 'card:${card.id}',
-                                  child: Text('${card.cardName} (..${card.last4})'),
-                                )));
+                                menuItems.addAll(cards.map((card) {
+                                  Widget cardVisual = Container(
+                                    width: 20,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                  );
+                                  if (card.imageUrl.isNotEmpty) {
+                                    cardVisual = ClipRRect(
+                                      borderRadius: BorderRadius.circular(3),
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 14,
+                                        child: card.imageUrl.toLowerCase().endsWith('.svg')
+                                            ? SvgPicture.asset(
+                                                'assets/credit_card_images/${card.imageUrl}',
+                                                fit: BoxFit.fill,
+                                              )
+                                            : Image.asset(
+                                                'assets/credit_card_images/${card.imageUrl}',
+                                                fit: BoxFit.cover,
+                                              ),
+                                      ),
+                                    );
+                                  }
+                                  return DropdownMenuItem(
+                                    value: 'card:${card.id}',
+                                    child: Row(
+                                      children: [
+                                        cardVisual,
+                                        const SizedBox(width: 8),
+                                        Text('${card.cardName} (..${card.last4})'),
+                                      ],
+                                    ),
+                                  );
+                                }));
                               },
                               orElse: () {},
                             );
@@ -1177,7 +1340,7 @@ class DashboardView extends ConsumerWidget {
                               onPressed: () {
                                 final amount = double.tryParse(amountController.text) ?? 0.0;
                                 final desc = descController.text.trim();
-                                final category = catController.text.trim();
+                                final category = selectedCategory;
 
                                 if (amount <= 0 || desc.isEmpty || category.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -3391,6 +3554,18 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   trailing: const Icon(Icons.vpn_key_outlined, size: 20, color: AppColors.textSecondary),
                   onTap: () => _showManagePasswordsDialog(context),
                 ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
+                  title: const Text('Recovery Bin', style: TextStyle(fontSize: 14, color: AppColors.neonTeal)),
+                  subtitle: const Text('Restore recently deleted transactions', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.restore_from_trash_rounded, size: 20, color: AppColors.neonTeal),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const RecoveryBinPage()),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -3403,17 +3578,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
             child: Column(
               children: [
                 ListTile(
-                  title: const Text('Configure Gmail IMAP', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Store email fetch credentials locally', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.mail_outline_rounded, size: 20, color: AppColors.textSecondary),
-                  onTap: () => _showImapConfigDialog(context),
-                ),
-                const Divider(height: 1, color: AppColors.glassBorder),
-                ListTile(
-                  title: const Text('WebDAV Backup & Sync', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Configure encrypted Nextcloud or WebDAV backups', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.sync_alt_rounded, size: 20, color: AppColors.textSecondary),
-                  onTap: () => _showSyncConfigDialog(context),
+                  title: const Text('Linked Google Accounts', style: TextStyle(fontSize: 14)),
+                  subtitle: const Text('Manage backup, sync, and Gmail scanning accounts', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.account_tree_rounded, size: 20, color: AppColors.textSecondary),
+                  onTap: () => _showGoogleAccountsDialog(context),
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
@@ -3490,10 +3658,24 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
             child: Column(
               children: [
                 ListTile(
+                  title: const Text('Clear All Transactions', style: TextStyle(fontSize: 14, color: Colors.orangeAccent)),
+                  subtitle: const Text('Erases transaction history. Cards & Bank Accounts remain intact.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.receipt_long_rounded, size: 20, color: Colors.orangeAccent),
+                  onTap: () => _showClearDataConfirmDialog(context, type: 'transactions'),
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
+                  title: const Text('Clear All Debts & Loans', style: TextStyle(fontSize: 14, color: Colors.orangeAccent)),
+                  subtitle: const Text('Erases loan history and tracking. Cards & Bank Accounts remain intact.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.account_balance_wallet_rounded, size: 20, color: Colors.orangeAccent),
+                  onTap: () => _showClearDataConfirmDialog(context, type: 'loans'),
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
                   title: const Text('Clear All Data', style: TextStyle(fontSize: 14, color: Colors.redAccent)),
                   subtitle: const Text('Permanently erase all credit cards, loans, holdings, and transactions', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   trailing: const Icon(Icons.delete_forever_rounded, size: 20, color: Colors.redAccent),
-                  onTap: () => _showClearDataConfirmDialog(context),
+                  onTap: () => _showClearDataConfirmDialog(context, type: 'all'),
                 ),
               ],
             ),
@@ -4077,9 +4259,19 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     return pinMatched ?? false;
   }
 
-  void _showClearDataConfirmDialog(BuildContext context) {
+  void _showClearDataConfirmDialog(BuildContext context, {String type = 'all'}) {
     final textController = TextEditingController();
     bool canDelete = false;
+
+    String title = 'Erase All Data';
+    String warning = 'This will permanently delete all transactions, credit cards, active loans, and portfolios from this device. This operation cannot be undone.';
+    if (type == 'transactions') {
+      title = 'Clear All Transactions';
+      warning = 'This will permanently delete all transaction history from this device. Your cards and bank accounts will remain intact.';
+    } else if (type == 'loans') {
+      title = 'Clear All Debts & Loans';
+      warning = 'This will permanently delete all active loans and debtor/creditor ledgers. Your cards and bank accounts will remain intact.';
+    }
 
     showDialog(
       context: context,
@@ -4103,7 +4295,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
                           const SizedBox(width: 8),
                           Text(
-                            'Erase All Data',
+                            title,
                             style: Theme.of(stateContext).textTheme.titleLarge?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -4112,9 +4304,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'This will permanently delete all transactions, credit cards, active loans, and portfolios from this device. This operation cannot be undone.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                      Text(
+                        warning,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
                       ),
                       const SizedBox(height: 20),
                       Text(
@@ -4168,22 +4360,29 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     // Trigger security authentication layer
                                     final authenticated = await _authenticateUserForClear(context);
                                     if (authenticated) {
-                                      // Clear DB
-                                      await ref.read(databaseServiceProvider).clearAllData();
-                                      
-                                      // Clear sync timestamps
-                                      await _storage.delete(key: 'last_sms_sync_time');
-                                      await _storage.delete(key: 'last_email_sync_time');
-                                      
-                                      // Reload providers to refresh UI immediately
-                                      ref.read(transactionsProvider.notifier).loadTransactions();
-                                      ref.read(creditCardsProvider.notifier).loadCreditCards();
-                                      ref.read(loansProvider.notifier).loadLoans();
-                                      ref.read(holdingsProvider.notifier).loadHoldings();
+                                      // Clear DB based on type
+                                      if (type == 'transactions') {
+                                        await ref.read(databaseServiceProvider).clearAllTransactions();
+                                        await _storage.delete(key: 'last_sms_sync_time');
+                                        await _storage.delete(key: 'last_email_sync_time');
+                                        ref.read(transactionsProvider.notifier).loadTransactions();
+                                        ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                      } else if (type == 'loans') {
+                                        await ref.read(databaseServiceProvider).clearAllLoans();
+                                        ref.read(loansProvider.notifier).loadLoans();
+                                      } else {
+                                        await ref.read(databaseServiceProvider).clearAllData();
+                                        await _storage.delete(key: 'last_sms_sync_time');
+                                        await _storage.delete(key: 'last_email_sync_time');
+                                        ref.read(transactionsProvider.notifier).loadTransactions();
+                                        ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                        ref.read(loansProvider.notifier).loadLoans();
+                                        ref.read(holdingsProvider.notifier).loadHoldings();
+                                      }
                                       
                                       messenger.showSnackBar(
                                         const SnackBar(
-                                          content: Text('All data successfully cleared from the database.'),
+                                          content: Text('Selected data successfully cleared from the database.'),
                                           backgroundColor: Colors.redAccent,
                                         ),
                                       );
@@ -4204,6 +4403,219 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   ),
                 ),
               ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showGoogleAccountsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (stateContext, setState) {
+            return FutureBuilder<List<LinkedGoogleAccount>>(
+              future: ref.read(googleSyncServiceProvider).getLinkedAccounts(),
+              builder: (context, snapshot) {
+                final accounts = snapshot.data ?? [];
+                final primary = accounts.firstWhere((e) => e.isPrimary, orElse: () => LinkedGoogleAccount(email: 'Not Linked', isPrimary: true));
+                final secondaries = accounts.where((e) => !e.isPrimary).toList();
+
+                return Dialog(
+                  backgroundColor: Colors.transparent,
+                  child: GlassBlur(
+                    borderRadius: 24,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.account_tree_rounded, color: AppColors.neonTeal, size: 24),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Linked Google Accounts',
+                                style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Primary backup section
+                          const Text(
+                            'PRIMARY SYNC & BACKUP ACCOUNT',
+                            style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                          ),
+                          const SizedBox(height: 8),
+                          GlassBlur(
+                            borderRadius: 12,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          primary.email,
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          primary.email == 'Not Linked' ? 'Sync and Cloud Backup disabled' : 'Sync & backups enabled',
+                                          style: TextStyle(fontSize: 11, color: primary.email == 'Not Linked' ? Colors.redAccent : AppColors.neonEmerald),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (primary.email == 'Not Linked')
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.neonTeal,
+                                        foregroundColor: Colors.black,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      ),
+                                      onPressed: () async {
+                                        final acc = await ref.read(googleSyncServiceProvider).authenticateAccount(true);
+                                        if (acc != null) {
+                                          setState(() {});
+                                        }
+                                      },
+                                      child: const Text('Link', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    )
+                                  else ...[
+                                    IconButton(
+                                      icon: const Icon(Icons.cloud_upload_rounded, color: AppColors.neonTeal),
+                                      onPressed: () async {
+                                        final success = await ref.read(googleSyncServiceProvider).backupToCloud(ref.read(databaseServiceProvider));
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(success ? 'Backup saved successfully to Google Drive' : 'Backup failed'),
+                                            backgroundColor: success ? AppColors.neonEmerald : Colors.redAccent,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.cloud_download_rounded, color: AppColors.neonPurple),
+                                      onPressed: () async {
+                                        final success = await ref.read(googleSyncServiceProvider).restoreFromCloud(ref.read(databaseServiceProvider));
+                                        if (success) {
+                                          ref.read(transactionsProvider.notifier).loadTransactions();
+                                          ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                          ref.read(loansProvider.notifier).loadLoans();
+                                          ref.read(holdingsProvider.notifier).loadHoldings();
+                                        }
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(success ? 'Database restored from Google Drive' : 'Restore failed'),
+                                            backgroundColor: success ? AppColors.neonEmerald : Colors.redAccent,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+                                      onPressed: () async {
+                                        await ref.read(googleSyncServiceProvider).removeAccount(primary.email);
+                                        setState(() {});
+                                      },
+                                    ),
+                                  ]
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Secondary accounts section
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'SECONDARY SCANNING ACCOUNTS',
+                                style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.neonTeal, size: 20),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () async {
+                                  final acc = await ref.read(googleSyncServiceProvider).authenticateAccount(false);
+                                  if (acc != null) {
+                                    setState(() {});
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (secondaries.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Text('No secondary emails linked.', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                            )
+                          else
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 120),
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: secondaries.length,
+                                itemBuilder: (context, index) {
+                                  final sec = secondaries[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: GlassBlur(
+                                      borderRadius: 10,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                sec.email,
+                                                style: const TextStyle(fontSize: 12, color: Colors.white),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              onPressed: () async {
+                                                await ref.read(googleSyncServiceProvider).removeAccount(sec.email);
+                                                setState(() {});
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          const SizedBox(height: 16),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(dialogContext),
+                              child: const Text('Close', style: TextStyle(color: AppColors.neonTeal)),
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             );
           },
         );
@@ -4247,10 +4659,8 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       }
 
       int emailCount = 0;
-      final hasEmailCreds = await ref.read(emailSyncServiceProvider).hasCredentials();
-      if (hasEmailCreds) {
-        emailCount = await ref.read(emailSyncServiceProvider).syncEmails();
-      }
+      final parsedTxs = await ref.read(googleSyncServiceProvider).syncTransactionsFromGmail(ref.read(databaseServiceProvider));
+      emailCount = parsedTxs.length;
 
       // Reload database providers
       ref.read(transactionsProvider.notifier).loadTransactions();
@@ -5940,6 +6350,158 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                         );
                       },
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class RecoveryBinPage extends ConsumerStatefulWidget {
+  const RecoveryBinPage({super.key});
+
+  @override
+  ConsumerState<RecoveryBinPage> createState() => _RecoveryBinPageState();
+}
+
+class _RecoveryBinPageState extends ConsumerState<RecoveryBinPage> {
+  List<Transaction> _deletedTxs = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDeletedTransactions();
+  }
+
+  Future<void> _loadDeletedTransactions() async {
+    setState(() => _isLoading = true);
+    final txs = await ref.read(databaseServiceProvider).getDeletedTransactions();
+    if (mounted) {
+      setState(() {
+        _deletedTxs = txs;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _restoreTx(Transaction tx) async {
+    await ref.read(databaseServiceProvider).restoreTransaction(tx.id);
+    ref.read(transactionsProvider.notifier).loadTransactions();
+    ref.read(creditCardsProvider.notifier).loadCreditCards();
+    _loadDeletedTransactions();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Transaction successfully restored'), backgroundColor: AppColors.neonEmerald),
+      );
+    }
+  }
+
+  Future<void> _purgeTx(Transaction tx) async {
+    await ref.read(databaseServiceProvider).permanentlyDeleteTransaction(tx.id);
+    _loadDeletedTransactions();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Transaction permanently deleted'), backgroundColor: Colors.redAccent),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          const AnimatedGradientBackground(),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Recovery Bin',
+                        style: GoogleFonts.montserrat(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator(color: AppColors.neonTeal))
+                        : _deletedTxs.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No recently deleted transactions.',
+                                  style: TextStyle(color: AppColors.textMuted),
+                                ),
+                              )
+                            : ListView.builder(
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: _deletedTxs.length,
+                                itemBuilder: (context, index) {
+                                  final tx = _deletedTxs[index];
+                                  final isIncome = tx.transactionType == 'income';
+                                  final formattedAmt = '${isIncome ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
+                                  
+                                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                  final dateStr = '${tx.timestamp.day} ${months[tx.timestamp.month - 1]}';
+                                  final deletedStr = tx.deletedAt != null 
+                                      ? 'Deleted: ${tx.deletedAt!.day} ${months[tx.deletedAt!.month - 1]}'
+                                      : '';
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: GlassBlur(
+                                      borderRadius: 16,
+                                      child: ListTile(
+                                        title: Text(
+                                          tx.description,
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                        ),
+                                        subtitle: Text(
+                                          '${tx.category} • $dateStr\n$deletedStr',
+                                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                        ),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              formattedAmt,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: isIncome ? AppColors.neonEmerald : Colors.white,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            IconButton(
+                                              icon: const Icon(Icons.restore_rounded, color: AppColors.neonTeal, size: 20),
+                                              onPressed: () => _restoreTx(tx),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 20),
+                                              onPressed: () => _purgeTx(tx),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                   ),
                 ],
               ),

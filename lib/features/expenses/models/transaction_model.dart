@@ -21,6 +21,9 @@ class Transaction {
 
   bool isSplit = false;
   List<TransactionSplitDetail> splitDetails = [];
+
+  bool isDeleted = false;
+  DateTime? deletedAt;
 }
 
 @embedded
