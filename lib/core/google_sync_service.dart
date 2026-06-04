@@ -332,6 +332,31 @@ class GoogleSyncService {
         await driveApi.files.create(driveFile, uploadMedia: media);
       }
       
+      // Backup API keys securely to appDataFolder
+      final geminiKey = await _storage.read(key: 'ai_gemini_key') ?? '';
+      final openaiKey = await _storage.read(key: 'ai_openai_key') ?? '';
+      final ollamaHost = await _storage.read(key: 'ai_ollama_host') ?? '';
+      final keysMap = {
+        'ai_gemini_key': geminiKey,
+        'ai_openai_key': openaiKey,
+        'ai_ollama_host': ollamaHost,
+      };
+      final keysBytes = utf8.encode(jsonEncode(keysMap));
+      final keysMedia = drive.Media(Stream.value(keysBytes), keysBytes.length);
+      final keysFile = drive.File()
+        ..name = 'money_tracker_keys.json'
+        ..parents = ['appDataFolder'];
+
+      final keysList = await driveApi.files.list(
+        q: "name = 'money_tracker_keys.json' and parents in 'appDataFolder'",
+        spaces: 'appDataFolder',
+      );
+      if (keysList.files != null && keysList.files!.isNotEmpty) {
+        await driveApi.files.update(drive.File(), keysList.files!.first.id!, uploadMedia: keysMedia);
+      } else {
+        await driveApi.files.create(keysFile, uploadMedia: keysMedia);
+      }
+      
       // Save last local backup/sync timestamp
       await _storage.write(key: 'last_local_backup_time', value: DateTime.now().toUtc().toIso8601String());
       
@@ -382,6 +407,31 @@ class GoogleSyncService {
 
       await isarDbFile.writeAsBytes(dataBytes);
       await dbService.init();
+
+      // Restore API keys if available
+      final keysList = await driveApi.files.list(
+        q: "name = 'money_tracker_keys.json' and parents in 'appDataFolder'",
+        spaces: 'appDataFolder',
+        $fields: 'files(id, name)',
+      );
+      if (keysList.files != null && keysList.files!.isNotEmpty) {
+        final keysResponse = await driveApi.files.get(
+          keysList.files!.first.id!,
+          downloadOptions: drive.DownloadOptions.fullMedia,
+        ) as drive.Media;
+        final List<int> keysData = [];
+        await keysResponse.stream.forEach((element) => keysData.addAll(element));
+        if (keysData.isNotEmpty) {
+          try {
+            final keysMap = jsonDecode(utf8.decode(keysData));
+            if (keysMap['ai_gemini_key'] != null) await _storage.write(key: 'ai_gemini_key', value: keysMap['ai_gemini_key']);
+            if (keysMap['ai_openai_key'] != null) await _storage.write(key: 'ai_openai_key', value: keysMap['ai_openai_key']);
+            if (keysMap['ai_ollama_host'] != null) await _storage.write(key: 'ai_ollama_host', value: keysMap['ai_ollama_host']);
+          } catch (e) {
+            debugPrint('Failed to decode restored keys: $e');
+          }
+        }
+      }
 
       // Align local sync timestamp with cloud modified time
       final cloudModifiedTime = cloudFile.modifiedTime;

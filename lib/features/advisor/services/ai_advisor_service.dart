@@ -8,7 +8,7 @@ import 'quant_forecast_service.dart';
 import '../../expenses/models/transaction_model.dart';
 import '../../cards_loans/models/card_loan_models.dart';
 import '../../investments/models/holding_model.dart';
-
+import 'package:google_generative_ai/google_generative_ai.dart';
 class AiAdvisorService {
   final _storage = const FlutterSecureStorage();
 
@@ -35,35 +35,19 @@ class AiAdvisorService {
     return meta.assetPath; // asset path is relative to assets folder.
   }
 
-  // Primary entrypoint to query the advisor (local on‑device LLM via FlutterGemma).
+  // Primary entrypoint to query the advisor.
   Future<String> queryAdvisor({
     required String userQuery,
     required String sanitizedProfile,
     required QuantForecastResult forecast,
   }) async {
-    final useLocalStr = await _storage.read(key: 'ai_use_local') ?? 'false';
-    if (useLocalStr != 'true') {
-      return _generateRuleBasedResponse(userQuery, forecast);
-    }
-
-    // Determine which model to use.
     final modelId = await _getSelectedModelId();
-    final meta = await ModelRepository.instance.getMeta(modelId);
-    if (meta == null) {
-      return _generateRuleBasedResponse(userQuery, forecast);
-    }
-
-    final modelPath = await ModelRepository.instance.localModelPath(meta.assetPath);
-    final file = File(modelPath);
-    if (!await file.exists()) {
-      return _generateRuleBasedResponse(userQuery, forecast);
-    }
 
     final systemInstruction =
         "You are a professional wealth advisor and financial analyst. "
         "Answer the user's financial questions based on their sanitized profile. "
         "Do not reference any specific real company names or stock tickers that were not provided in the profile. "
-        "Keep advice local, logical, quantitative, and privacy‑first.";
+        "Keep advice logical, quantitative, and privacy‑first.";
     final prompt = """
 $systemInstruction
 
@@ -74,6 +58,39 @@ User's Question: "$userQuery"
 
 Provide a concise, professional financial assessment in 2-3 paragraphs. Discuss budgeting, debt consolidation, investment rebalancing, or emergency savings where relevant.
 """;
+
+    if (modelId == '__gemini__') {
+      try {
+        final geminiKey = await _storage.read(key: 'ai_gemini_key');
+        if (geminiKey != null && geminiKey.isNotEmpty) {
+          final model = GenerativeModel(
+            model: 'gemini-3.1-flash-lite',
+            apiKey: geminiKey,
+          );
+          final response = await model.generateContent([Content.text(prompt)]);
+          if (response.text != null && response.text!.isNotEmpty) {
+            return response.text!.trim();
+          }
+        }
+      } catch (e) {
+        return "Gemini API Error: $e\n\n${_generateRuleBasedResponse(userQuery, forecast)}";
+      }
+    } else if (modelId == '__openai__') {
+      return "OpenAI integration pending.\n\n${_generateRuleBasedResponse(userQuery, forecast)}";
+    } else if (modelId == '__ollama__') {
+      return "Ollama integration pending.\n\n${_generateRuleBasedResponse(userQuery, forecast)}";
+    }
+
+    final meta = await ModelRepository.instance.getMeta(modelId);
+    if (meta == null) {
+      return _generateRuleBasedResponse(userQuery, forecast);
+    }
+
+    final modelPath = await ModelRepository.instance.localModelPath(meta.assetPath);
+    final file = File(modelPath);
+    if (!await file.exists()) {
+      return _generateRuleBasedResponse(userQuery, forecast);
+    }
 
     try {
       if (!FlutterGemma.hasActiveModel()) {

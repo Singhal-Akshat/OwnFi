@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/model_repository.dart';
-import '../../services/model_downloader.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:io';
 
-/// Chat screen widget that lets the user pick which downloaded model to use.
+class ModelItem {
+  final String id;
+  final String displayName;
+  final bool isLocal;
+
+  ModelItem({required this.id, required this.displayName, required this.isLocal});
+}
+
+/// Chat screen widget that lets the user pick which model (Cloud or Local) to use.
 class ModelSelector extends StatefulWidget {
   final VoidCallback? onChanged;
   const ModelSelector({Key? key, this.onChanged}) : super(key: key);
@@ -15,7 +22,7 @@ class ModelSelector extends StatefulWidget {
 }
 
 class _ModelSelectorState extends State<ModelSelector> {
-  List<ModelMeta> _downloaded = [];
+  List<ModelItem> _availableModels = [];
   String? _selectedId;
   bool _loading = true;
 
@@ -26,23 +33,48 @@ class _ModelSelectorState extends State<ModelSelector> {
   }
 
   Future<void> _loadModels() async {
+    final available = <ModelItem>[];
+    
+    // 1. Cloud APIs
+    const storage = FlutterSecureStorage();
+    final geminiKey = await storage.read(key: 'ai_gemini_key');
+    if (geminiKey != null && geminiKey.isNotEmpty) {
+      available.add(ModelItem(id: '__gemini__', displayName: 'Gemini Cloud API', isLocal: false));
+    }
+    final openaiKey = await storage.read(key: 'ai_openai_key');
+    if (openaiKey != null && openaiKey.isNotEmpty) {
+      available.add(ModelItem(id: '__openai__', displayName: 'OpenAI Cloud API', isLocal: false));
+    }
+
+    final ollamaHost = await storage.read(key: 'ai_ollama_host');
+    if (ollamaHost != null && ollamaHost.isNotEmpty) {
+      available.add(ModelItem(id: '__ollama__', displayName: 'Ollama Local Host', isLocal: false));
+    }
+
+    // 2. Downloaded Local Models
     final repo = ModelRepository.instance;
     final all = await repo.loadModels();
-    // Keep only models that have a local file.
-    final downloaded = <ModelMeta>[];
     for (var m in all) {
       final localPath = await repo.localModelPath(m.assetPath);
       if (await File(localPath).exists()) {
-        downloaded.add(m);
+        available.add(ModelItem(id: m.id, displayName: 'Local: ${m.displayName}', isLocal: true));
       }
     }
+    
     final prefs = await SharedPreferences.getInstance();
     final selected = prefs.getString('selectedModelId');
+    
+    bool selectedExists = available.any((e) => e.id == selected);
+    
     setState(() {
-      _downloaded = downloaded;
-      _selectedId = selected ?? (downloaded.isNotEmpty ? downloaded.first.id : null);
+      _availableModels = available;
+      _selectedId = selectedExists ? selected : (available.isNotEmpty ? available.first.id : null);
       _loading = false;
     });
+
+    if (!selectedExists && _selectedId != null) {
+      await prefs.setString('selectedModelId', _selectedId!);
+    }
   }
 
   Future<void> _onSelect(String? id) async {
@@ -64,7 +96,7 @@ class _ModelSelectorState extends State<ModelSelector> {
         child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.blueAccent),
       );
     }
-    if (_downloaded.isEmpty) {
+    if (_availableModels.isEmpty) {
       return const Text(
         'No models',
         style: TextStyle(fontSize: 11, color: Colors.redAccent, fontWeight: FontWeight.w600),
@@ -77,7 +109,7 @@ class _ModelSelectorState extends State<ModelSelector> {
       underline: const SizedBox(),
       icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent, size: 18),
       style: const TextStyle(fontSize: 11, color: Colors.blueAccent, fontWeight: FontWeight.bold),
-      items: _downloaded
+      items: _availableModels
           .map((m) => DropdownMenuItem<String>(
                 value: m.id,
                 child: Text(

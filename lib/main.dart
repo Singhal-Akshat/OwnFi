@@ -57,10 +57,7 @@ void main() async {
   }
 
   try {
-    await Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: false,
-    );
+    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
     await Workmanager().registerPeriodicTask(
       "nightly-backup-task",
       "nightlyBackupSync",
@@ -91,9 +88,7 @@ void main() async {
 
   runApp(
     ProviderScope(
-      overrides: [
-        databaseServiceProvider.overrideWithValue(dbService),
-      ],
+      overrides: [databaseServiceProvider.overrideWithValue(dbService)],
       child: const MyApp(),
     ),
   );
@@ -146,7 +141,8 @@ class MainNavigationShell extends StatefulWidget {
   State<MainNavigationShell> createState() => _MainNavigationShellState();
 }
 
-class _MainNavigationShellState extends State<MainNavigationShell> with WidgetsBindingObserver {
+class _MainNavigationShellState extends State<MainNavigationShell>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   @override
@@ -175,7 +171,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> with WidgetsB
     if (!hasSeen) {
       await prefs.setBool('hasSeenModelOnboarding', true);
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ModelOnboardingScreen()));
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ModelOnboardingScreen()));
     }
   }
 
@@ -197,39 +195,43 @@ class _MainNavigationShellState extends State<MainNavigationShell> with WidgetsB
           const AnimatedGradientBackground(),
           SafeArea(
             bottom: false,
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _screens,
-            ),
+            child: IndexedStack(index: _currentIndex, children: _screens),
           ),
         ],
       ),
       bottomNavigationBar: View.of(context).viewInsets.bottom > 0
           ? null
           : SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: GlassBlur(
-            borderRadius: 24,
-            blurX: 20,
-            blurY: 20,
-            child: Container(
-              height: 70,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildNavBarItem(Icons.dashboard_rounded, 'Home', 0),
-                  _buildNavBarItem(Icons.credit_card_rounded, 'Cards', 1),
-                  _buildNavBarItem(Icons.show_chart_rounded, 'Invest', 2),
-                  _buildNavBarItem(Icons.psychology_rounded, 'AI Advisor', 3),
-                  _buildNavBarItem(Icons.settings_rounded, 'Settings', 4),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: GlassBlur(
+                  borderRadius: 24,
+                  blurX: 20,
+                  blurY: 20,
+                  child: Container(
+                    height: 70,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildNavBarItem(Icons.dashboard_rounded, 'Home', 0),
+                        _buildNavBarItem(Icons.credit_card_rounded, 'Cards', 1),
+                        _buildNavBarItem(Icons.show_chart_rounded, 'Invest', 2),
+                        _buildNavBarItem(
+                          Icons.psychology_rounded,
+                          'AI Advisor',
+                          3,
+                        ),
+                        _buildNavBarItem(Icons.settings_rounded, 'Settings', 4),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -248,7 +250,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> with WidgetsB
             duration: const Duration(milliseconds: 250),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isSelected ? activeColor.withOpacity(0.15) : Colors.transparent,
+              color: isSelected
+                  ? activeColor.withOpacity(0.15)
+                  : Colors.transparent,
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -314,7 +318,8 @@ class DashboardView extends ConsumerWidget {
 
     // Baseline Cash/Bank is ₹3,25,820. We adjust it by manual cash/bank transactions.
     // If the database is completely empty, cashAndBank and netWorth should be exactly 0.
-    final bool isEmptyDb = (txsState.valueOrNull?.isEmpty ?? true) &&
+    final bool isEmptyDb =
+        (txsState.valueOrNull?.isEmpty ?? true) &&
         (cardsState.valueOrNull?.isEmpty ?? true) &&
         (loansState.valueOrNull?.isEmpty ?? true) &&
         (holdingsState.valueOrNull?.isEmpty ?? true);
@@ -325,7 +330,11 @@ class DashboardView extends ConsumerWidget {
     txsState.whenData((txs) {
       for (final tx in txs) {
         // Only adjust dynamic cash balance for manual Cash transactions
-        if (tx.cardId == null && (tx.accountName == 'Cash' || tx.accountName == null || (!tx.accountName!.startsWith('bank:') && tx.accountName != 'Credit Card'))) {
+        if (tx.cardId == null &&
+            (tx.accountName == 'Cash' ||
+                tx.accountName == null ||
+                (!tx.accountName!.startsWith('bank:') &&
+                    tx.accountName != 'Credit Card'))) {
           if (tx.transactionType == 'income') {
             cashAndBank += tx.amount;
           } else if (tx.transactionType == 'expense') {
@@ -341,7 +350,12 @@ class DashboardView extends ConsumerWidget {
       }
     });
 
-    final netWorth = totalHoldingsVal + cashAndBank + totalReceivables - totalCardOutstanding - totalDebts;
+    final netWorth =
+        totalHoldingsVal +
+        cashAndBank +
+        totalReceivables -
+        totalCardOutstanding -
+        totalDebts;
 
     String formatCurrency(double val) {
       final sign = val < 0 ? '-' : '';
@@ -394,7 +408,10 @@ class DashboardView extends ConsumerWidget {
                   GlassBlur(
                     borderRadius: 14,
                     child: IconButton(
-                      icon: const Icon(Icons.sync_rounded, color: AppColors.neonTeal),
+                      icon: const Icon(
+                        Icons.sync_rounded,
+                        color: AppColors.neonTeal,
+                      ),
                       onPressed: () async {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -403,23 +420,35 @@ class DashboardView extends ConsumerWidget {
                           ),
                         );
                         try {
-                          final restored = await ref.read(googleSyncServiceProvider).syncOnStartup(ref.read(databaseServiceProvider));
+                          final restored = await ref
+                              .read(googleSyncServiceProvider)
+                              .syncOnStartup(ref.read(databaseServiceProvider));
                           if (restored) {
-                            ref.read(transactionsProvider.notifier).loadTransactions();
-                            ref.read(creditCardsProvider.notifier).loadCreditCards();
-                            ref.read(bankAccountsProvider.notifier).loadBankAccounts();
+                            ref
+                                .read(transactionsProvider.notifier)
+                                .loadTransactions();
+                            ref
+                                .read(creditCardsProvider.notifier)
+                                .loadCreditCards();
+                            ref
+                                .read(bankAccountsProvider.notifier)
+                                .loadBankAccounts();
                             ref.read(loansProvider.notifier).loadLoans();
                             ref.read(holdingsProvider.notifier).loadHoldings();
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Sync completed. Newer data restored from Google Drive.'),
+                                content: Text(
+                                  'Sync completed. Newer data restored from Google Drive.',
+                                ),
                                 backgroundColor: AppColors.neonEmerald,
                               ),
                             );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Your database is already in sync with Google Drive.'),
+                                content: Text(
+                                  'Your database is already in sync with Google Drive.',
+                                ),
                               ),
                             );
                           }
@@ -452,23 +481,42 @@ class DashboardView extends ConsumerWidget {
 
           // Horizontal Balance Cards Slider
           SizedBox(
-            height: 165,
+            height: 185,
             child: bankAccountsState.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
-              error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.neonTeal),
+              ),
+              error: (err, _) => Center(
+                child: Text(
+                  'Error: $err',
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
+              ),
               data: (accounts) {
                 return ListView(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
                   children: [
-                    // Card 1: Net Worth Card
-                    _buildNetWorthCard(context, netWorth, totalHoldingsVal, cashAndBank, totalCardOutstanding, formatCurrency),
-                    
+                    _buildNetWorthCard(
+                      context,
+                      netWorth,
+                      totalHoldingsVal,
+                      cashAndBank,
+                      totalCardOutstanding + totalDebts,
+                      totalReceivables,
+                      formatCurrency,
+                    ),
+
                     // Card 2+: Bank Accounts
                     ...accounts.map((account) {
-                      return _buildBankAccountCard(context, ref, account, formatCurrency);
+                      return _buildBankAccountCard(
+                        context,
+                        ref,
+                        account,
+                        formatCurrency,
+                      );
                     }),
-                    
+
                     // Card Last: Add Bank Account Button Card
                     _buildAddBankAccountCardButton(context, ref),
                   ],
@@ -488,8 +536,15 @@ class DashboardView extends ConsumerWidget {
           // Transactions List
           Expanded(
             child: txsState.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
-              error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.neonTeal),
+              ),
+              error: (err, _) => Center(
+                child: Text(
+                  'Error: $err',
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
+              ),
               data: (txs) {
                 if (txs.isEmpty) {
                   return const Center(
@@ -513,8 +568,10 @@ class DashboardView extends ConsumerWidget {
                       iconColor = AppColors.neonPurple;
                     }
 
-                    final formattedAmt = '${tx.transactionType == 'income' ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
-                    final dateStr = '${tx.timestamp.day} ${_getMonthName(tx.timestamp.month)}';
+                    final formattedAmt =
+                        '${tx.transactionType == 'income' ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
+                    final dateStr =
+                        '${tx.timestamp.day} ${_getMonthName(tx.timestamp.month)}';
 
                     return Dismissible(
                       key: ValueKey(tx.id),
@@ -526,10 +583,16 @@ class DashboardView extends ConsumerWidget {
                           color: Colors.redAccent.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 28),
+                        child: const Icon(
+                          Icons.delete_sweep_rounded,
+                          color: Colors.redAccent,
+                          size: 28,
+                        ),
                       ),
                       onDismissed: (_) {
-                        ref.read(transactionsProvider.notifier).removeTransaction(tx.id);
+                        ref
+                            .read(transactionsProvider.notifier)
+                            .removeTransaction(tx.id);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('${tx.description} deleted'),
@@ -542,7 +605,11 @@ class DashboardView extends ConsumerWidget {
                         child: GlassBlur(
                           borderRadius: 16,
                           child: ListTile(
-                            onTap: () => _showAddExpenseDialog(context, ref, existingTransaction: tx),
+                            onTap: () => _showAddExpenseDialog(
+                              context,
+                              ref,
+                              existingTransaction: tx,
+                            ),
                             leading: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
@@ -550,14 +617,20 @@ class DashboardView extends ConsumerWidget {
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                tx.transactionType == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
+                                tx.transactionType == 'income'
+                                    ? Icons.arrow_downward
+                                    : Icons.arrow_upward,
                                 color: iconColor,
                                 size: 20,
                               ),
                             ),
                             title: Text(
                               tx.description,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                             subtitle: () {
                               String accountDisplayName = 'Cash';
@@ -565,16 +638,28 @@ class DashboardView extends ConsumerWidget {
                                 accountDisplayName = 'Credit Card';
                               } else if (tx.accountName != null) {
                                 if (tx.accountName!.startsWith('bank:')) {
-                                  final bankId = int.tryParse(tx.accountName!.substring(5));
-                                  final bank = bankAccountsState.valueOrNull?.firstWhere((b) => b.id == bankId, orElse: () => BankAccount());
-                                  accountDisplayName = bank != null && bank.bankName.isNotEmpty ? bank.bankName : 'Bank';
+                                  final bankId = int.tryParse(
+                                    tx.accountName!.substring(5),
+                                  );
+                                  final bank = bankAccountsState.valueOrNull
+                                      ?.firstWhere(
+                                        (b) => b.id == bankId,
+                                        orElse: () => BankAccount(),
+                                      );
+                                  accountDisplayName =
+                                      bank != null && bank.bankName.isNotEmpty
+                                      ? bank.bankName
+                                      : 'Bank';
                                 } else {
                                   accountDisplayName = tx.accountName!;
                                 }
                               }
                               return Text(
                                 '${tx.category} • $accountDisplayName • $dateStr',
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
                               );
                             }(),
                             trailing: Text(
@@ -582,7 +667,9 @@ class DashboardView extends ConsumerWidget {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
-                                color: tx.transactionType == 'income' ? AppColors.neonEmerald : Colors.white,
+                                color: tx.transactionType == 'income'
+                                    ? AppColors.neonEmerald
+                                    : Colors.white,
                               ),
                             ),
                           ),
@@ -600,7 +687,20 @@ class DashboardView extends ConsumerWidget {
   }
 
   static String _getMonthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return months[month - 1];
   }
 
@@ -615,20 +715,32 @@ class DashboardView extends ConsumerWidget {
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildNetWorthCard(BuildContext context, double netWorth, double totalHoldingsVal, double cashAndBank, double totalCardOutstanding, String Function(double) formatCurrency) {
+  Widget _buildNetWorthCard(
+    BuildContext context,
+    double netWorth,
+    double totalHoldingsVal,
+    double cashAndBank,
+    double liabilities,
+    double receivables,
+    String Function(double) formatCurrency,
+  ) {
     return Container(
       width: 290,
       margin: const EdgeInsets.only(right: 16),
       child: GlassBlur(
         borderRadius: 20,
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -658,9 +770,40 @@ class DashboardView extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildAssetMini('Investments', formatCurrency(totalHoldingsVal), AppColors.neonEmerald),
-                  _buildAssetMini('Cash/Bank', formatCurrency(cashAndBank), AppColors.neonTeal),
-                  _buildAssetMini('Outstanding', formatCurrency(-totalCardOutstanding), Colors.redAccent),
+                  Expanded(
+                    child: _buildAssetMini(
+                      'Investments',
+                      formatCurrency(totalHoldingsVal),
+                      AppColors.neonEmerald,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildAssetMini(
+                      'Cash/Bank',
+                      formatCurrency(cashAndBank),
+                      AppColors.neonTeal,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: _buildAssetMini(
+                      'Liabilities',
+                      formatCurrency(-liabilities),
+                      Colors.redAccent,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildAssetMini(
+                      'Receivables',
+                      formatCurrency(receivables),
+                      Colors.orangeAccent,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -670,7 +813,12 @@ class DashboardView extends ConsumerWidget {
     );
   }
 
-  Widget _buildBankAccountCard(BuildContext context, WidgetRef ref, BankAccount account, String Function(double) formatCurrency) {
+  Widget _buildBankAccountCard(
+    BuildContext context,
+    WidgetRef ref,
+    BankAccount account,
+    String Function(double) formatCurrency,
+  ) {
     return BankAccountCard(
       account: account,
       ref: ref,
@@ -693,7 +841,11 @@ class DashboardView extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.add_card_rounded, color: AppColors.neonTeal, size: 28),
+                Icon(
+                  Icons.add_card_rounded,
+                  color: AppColors.neonTeal,
+                  size: 28,
+                ),
                 SizedBox(height: 8),
                 Text(
                   'Add Bank',
@@ -711,7 +863,10 @@ class DashboardView extends ConsumerWidget {
     );
   }
 
-  void _showBankAccountDetailsBottomSheet(BuildContext context, BankAccount account) {
+  void _showBankAccountDetailsBottomSheet(
+    BuildContext context,
+    BankAccount account,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -724,8 +879,13 @@ class DashboardView extends ConsumerWidget {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.4),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.15),
+                width: 1,
+              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -736,9 +896,17 @@ class DashboardView extends ConsumerWidget {
                   children: [
                     Text(
                       account.bankName,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
-                    const Icon(Icons.lock_outline_rounded, color: AppColors.neonTeal, size: 20),
+                    const Icon(
+                      Icons.lock_outline_rounded,
+                      color: AppColors.neonTeal,
+                      size: 20,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -748,7 +916,10 @@ class DashboardView extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _buildDetailRow('IFSC Code', account.ifscCode),
                 const SizedBox(height: 12),
-                _buildDetailRow('Balance', '₹${account.balance.toStringAsFixed(2)}'),
+                _buildDetailRow(
+                  'Balance',
+                  '₹${account.balance.toStringAsFixed(2)}',
+                ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -756,7 +927,9 @@ class DashboardView extends ConsumerWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.neonTeal,
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Close'),
@@ -780,13 +953,21 @@ class DashboardView extends ConsumerWidget {
         ),
         Text(
           value.isEmpty ? 'N/A' : value,
-          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
   }
 
-  void _showBankAccountOptions(BuildContext context, WidgetRef ref, BankAccount account) {
+  void _showBankAccountOptions(
+    BuildContext context,
+    WidgetRef ref,
+    BankAccount account,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -800,37 +981,67 @@ class DashboardView extends ConsumerWidget {
               children: [
                 ListTile(
                   leading: const Icon(Icons.edit_rounded, color: Colors.white),
-                  title: const Text('Edit Account', style: TextStyle(color: Colors.white)),
+                  title: const Text(
+                    'Edit Account',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onTap: () {
                     Navigator.pop(context);
-                    _showAddBankAccountDialog(context, ref, existingAccount: account);
+                    _showAddBankAccountDialog(
+                      context,
+                      ref,
+                      existingAccount: account,
+                    );
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                  title: const Text('Delete Account', style: TextStyle(color: Colors.white)),
+                  leading: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                  ),
+                  title: const Text(
+                    'Delete Account',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
                         backgroundColor: AppColors.obsidianSurface,
-                        title: const Text('Delete Account', style: TextStyle(color: Colors.white)),
-                        content: Text('Are you sure you want to delete ${account.bankName} account?', style: const TextStyle(color: Colors.white70)),
+                        title: const Text(
+                          'Delete Account',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        content: Text(
+                          'Are you sure you want to delete ${account.bankName} account?',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
                           ),
                           TextButton(
                             onPressed: () {
-                              ref.read(bankAccountsProvider.notifier).removeBankAccount(account.id);
+                              ref
+                                  .read(bankAccountsProvider.notifier)
+                                  .removeBankAccount(account.id);
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Account deleted'), backgroundColor: AppColors.obsidianSurface),
+                                const SnackBar(
+                                  content: Text('Account deleted'),
+                                  backgroundColor: AppColors.obsidianSurface,
+                                ),
                               );
                             },
-                            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(color: Colors.redAccent),
+                            ),
                           ),
                         ],
                       ),
@@ -845,13 +1056,29 @@ class DashboardView extends ConsumerWidget {
     );
   }
 
-  void _showAddBankAccountDialog(BuildContext context, WidgetRef ref, {BankAccount? existingAccount}) {
-    final nameController = TextEditingController(text: existingAccount?.bankName ?? '');
-    final holderController = TextEditingController(text: existingAccount?.accountHolderName ?? 'Akshat');
-    final fullNumberController = TextEditingController(text: existingAccount?.fullAccountNumber ?? '');
-    final last4Controller = TextEditingController(text: existingAccount?.last4 ?? '');
-    final ifscController = TextEditingController(text: existingAccount?.ifscCode ?? '');
-    final balanceController = TextEditingController(text: existingAccount?.balance.toStringAsFixed(0) ?? '0');
+  void _showAddBankAccountDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    BankAccount? existingAccount,
+  }) {
+    final nameController = TextEditingController(
+      text: existingAccount?.bankName ?? '',
+    );
+    final holderController = TextEditingController(
+      text: existingAccount?.accountHolderName ?? 'Akshat',
+    );
+    final fullNumberController = TextEditingController(
+      text: existingAccount?.fullAccountNumber ?? '',
+    );
+    final last4Controller = TextEditingController(
+      text: existingAccount?.last4 ?? '',
+    );
+    final ifscController = TextEditingController(
+      text: existingAccount?.ifscCode ?? '',
+    );
+    final balanceController = TextEditingController(
+      text: existingAccount?.balance.toStringAsFixed(0) ?? '0',
+    );
 
     String selectedLogo = existingAccount?.logoAsset ?? '';
     String selectedCardColor = existingAccount?.colorHex ?? '#0D47A1';
@@ -890,13 +1117,18 @@ class DashboardView extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          existingAccount == null ? 'Register Bank Account' : 'Edit Bank Account',
+                          existingAccount == null
+                              ? 'Register Bank Account'
+                              : 'Edit Bank Account',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 16),
                         TextField(
                           controller: nameController,
-                          decoration: const InputDecoration(labelText: 'Bank Name (e.g. HDFC Bank)', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Bank Name (e.g. HDFC Bank)',
+                            border: OutlineInputBorder(),
+                          ),
                           onChanged: (val) {
                             final lower = val.toLowerCase();
                             if (lower.contains('hdfc')) {
@@ -904,7 +1136,8 @@ class DashboardView extends ConsumerWidget {
                                 selectedLogo = 'HDB.svg';
                                 selectedCardColor = '#0D47A1';
                               });
-                            } else if (lower.contains('sbi') || lower.contains('state bank')) {
+                            } else if (lower.contains('sbi') ||
+                                lower.contains('state bank')) {
                               setState(() {
                                 selectedLogo = 'SBI-logo.svg';
                                 selectedCardColor = '#0084B4';
@@ -923,7 +1156,10 @@ class DashboardView extends ConsumerWidget {
                         const SizedBox(height: 12),
                         TextField(
                           controller: holderController,
-                          decoration: const InputDecoration(labelText: 'Account Holder Name', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Account Holder Name',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -932,11 +1168,16 @@ class DashboardView extends ConsumerWidget {
                               flex: 2,
                               child: TextField(
                                 controller: fullNumberController,
-                                decoration: const InputDecoration(labelText: 'Account Number', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Account Number',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                                 onChanged: (val) {
                                   if (val.length >= 4) {
-                                    last4Controller.text = val.substring(val.length - 4);
+                                    last4Controller.text = val.substring(
+                                      val.length - 4,
+                                    );
                                   }
                                 },
                               ),
@@ -946,7 +1187,10 @@ class DashboardView extends ConsumerWidget {
                               flex: 1,
                               child: TextField(
                                 controller: last4Controller,
-                                decoration: const InputDecoration(labelText: 'Last 4', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Last 4',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                                 maxLength: 4,
                               ),
@@ -956,27 +1200,55 @@ class DashboardView extends ConsumerWidget {
                         const SizedBox(height: 12),
                         TextField(
                           controller: ifscController,
-                          decoration: const InputDecoration(labelText: 'IFSC Code', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'IFSC Code',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: balanceController,
-                          decoration: const InputDecoration(labelText: 'Current Balance', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Current Balance',
+                            border: OutlineInputBorder(),
+                          ),
                           keyboardType: TextInputType.number,
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           value: selectedLogo,
-                          decoration: const InputDecoration(labelText: 'Bank Logo', border: OutlineInputBorder()),
-                          items: logoOptions.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
-                          onChanged: (val) => setState(() => selectedLogo = val!),
+                          decoration: const InputDecoration(
+                            labelText: 'Bank Logo',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: logoOptions.entries
+                              .map(
+                                (e) => DropdownMenuItem(
+                                  value: e.key,
+                                  child: Text(e.value),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) =>
+                              setState(() => selectedLogo = val!),
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           value: selectedCardColor,
-                          decoration: const InputDecoration(labelText: 'Card Color Accent', border: OutlineInputBorder()),
-                          items: colorOptions.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
-                          onChanged: (val) => setState(() => selectedCardColor = val!),
+                          decoration: const InputDecoration(
+                            labelText: 'Card Color Accent',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: colorOptions.entries
+                              .map(
+                                (e) => DropdownMenuItem(
+                                  value: e.key,
+                                  child: Text(e.value),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) =>
+                              setState(() => selectedCardColor = val!),
                         ),
                         const SizedBox(height: 20),
                         Row(
@@ -984,30 +1256,54 @@ class DashboardView extends ConsumerWidget {
                           children: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.neonTeal,
+                                foregroundColor: Colors.black,
+                              ),
                               onPressed: () {
                                 final bank = nameController.text.trim();
                                 final holder = holderController.text.trim();
-                                final fullNum = fullNumberController.text.trim();
+                                final fullNum = fullNumberController.text
+                                    .trim();
                                 final l4 = last4Controller.text.trim();
                                 final ifsc = ifscController.text.trim();
-                                final bal = double.tryParse(balanceController.text) ?? 0.0;
+                                final bal =
+                                    double.tryParse(balanceController.text) ??
+                                    0.0;
 
                                 if (bank.isEmpty || l4.isEmpty) {
                                   showDialog(
                                     context: context,
                                     builder: (context) => AlertDialog(
-                                      backgroundColor: AppColors.obsidianSurface,
-                                      title: const Text('Invalid Input', style: TextStyle(color: Colors.white)),
-                                      content: const Text('Please fill Bank Name and Account Number.', style: TextStyle(color: Colors.white70)),
+                                      backgroundColor:
+                                          AppColors.obsidianSurface,
+                                      title: const Text(
+                                        'Invalid Input',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      content: const Text(
+                                        'Please fill Bank Name and Account Number.',
+                                        style: TextStyle(color: Colors.white70),
+                                      ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context),
-                                          child: const Text('OK', style: TextStyle(color: AppColors.neonTeal)),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text(
+                                            'OK',
+                                            style: TextStyle(
+                                              color: AppColors.neonTeal,
+                                            ),
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -1015,7 +1311,8 @@ class DashboardView extends ConsumerWidget {
                                   return;
                                 }
 
-                                final account = existingAccount ?? BankAccount();
+                                final account =
+                                    existingAccount ?? BankAccount();
                                 account
                                   ..bankName = bank
                                   ..accountHolderName = holder
@@ -1027,16 +1324,24 @@ class DashboardView extends ConsumerWidget {
                                   ..colorHex = selectedCardColor;
 
                                 if (existingAccount == null) {
-                                  ref.read(bankAccountsProvider.notifier).addBankAccount(account);
+                                  ref
+                                      .read(bankAccountsProvider.notifier)
+                                      .addBankAccount(account);
                                 } else {
-                                  ref.read(bankAccountsProvider.notifier).updateBankAccount(account);
+                                  ref
+                                      .read(bankAccountsProvider.notifier)
+                                      .updateBankAccount(account);
                                 }
                                 Navigator.pop(context);
                               },
-                              child: Text(existingAccount == null ? 'Add Account' : 'Save Changes'),
+                              child: Text(
+                                existingAccount == null
+                                    ? 'Add Account'
+                                    : 'Save Changes',
+                              ),
                             ),
                           ],
-                        )
+                        ),
                       ],
                     ),
                   ),
@@ -1049,23 +1354,65 @@ class DashboardView extends ConsumerWidget {
     );
   }
 
-  void _showAddExpenseDialog(BuildContext context, WidgetRef ref, {Transaction? existingTransaction}) {
-    final amountController = TextEditingController(text: existingTransaction != null ? existingTransaction.amount.toStringAsFixed(0) : '');
-    final descController = TextEditingController(text: existingTransaction?.description ?? '');
+  void _showAddExpenseDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    Transaction? existingTransaction,
+  }) {
+    final amountController = TextEditingController(
+      text: existingTransaction != null
+          ? existingTransaction.amount.toStringAsFixed(0)
+          : '',
+    );
+    final descController = TextEditingController(
+      text: existingTransaction?.description ?? '',
+    );
 
     // Category setup with rich metadata
-    final List<String> categories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Salary', 'Investment', 'Health', 'Education', 'Others'];
+    final List<String> categories = [
+      'Food',
+      'Shopping',
+      'Bills',
+      'Entertainment',
+      'Travel',
+      'Salary',
+      'Investment',
+      'Health',
+      'Education',
+      'Others',
+    ];
     final Map<String, Map<String, dynamic>> categoryMetadata = {
       'Food': {'icon': Icons.fastfood_rounded, 'color': Colors.orangeAccent},
-      'Shopping': {'icon': Icons.shopping_bag_rounded, 'color': Colors.pinkAccent},
-      'Bills': {'icon': Icons.receipt_long_rounded, 'color': AppColors.neonTeal},
-      'Entertainment': {'icon': Icons.movie_rounded, 'color': AppColors.neonPurple},
-      'Travel': {'icon': Icons.directions_car_rounded, 'color': Colors.blueAccent},
+      'Shopping': {
+        'icon': Icons.shopping_bag_rounded,
+        'color': Colors.pinkAccent,
+      },
+      'Bills': {
+        'icon': Icons.receipt_long_rounded,
+        'color': AppColors.neonTeal,
+      },
+      'Entertainment': {
+        'icon': Icons.movie_rounded,
+        'color': AppColors.neonPurple,
+      },
+      'Travel': {
+        'icon': Icons.directions_car_rounded,
+        'color': Colors.blueAccent,
+      },
       'Salary': {'icon': Icons.wallet_rounded, 'color': AppColors.neonEmerald},
-      'Investment': {'icon': Icons.trending_up_rounded, 'color': Colors.amberAccent},
-      'Health': {'icon': Icons.health_and_safety_rounded, 'color': Colors.redAccent},
+      'Investment': {
+        'icon': Icons.trending_up_rounded,
+        'color': Colors.amberAccent,
+      },
+      'Health': {
+        'icon': Icons.health_and_safety_rounded,
+        'color': Colors.redAccent,
+      },
       'Education': {'icon': Icons.school_rounded, 'color': Colors.indigoAccent},
-      'Others': {'icon': Icons.more_horiz_rounded, 'color': AppColors.textSecondary},
+      'Others': {
+        'icon': Icons.more_horiz_rounded,
+        'color': AppColors.textSecondary,
+      },
     };
 
     String selectedCategory = 'Others';
@@ -1097,16 +1444,23 @@ class DashboardView extends ConsumerWidget {
 
     // Split Details controllers
     final splitFriendController = TextEditingController(
-      text: (existingTransaction != null && existingTransaction.isSplit && existingTransaction.splitDetails.isNotEmpty)
+      text:
+          (existingTransaction != null &&
+              existingTransaction.isSplit &&
+              existingTransaction.splitDetails.isNotEmpty)
           ? existingTransaction.splitDetails.first.friendName ?? ''
-          : ''
+          : '',
     );
     final splitAmountController = TextEditingController(
-      text: (existingTransaction != null && existingTransaction.isSplit && existingTransaction.splitDetails.isNotEmpty)
+      text:
+          (existingTransaction != null &&
+              existingTransaction.isSplit &&
+              existingTransaction.splitDetails.isNotEmpty)
           ? existingTransaction.splitDetails.first.amount.toStringAsFixed(0)
-          : ''
+          : '',
     );
-    DateTime selectedDateTime = existingTransaction?.timestamp ?? DateTime.now();
+    DateTime selectedDateTime =
+        existingTransaction?.timestamp ?? DateTime.now();
 
     showDialog(
       context: context,
@@ -1130,7 +1484,9 @@ class DashboardView extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          existingTransaction != null ? 'Edit Transaction' : 'Manual Transaction Entry',
+                          existingTransaction != null
+                              ? 'Edit Transaction'
+                              : 'Manual Transaction Entry',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 16),
@@ -1138,12 +1494,24 @@ class DashboardView extends ConsumerWidget {
                         // Transaction Type Dropdown
                         DropdownButtonFormField<String>(
                           value: selectedType,
-                          decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Type',
+                            border: OutlineInputBorder(),
+                          ),
                           dropdownColor: AppColors.obsidianSurface,
                           items: const [
-                            DropdownMenuItem(value: 'expense', child: Text('Expense')),
-                            DropdownMenuItem(value: 'income', child: Text('Income')),
-                            DropdownMenuItem(value: 'transfer', child: Text('Card Repayment (Transfer)')),
+                            DropdownMenuItem(
+                              value: 'expense',
+                              child: Text('Expense'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'income',
+                              child: Text('Income'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'transfer',
+                              child: Text('Card Repayment (Transfer)'),
+                            ),
                           ],
                           onChanged: (val) {
                             if (val != null) setState(() => selectedType = val);
@@ -1159,7 +1527,9 @@ class DashboardView extends ConsumerWidget {
                             prefixText: '₹ ',
                             border: OutlineInputBorder(),
                           ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                         ),
                         const SizedBox(height: 12),
 
@@ -1177,13 +1547,18 @@ class DashboardView extends ConsumerWidget {
                         // Category Dropdown with Rich Icons
                         DropdownButtonFormField<String>(
                           value: selectedCategory,
-                          decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Category',
+                            border: OutlineInputBorder(),
+                          ),
                           dropdownColor: AppColors.obsidianSurface,
                           items: categories.map((cat) {
-                            final meta = categoryMetadata[cat] ?? {
-                              'icon': Icons.category_rounded,
-                              'color': AppColors.textSecondary,
-                            };
+                            final meta =
+                                categoryMetadata[cat] ??
+                                {
+                                  'icon': Icons.category_rounded,
+                                  'color': AppColors.textSecondary,
+                                };
                             return DropdownMenuItem(
                               value: cat,
                               child: Row(
@@ -1191,10 +1566,15 @@ class DashboardView extends ConsumerWidget {
                                   Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: BoxDecoration(
-                                      color: (meta['color'] as Color).withOpacity(0.15),
+                                      color: (meta['color'] as Color)
+                                          .withOpacity(0.15),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: Icon(meta['icon'] as IconData, color: meta['color'] as Color, size: 16),
+                                    child: Icon(
+                                      meta['icon'] as IconData,
+                                      color: meta['color'] as Color,
+                                      size: 16,
+                                    ),
                                   ),
                                   const SizedBox(width: 10),
                                   Text(cat),
@@ -1203,7 +1583,8 @@ class DashboardView extends ConsumerWidget {
                             );
                           }).toList(),
                           onChanged: (val) {
-                            if (val != null) setState(() => selectedCategory = val);
+                            if (val != null)
+                              setState(() => selectedCategory = val);
                           },
                         ),
                         const SizedBox(height: 12),
@@ -1211,7 +1592,10 @@ class DashboardView extends ConsumerWidget {
                         // Payment Source / Account Selection
                         DropdownButtonFormField<String>(
                           value: selectedAccountType,
-                          decoration: const InputDecoration(labelText: 'Account / Card', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Account / Card',
+                            border: OutlineInputBorder(),
+                          ),
                           dropdownColor: AppColors.obsidianSurface,
                           isExpanded: true,
                           items: () {
@@ -1220,116 +1604,157 @@ class DashboardView extends ConsumerWidget {
                                 value: 'Cash',
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.wallet_rounded, color: AppColors.neonEmerald, size: 18),
+                                    const Icon(
+                                      Icons.wallet_rounded,
+                                      color: AppColors.neonEmerald,
+                                      size: 18,
+                                    ),
                                     const SizedBox(width: 8),
                                     const Text('Cash'),
                                   ],
                                 ),
                               ),
                             ];
-                            
+
                             bankAccountsState.maybeWhen(
                               data: (accounts) {
                                 if (accounts.isEmpty) {
-                                  menuItems.add(DropdownMenuItem(
+                                  menuItems.add(
+                                    DropdownMenuItem(
+                                      value: 'Bank',
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.account_balance_rounded,
+                                            color: Colors.white70,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Text('Bank Account'),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  menuItems.addAll(
+                                    accounts.map((acc) {
+                                      Widget logoWidget = const Icon(
+                                        Icons.account_balance_rounded,
+                                        color: Colors.white70,
+                                        size: 18,
+                                      );
+                                      if (acc.logoAsset.isNotEmpty) {
+                                        logoWidget = SvgPicture.asset(
+                                          'assets/bank_logos/${acc.logoAsset}',
+                                          width: 18,
+                                          height: 18,
+                                        );
+                                      }
+                                      return DropdownMenuItem(
+                                        value: 'bank:${acc.id}',
+                                        child: Row(
+                                          children: [
+                                            logoWidget,
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '${acc.bankName} (..${acc.last4})',
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
+                                  );
+                                }
+                              },
+                              orElse: () {
+                                menuItems.add(
+                                  DropdownMenuItem(
                                     value: 'Bank',
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 18),
+                                        const Icon(
+                                          Icons.account_balance_rounded,
+                                          color: Colors.white70,
+                                          size: 18,
+                                        ),
                                         const SizedBox(width: 8),
                                         const Text('Bank Account'),
                                       ],
                                     ),
-                                  ));
-                                } else {
-                                  menuItems.addAll(accounts.map((acc) {
-                                    Widget logoWidget = const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 18);
-                                    if (acc.logoAsset.isNotEmpty) {
-                                      logoWidget = SvgPicture.asset(
-                                        'assets/bank_logos/${acc.logoAsset}',
-                                        width: 18,
-                                        height: 18,
-                                      );
-                                    }
-                                    return DropdownMenuItem(
-                                      value: 'bank:${acc.id}',
-                                      child: Row(
-                                        children: [
-                                          logoWidget,
-                                          const SizedBox(width: 8),
-                                          Text('${acc.bankName} (..${acc.last4})'),
-                                        ],
-                                      ),
-                                    );
-                                  }));
-                                }
-                              },
-                              orElse: () {
-                                menuItems.add(DropdownMenuItem(
-                                  value: 'Bank',
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 18),
-                                      const SizedBox(width: 8),
-                                      const Text('Bank Account'),
-                                    ],
                                   ),
-                                ));
+                                );
                               },
                             );
 
                             cardsState.maybeWhen(
                               data: (cards) {
-                                menuItems.addAll(cards.map((card) {
-                                  Widget cardVisual = Container(
-                                    width: 20,
-                                    height: 14,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey,
-                                      borderRadius: BorderRadius.circular(3),
-                                    ),
-                                  );
-                                  if (card.imageUrl.isNotEmpty) {
-                                    cardVisual = ClipRRect(
-                                      borderRadius: BorderRadius.circular(3),
-                                      child: SizedBox(
-                                        width: 20,
-                                        height: 14,
-                                        child: card.imageUrl.toLowerCase().endsWith('.svg')
-                                            ? SvgPicture.asset(
-                                                'assets/credit_card_images/${card.imageUrl}',
-                                                fit: BoxFit.fill,
-                                              )
-                                            : Image.asset(
-                                                'assets/credit_card_images/${card.imageUrl}',
-                                                fit: BoxFit.cover,
-                                              ),
+                                menuItems.addAll(
+                                  cards.map((card) {
+                                    Widget cardVisual = Container(
+                                      width: 20,
+                                      height: 14,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey,
+                                        borderRadius: BorderRadius.circular(3),
                                       ),
                                     );
-                                  }
-                                  return DropdownMenuItem(
-                                    value: 'card:${card.id}',
-                                    child: Row(
-                                      children: [
-                                        cardVisual,
-                                        const SizedBox(width: 8),
-                                        Text('${card.cardName} (..${card.last4})'),
-                                      ],
-                                    ),
-                                  );
-                                }));
+                                    if (card.imageUrl.isNotEmpty) {
+                                      cardVisual = ClipRRect(
+                                        borderRadius: BorderRadius.circular(3),
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 14,
+                                          child:
+                                              card.imageUrl
+                                                  .toLowerCase()
+                                                  .endsWith('.svg')
+                                              ? SvgPicture.asset(
+                                                  'assets/credit_card_images/${card.imageUrl}',
+                                                  fit: BoxFit.fill,
+                                                )
+                                              : Image.asset(
+                                                  'assets/credit_card_images/${card.imageUrl}',
+                                                  fit: BoxFit.cover,
+                                                ),
+                                        ),
+                                      );
+                                    }
+                                    return DropdownMenuItem(
+                                      value: 'card:${card.id}',
+                                      child: Row(
+                                        children: [
+                                          cardVisual,
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${card.cardName} (..${card.last4})',
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                );
                               },
                               orElse: () {},
                             );
 
-                            final hasSelection = menuItems.any((item) => item.value == selectedAccountType);
+                            final hasSelection = menuItems.any(
+                              (item) => item.value == selectedAccountType,
+                            );
                             if (!hasSelection) {
-                              menuItems.add(DropdownMenuItem(
-                                value: selectedAccountType,
-                                child: Text(selectedAccountType.startsWith('bank:') 
-                                  ? 'Deleted Bank Account' 
-                                  : selectedAccountType.startsWith('card:') ? 'Deleted Card' : selectedAccountType),
-                              ));
+                              menuItems.add(
+                                DropdownMenuItem(
+                                  value: selectedAccountType,
+                                  child: Text(
+                                    selectedAccountType.startsWith('bank:')
+                                        ? 'Deleted Bank Account'
+                                        : selectedAccountType.startsWith(
+                                            'card:',
+                                          )
+                                        ? 'Deleted Card'
+                                        : selectedAccountType,
+                                  ),
+                                ),
+                              );
                             }
                             return menuItems;
                           }(),
@@ -1338,7 +1763,9 @@ class DashboardView extends ConsumerWidget {
                               setState(() {
                                 selectedAccountType = val;
                                 if (val.startsWith('card:')) {
-                                  selectedCardId = int.tryParse(val.substring(5));
+                                  selectedCardId = int.tryParse(
+                                    val.substring(5),
+                                  );
                                 } else {
                                   selectedCardId = null;
                                 }
@@ -1354,7 +1781,10 @@ class DashboardView extends ConsumerWidget {
                           children: [
                             const Text(
                               'Date & Time',
-                              style: TextStyle(fontSize: 14, color: Colors.white70),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white70,
+                              ),
                             ),
                             TextButton.icon(
                               onPressed: () async {
@@ -1362,7 +1792,9 @@ class DashboardView extends ConsumerWidget {
                                   context: context,
                                   initialDate: selectedDateTime,
                                   firstDate: DateTime(2020),
-                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 365),
+                                  ),
                                   builder: (context, child) {
                                     return Theme(
                                       data: Theme.of(context).copyWith(
@@ -1380,7 +1812,9 @@ class DashboardView extends ConsumerWidget {
                                 if (datePicked != null) {
                                   final timePicked = await showTimePicker(
                                     context: context,
-                                    initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+                                    initialTime: TimeOfDay.fromDateTime(
+                                      selectedDateTime,
+                                    ),
                                     builder: (context, child) {
                                       return Theme(
                                         data: Theme.of(context).copyWith(
@@ -1408,10 +1842,18 @@ class DashboardView extends ConsumerWidget {
                                   }
                                 }
                               },
-                              icon: const Icon(Icons.calendar_today_rounded, color: AppColors.neonTeal, size: 16),
+                              icon: const Icon(
+                                Icons.calendar_today_rounded,
+                                color: AppColors.neonTeal,
+                                size: 16,
+                              ),
                               label: Text(
                                 '${selectedDateTime.day}/${selectedDateTime.month}/${selectedDateTime.year}  ${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}',
-                                style: const TextStyle(color: AppColors.neonTeal, fontSize: 13, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  color: AppColors.neonTeal,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -1420,8 +1862,17 @@ class DashboardView extends ConsumerWidget {
 
                         // Split Toggle
                         CheckboxListTile(
-                          title: const Text('Split Expense?', style: TextStyle(fontSize: 14)),
-                          subtitle: const Text('Split bills with friends/contacts', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          title: const Text(
+                            'Split Expense?',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          subtitle: const Text(
+                            'Split bills with friends/contacts',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                           value: isSplit,
                           activeColor: AppColors.neonTeal,
                           contentPadding: EdgeInsets.zero,
@@ -1468,7 +1919,12 @@ class DashboardView extends ConsumerWidget {
                           children: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton(
@@ -1477,13 +1933,21 @@ class DashboardView extends ConsumerWidget {
                                 foregroundColor: Colors.black,
                               ),
                               onPressed: () {
-                                final amount = double.tryParse(amountController.text) ?? 0.0;
+                                final amount =
+                                    double.tryParse(amountController.text) ??
+                                    0.0;
                                 final desc = descController.text.trim();
                                 final category = selectedCategory;
 
-                                if (amount <= 0 || desc.isEmpty || category.isEmpty) {
+                                if (amount <= 0 ||
+                                    desc.isEmpty ||
+                                    category.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please fill all required fields')),
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please fill all required fields',
+                                      ),
+                                    ),
                                   );
                                   return;
                                 }
@@ -1508,29 +1972,39 @@ class DashboardView extends ConsumerWidget {
 
                                 if (isSplit) {
                                   tx.isSplit = true;
-                                  final splitAmt = double.tryParse(splitAmountController.text) ?? 0.0;
-                                  final friend = splitFriendController.text.trim();
+                                  final splitAmt =
+                                      double.tryParse(
+                                        splitAmountController.text,
+                                      ) ??
+                                      0.0;
+                                  final friend = splitFriendController.text
+                                      .trim();
                                   if (splitAmt > 0 && friend.isNotEmpty) {
                                     tx.splitDetails = [
                                       TransactionSplitDetail()
                                         ..amount = splitAmt
                                         ..category = category
                                         ..friendName = friend
-                                        ..description = 'Owed from split: $desc',
+                                        ..description =
+                                            'Owed from split: $desc',
                                     ];
 
                                     // Add to borrowed/lent loans ledger!
-                                    if (existingTransaction == null || !existingTransaction.isSplit) {
+                                    if (existingTransaction == null ||
+                                        !existingTransaction.isSplit) {
                                       final loan = Loan()
                                         ..contactName = friend
-                                        ..isLent = true // they owe us money, so it is lent
+                                        ..isLent =
+                                            true // they owe us money, so it is lent
                                         ..amount = splitAmt
                                         ..remainingBalance = splitAmt
                                         ..startDate = DateTime.now()
                                         ..interestRate = 0.0
                                         ..compoundInterval = 'none'
                                         ..emiAmount = 0.0;
-                                      ref.read(loansProvider.notifier).addLoan(loan);
+                                      ref
+                                          .read(loansProvider.notifier)
+                                          .addLoan(loan);
                                     }
                                   }
                                 } else {
@@ -1538,10 +2012,16 @@ class DashboardView extends ConsumerWidget {
                                   tx.splitDetails = [];
                                 }
 
-                                ref.read(transactionsProvider.notifier).addTransaction(tx);
+                                ref
+                                    .read(transactionsProvider.notifier)
+                                    .addTransaction(tx);
                                 Navigator.pop(context);
                               },
-                              child: Text(existingTransaction != null ? 'Save Changes' : 'Log Transaction'),
+                              child: Text(
+                                existingTransaction != null
+                                    ? 'Save Changes'
+                                    : 'Log Transaction',
+                              ),
                             ),
                           ],
                         ),
@@ -1581,12 +2061,14 @@ class CardsLoansView extends ConsumerWidget {
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),
-  
+
             // Cards horizontal scroll list
             SizedBox(
               height: 340,
               child: cardsState.when(
-                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppColors.neonTeal),
+                ),
                 error: (err, _) => Center(child: Text('Error: $err')),
                 data: (cards) {
                   return ListView(
@@ -1603,7 +2085,7 @@ class CardsLoansView extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-  
+
             // Loans section header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1613,24 +2095,36 @@ class CardsLoansView extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 TextButton.icon(
-                  icon: const Icon(Icons.add, size: 16, color: AppColors.neonTeal),
-                  label: const Text('Add Loan', style: TextStyle(color: AppColors.neonTeal, fontSize: 13)),
+                  icon: const Icon(
+                    Icons.add,
+                    size: 16,
+                    color: AppColors.neonTeal,
+                  ),
+                  label: const Text(
+                    'Add Loan',
+                    style: TextStyle(color: AppColors.neonTeal, fontSize: 13),
+                  ),
                   onPressed: () => _showAddLoanDialog(context, ref),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-  
+
             // Loans items list
             loansState.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.neonTeal),
+              ),
               error: (err, _) => Center(child: Text('Error: $err')),
               data: (loans) {
                 if (loans.isEmpty) {
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text('No active loans. Click Add Loan to track!', style: TextStyle(color: AppColors.textMuted)),
+                      child: Text(
+                        'No active loans. Click Add Loan to track!',
+                        style: TextStyle(color: AppColors.textMuted),
+                      ),
                     ),
                   );
                 }
@@ -1640,13 +2134,17 @@ class CardsLoansView extends ConsumerWidget {
                   itemCount: loans.length,
                   itemBuilder: (context, index) {
                     final loan = loans[index];
-                    final String typeStr = loan.isLent ? 'Lent (Receivable)' : 'Borrowed (Debt)';
-                    final Color typeColor = loan.isLent ? AppColors.neonEmerald : Colors.redAccent;
+                    final String typeStr = loan.isLent
+                        ? 'Lent (Receivable)'
+                        : 'Borrowed (Debt)';
+                    final Color typeColor = loan.isLent
+                        ? AppColors.neonEmerald
+                        : Colors.redAccent;
                     final String emiInfo = loan.emiAmount > 0
                         ? 'EMI: ₹${loan.emiAmount.toStringAsFixed(0)} (${loan.interestRate}%)'
                         : 'Friendly Loan (${loan.interestRate}%)';
-  
-                     return Dismissible(
+
+                    return Dismissible(
                       key: ValueKey(loan.id),
                       direction: DismissDirection.endToStart,
                       background: Container(
@@ -1656,19 +2154,29 @@ class CardsLoansView extends ConsumerWidget {
                           color: Colors.redAccent.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 28),
+                        child: const Icon(
+                          Icons.delete_sweep_rounded,
+                          color: Colors.redAccent,
+                          size: 28,
+                        ),
                       ),
                       onDismissed: (_) {
                         ref.read(loansProvider.notifier).removeLoan(loan.id);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('${loan.contactName}\'s loan deleted'),
+                            content: Text(
+                              '${loan.contactName}\'s loan deleted',
+                            ),
                             backgroundColor: AppColors.obsidianSurface,
                           ),
                         );
                       },
                       child: GestureDetector(
-                        onTap: () => _showAddLoanDialog(context, ref, existingLoan: loan),
+                        onTap: () => _showAddLoanDialog(
+                          context,
+                          ref,
+                          existingLoan: loan,
+                        ),
                         child: _buildLoanItem(
                           loan.contactName,
                           typeStr,
@@ -1706,37 +2214,70 @@ class CardsLoansView extends ConsumerWidget {
 
   String _toTitleCase(String text) {
     if (text.isEmpty) return text;
-    return text.split(' ').map((word) {
-      if (word.isEmpty) return word;
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
+    return text
+        .split(' ')
+        .map((word) {
+          if (word.isEmpty) return word;
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 
   String _getMonthName(int day) {
     final now = DateTime.now();
     DateTime targetDate = DateTime(now.year, now.month, day);
-    
+
     if (now.day > day) {
       targetDate = DateTime(now.year, now.month + 1, day);
     }
-    
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return months[targetDate.month - 1];
   }
 
-  Widget _buildSecureFieldCompact(BuildContext context, String label, String value, bool copyable) {
+  Widget _buildSecureFieldCompact(
+    BuildContext context,
+    String label,
+    String value,
+    bool copyable,
+  ) {
     final displayValue = value.isEmpty ? 'N/A' : value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: const TextStyle(color: AppColors.textMuted, fontSize: 8, fontWeight: FontWeight.bold)),
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 8,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 2),
         Row(
           children: [
             Expanded(
               child: Text(
                 displayValue,
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1745,7 +2286,11 @@ class CardsLoansView extends ConsumerWidget {
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: value));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied to clipboard'), backgroundColor: AppColors.obsidianSurface, duration: Duration(seconds: 1)),
+                    const SnackBar(
+                      content: Text('Copied to clipboard'),
+                      backgroundColor: AppColors.obsidianSurface,
+                      duration: Duration(seconds: 1),
+                    ),
                   );
                 },
                 child: Container(
@@ -1754,7 +2299,11 @@ class CardsLoansView extends ConsumerWidget {
                     color: Colors.white.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Icon(Icons.copy_rounded, color: AppColors.neonTeal, size: 14),
+                  child: const Icon(
+                    Icons.copy_rounded,
+                    color: AppColors.neonTeal,
+                    size: 14,
+                  ),
                 ),
               ),
           ],
@@ -1763,7 +2312,11 @@ class CardsLoansView extends ConsumerWidget {
     );
   }
 
-  Widget _buildCreditCardItem(BuildContext context, WidgetRef ref, CreditCard card) {
+  Widget _buildCreditCardItem(
+    BuildContext context,
+    WidgetRef ref,
+    CreditCard card,
+  ) {
     bool showSpent = true; // State for toggle
     bool isLongPressed = false; // State for edit/delete
     bool isFlipped = false; // State for flip
@@ -1773,24 +2326,30 @@ class CardsLoansView extends ConsumerWidget {
         Future<void> authenticateAndFlipCard() async {
           final LocalAuthentication auth = LocalAuthentication();
           try {
-            final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
-            final bool canAuthenticate = canAuthenticateWithBiometrics || await auth.isDeviceSupported();
-            
+            final bool canAuthenticateWithBiometrics =
+                await auth.canCheckBiometrics;
+            final bool canAuthenticate =
+                canAuthenticateWithBiometrics || await auth.isDeviceSupported();
+
             if (!canAuthenticate) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Biometric auth not available')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Biometric auth not available')),
+              );
               return;
             }
-            
+
             final bool didAuthenticate = await auth.authenticate(
               localizedReason: 'Authenticate to view secure card details',
               options: const AuthenticationOptions(biometricOnly: true),
             );
-            
+
             if (didAuthenticate) {
               setState(() => isFlipped = true);
             }
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Auth error: $e')));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Auth error: $e')));
           }
         }
 
@@ -1801,10 +2360,16 @@ class CardsLoansView extends ConsumerWidget {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1.0,
+            ),
             gradient: card.imageUrl.isEmpty
                 ? LinearGradient(
-                    colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
+                    colors: [
+                      AppColors.tealBlueGradient[0],
+                      AppColors.tealBlueGradient[1],
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
@@ -1821,13 +2386,13 @@ class CardsLoansView extends ConsumerWidget {
                       ? SvgPicture.asset(
                           'assets/credit_card_images/${card.imageUrl}',
                           fit: BoxFit.fill,
-                       )
+                        )
                       : Image.asset(
                           'assets/credit_card_images/${card.imageUrl}',
                           fit: BoxFit.cover,
                         ),
                 ),
-            
+
               // Foreground content
               if (isLongPressed)
                 GlassBlur(
@@ -1843,20 +2408,37 @@ class CardsLoansView extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.white, size: 36),
+                            icon: const Icon(
+                              Icons.edit,
+                              color: Colors.white,
+                              size: 36,
+                            ),
                             onPressed: () {
                               setState(() => isLongPressed = false);
-                              _showAddCardDialog(context, ref, existingCard: card);
+                              _showAddCardDialog(
+                                context,
+                                ref,
+                                existingCard: card,
+                              );
                             },
                           ),
                           const SizedBox(width: 32),
                           IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 36),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                              size: 36,
+                            ),
                             onPressed: () {
                               setState(() => isLongPressed = false);
-                              ref.read(creditCardsProvider.notifier).removeCreditCard(card.id);
+                              ref
+                                  .read(creditCardsProvider.notifier)
+                                  .removeCreditCard(card.id);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Card deleted'), backgroundColor: AppColors.obsidianSurface),
+                                const SnackBar(
+                                  content: Text('Card deleted'),
+                                  backgroundColor: AppColors.obsidianSurface,
+                                ),
                               );
                             },
                           ),
@@ -1869,7 +2451,9 @@ class CardsLoansView extends ConsumerWidget {
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
-                    color: Colors.black.withOpacity(0.15), // Gentle global dimming
+                    color: Colors.black.withOpacity(
+                      0.15,
+                    ), // Gentle global dimming
                   ),
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
@@ -1884,20 +2468,24 @@ class CardsLoansView extends ConsumerWidget {
                             Text(
                               card.last4.isNotEmpty ? card.last4 : "****",
                               style: GoogleFonts.spaceGrotesk(
-                                fontSize: 22, 
-                                color: Colors.white, 
-                                fontWeight: FontWeight.bold, 
+                                fontSize: 22,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                                 letterSpacing: 2.0,
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Icon(Icons.visibility_rounded, color: Colors.white70, size: 24),
+                            const Icon(
+                              Icons.visibility_rounded,
+                              color: Colors.white70,
+                              size: 24,
+                            ),
                           ],
                         ),
                       ),
-                      
+
                       const SizedBox(height: 100),
-                      
+
                       // Bottom area: Spent/Statement Toggle
                       GestureDetector(
                         onTap: () => setState(() => showSpent = !showSpent),
@@ -1907,11 +2495,17 @@ class CardsLoansView extends ConsumerWidget {
                           blurY: 12.0,
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.35),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.15),
+                                width: 1.0,
+                              ),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.center,
@@ -1919,14 +2513,18 @@ class CardsLoansView extends ConsumerWidget {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(Icons.swap_horiz_rounded, color: AppColors.neonTeal, size: 16),
+                                    const Icon(
+                                      Icons.swap_horiz_rounded,
+                                      color: AppColors.neonTeal,
+                                      size: 16,
+                                    ),
                                     const SizedBox(width: 8),
                                     Text(
                                       showSpent ? 'SPENT' : 'STATEMENT',
                                       style: GoogleFonts.montserrat(
-                                        fontSize: 12, 
-                                        color: AppColors.neonTeal, 
-                                        fontWeight: FontWeight.bold, 
+                                        fontSize: 12,
+                                        color: AppColors.neonTeal,
+                                        fontWeight: FontWeight.bold,
                                         letterSpacing: 1.5,
                                       ),
                                     ),
@@ -1934,21 +2532,23 @@ class CardsLoansView extends ConsumerWidget {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  showSpent ? '₹${card.currentSpendings.toStringAsFixed(0)}' : '₹${card.statementAmount.toStringAsFixed(0)}',
+                                  showSpent
+                                      ? '₹${card.currentSpendings.toStringAsFixed(0)}'
+                                      : '₹${card.statementAmount.toStringAsFixed(0)}',
                                   style: GoogleFonts.spaceGrotesk(
-                                    fontSize: 22, 
-                                    fontWeight: FontWeight.w700, 
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
                                     color: Colors.white,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  showSpent 
+                                  showSpent
                                       ? '${card.statementDay} ${_getMonthName(card.statementDay)}'
                                       : '${card.dueDay} ${_getMonthName(card.dueDay)}',
                                   style: GoogleFonts.montserrat(
-                                    fontSize: 14, 
-                                    color: AppColors.textSecondary, 
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -1972,10 +2572,16 @@ class CardsLoansView extends ConsumerWidget {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1.0,
+            ),
             gradient: card.imageUrl.isEmpty
                 ? LinearGradient(
-                    colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
+                    colors: [
+                      AppColors.tealBlueGradient[0],
+                      AppColors.tealBlueGradient[1],
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
@@ -2002,7 +2608,9 @@ class CardsLoansView extends ConsumerWidget {
                 borderRadius: 20,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.65), // slightly darker for visibility on back
+                    color: Colors.black.withOpacity(
+                      0.65,
+                    ), // slightly darker for visibility on back
                   ),
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
@@ -2022,18 +2630,41 @@ class CardsLoansView extends ConsumerWidget {
                           ),
                           GestureDetector(
                             onTap: () => setState(() => isFlipped = false),
-                            child: const Icon(Icons.visibility_off_rounded, color: Colors.white70, size: 22),
+                            child: const Icon(
+                              Icons.visibility_off_rounded,
+                              color: Colors.white70,
+                              size: 22,
+                            ),
                           ),
                         ],
                       ),
                       const Spacer(),
-                      _buildSecureFieldCompact(context, 'Card Number', card.fullCardNumber, true),
+                      _buildSecureFieldCompact(
+                        context,
+                        'Card Number',
+                        card.fullCardNumber,
+                        true,
+                      ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          Expanded(child: _buildSecureFieldCompact(context, 'Expiry Date', card.expiryDate, false)),
+                          Expanded(
+                            child: _buildSecureFieldCompact(
+                              context,
+                              'Expiry Date',
+                              card.expiryDate,
+                              false,
+                            ),
+                          ),
                           const SizedBox(width: 12),
-                          Expanded(child: _buildSecureFieldCompact(context, 'CVV', card.cvv, false)),
+                          Expanded(
+                            child: _buildSecureFieldCompact(
+                              context,
+                              'CVV',
+                              card.cvv,
+                              false,
+                            ),
+                          ),
                         ],
                       ),
                       const Spacer(),
@@ -2053,7 +2684,9 @@ class CardsLoansView extends ConsumerWidget {
             } else if (!isFlipped) {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => CreditCardDetailView(card: card)),
+                MaterialPageRoute(
+                  builder: (_) => CreditCardDetailView(card: card),
+                ),
               );
             }
           },
@@ -2068,7 +2701,8 @@ class CardsLoansView extends ConsumerWidget {
                 child: child,
                 builder: (context, child) {
                   return Transform(
-                    transform: Matrix4.identity()..scale(flipAnimation.value, 1.0),
+                    transform: Matrix4.identity()
+                      ..scale(flipAnimation.value, 1.0),
                     alignment: Alignment.center,
                     child: child,
                   );
@@ -2078,7 +2712,7 @@ class CardsLoansView extends ConsumerWidget {
             child: isFlipped ? backSide : frontSide,
           ),
         );
-      }
+      },
     );
   }
 
@@ -2086,9 +2720,19 @@ class CardsLoansView extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 9, color: AppColors.textMuted)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9, color: AppColors.textMuted),
+        ),
         const SizedBox(height: 2),
-        Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.neonTeal)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: AppColors.neonTeal,
+          ),
+        ),
       ],
     );
   }
@@ -2106,9 +2750,19 @@ class CardsLoansView extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.add_card_rounded, color: AppColors.neonTeal, size: 36),
+                Icon(
+                  Icons.add_card_rounded,
+                  color: AppColors.neonTeal,
+                  size: 36,
+                ),
                 SizedBox(height: 8),
-                Text('Add Card', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                Text(
+                  'Add Card',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -2117,26 +2771,53 @@ class CardsLoansView extends ConsumerWidget {
     );
   }
 
-  Widget _buildLoanItem(String title, String type, String principal, String emiInfo, Color typeColor) {
+  Widget _buildLoanItem(
+    String title,
+    String type,
+    String principal,
+    String emiInfo,
+    Color typeColor,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassBlur(
         borderRadius: 16,
         child: ListTile(
-          title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          subtitle: Text(emiInfo, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          subtitle: Text(
+            emiInfo,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
           trailing: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 type,
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: typeColor),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: typeColor,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 principal,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ],
           ),
@@ -2145,24 +2826,46 @@ class CardsLoansView extends ConsumerWidget {
     );
   }
 
-  void _showAddCardDialog(BuildContext context, WidgetRef ref, {CreditCard? existingCard}) {
-    final nameController = TextEditingController(text: existingCard?.cardName ?? '');
-    final last4Controller = TextEditingController(text: existingCard?.last4 ?? '');
-    final stmtDayController = TextEditingController(text: existingCard?.statementDay.toString() ?? '15');
-    final dueDayController = TextEditingController(text: existingCard?.dueDay.toString() ?? '5');
-    
-    // Secure Fields
-    final fullCardNumberController = TextEditingController(text: existingCard?.fullCardNumber ?? '');
-    final expiryDateController = TextEditingController(text: existingCard?.expiryDate ?? '');
-    final cvvController = TextEditingController(text: existingCard?.cvv ?? '');
-    
-    // Financial metrics for card
-    final currentSpendingsController = TextEditingController(text: existingCard?.currentSpendings.toStringAsFixed(0) ?? '0');
-    final statementAmountController = TextEditingController(text: existingCard?.statementAmount.toStringAsFixed(0) ?? '0');
+  void _showAddCardDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    CreditCard? existingCard,
+  }) {
+    final nameController = TextEditingController(
+      text: existingCard?.cardName ?? '',
+    );
+    final last4Controller = TextEditingController(
+      text: existingCard?.last4 ?? '',
+    );
+    final stmtDayController = TextEditingController(
+      text: existingCard?.statementDay.toString() ?? '15',
+    );
+    final dueDayController = TextEditingController(
+      text: existingCard?.dueDay.toString() ?? '5',
+    );
 
-    String selectedBrand = existingCard?.brand.isNotEmpty == true ? existingCard!.brand : 'Visa';
+    // Secure Fields
+    final fullCardNumberController = TextEditingController(
+      text: existingCard?.fullCardNumber ?? '',
+    );
+    final expiryDateController = TextEditingController(
+      text: existingCard?.expiryDate ?? '',
+    );
+    final cvvController = TextEditingController(text: existingCard?.cvv ?? '');
+
+    // Financial metrics for card
+    final currentSpendingsController = TextEditingController(
+      text: existingCard?.currentSpendings.toStringAsFixed(0) ?? '0',
+    );
+    final statementAmountController = TextEditingController(
+      text: existingCard?.statementAmount.toStringAsFixed(0) ?? '0',
+    );
+
+    String selectedBrand = existingCard?.brand.isNotEmpty == true
+        ? existingCard!.brand
+        : 'Visa';
     String selectedImage = existingCard?.imageUrl ?? '';
-    
+
     final imageOptions = [
       '',
       'HDFC_MoneyBack_Vertical_HQ.avif',
@@ -2174,7 +2877,7 @@ class CardsLoansView extends ConsumerWidget {
       'Scapia_Visa.avif',
       'Tata_NeuCard_FullFrame.avif',
       'UNI_YesBank_Vertical.avif',
-      'hsbc_vertical_card_final.avif'
+      'hsbc_vertical_card_final.avif',
     ];
 
     showDialog(
@@ -2209,7 +2912,10 @@ class CardsLoansView extends ConsumerWidget {
                             TextButton.icon(
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.neonTeal,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                               ),
                               onPressed: () {
                                 showDialog(
@@ -2217,7 +2923,8 @@ class CardsLoansView extends ConsumerWidget {
                                   builder: (context) => NfcScanDialog(
                                     nameController: nameController,
                                     last4Controller: last4Controller,
-                                    fullCardNumberController: fullCardNumberController,
+                                    fullCardNumberController:
+                                        fullCardNumberController,
                                     expiryDateController: expiryDateController,
                                     onBrandDetected: (brand) {
                                       setState(() => selectedBrand = brand);
@@ -2226,14 +2933,20 @@ class CardsLoansView extends ConsumerWidget {
                                 );
                               },
                               icon: const Icon(Icons.nfc_rounded, size: 18),
-                              label: const Text('Scan', style: TextStyle(fontSize: 13)),
+                              label: const Text(
+                                'Scan',
+                                style: TextStyle(fontSize: 13),
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
                         TextField(
                           controller: nameController,
-                          decoration: const InputDecoration(labelText: 'Card Name (e.g. HDFC Regalia)', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Card Name (e.g. HDFC Regalia)',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -2242,11 +2955,16 @@ class CardsLoansView extends ConsumerWidget {
                               flex: 2,
                               child: TextField(
                                 controller: fullCardNumberController,
-                                decoration: const InputDecoration(labelText: 'Full Card Number', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Full Card Number',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                                 onChanged: (val) {
                                   if (val.length >= 4) {
-                                    last4Controller.text = val.substring(val.length - 4);
+                                    last4Controller.text = val.substring(
+                                      val.length - 4,
+                                    );
                                   }
                                 },
                               ),
@@ -2256,7 +2974,10 @@ class CardsLoansView extends ConsumerWidget {
                               flex: 1,
                               child: TextField(
                                 controller: last4Controller,
-                                decoration: const InputDecoration(labelText: 'Last 4', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Last 4',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                                 maxLength: 4,
                               ),
@@ -2269,14 +2990,20 @@ class CardsLoansView extends ConsumerWidget {
                             Expanded(
                               child: TextField(
                                 controller: expiryDateController,
-                                decoration: const InputDecoration(labelText: 'Expiry (MM/YY)', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Expiry (MM/YY)',
+                                  border: OutlineInputBorder(),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
                                 controller: cvvController,
-                                decoration: const InputDecoration(labelText: 'CVV', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'CVV',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                                 obscureText: true,
                               ),
@@ -2286,17 +3013,40 @@ class CardsLoansView extends ConsumerWidget {
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           value: selectedBrand,
-                          decoration: const InputDecoration(labelText: 'Brand', border: OutlineInputBorder()),
-                          items: ['Visa', 'Mastercard', 'RuPay', 'Amex'].map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-                          onChanged: (val) => setState(() => selectedBrand = val!),
+                          decoration: const InputDecoration(
+                            labelText: 'Brand',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: ['Visa', 'Mastercard', 'RuPay', 'Amex']
+                              .map(
+                                (b) =>
+                                    DropdownMenuItem(value: b, child: Text(b)),
+                              )
+                              .toList(),
+                          onChanged: (val) =>
+                              setState(() => selectedBrand = val!),
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           value: selectedImage,
-                          decoration: const InputDecoration(labelText: 'Card Background Image', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Card Background Image',
+                            border: OutlineInputBorder(),
+                          ),
                           isExpanded: true,
-                          items: imageOptions.map((i) => DropdownMenuItem(value: i, child: Text(i.isEmpty ? 'None' : i, overflow: TextOverflow.ellipsis))).toList(),
-                          onChanged: (val) => setState(() => selectedImage = val!),
+                          items: imageOptions
+                              .map(
+                                (i) => DropdownMenuItem(
+                                  value: i,
+                                  child: Text(
+                                    i.isEmpty ? 'None' : i,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) =>
+                              setState(() => selectedImage = val!),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -2304,7 +3054,10 @@ class CardsLoansView extends ConsumerWidget {
                             Expanded(
                               child: TextField(
                                 controller: currentSpendingsController,
-                                decoration: const InputDecoration(labelText: 'Current Spendings', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Current Spendings',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                               ),
                             ),
@@ -2312,7 +3065,10 @@ class CardsLoansView extends ConsumerWidget {
                             Expanded(
                               child: TextField(
                                 controller: statementAmountController,
-                                decoration: const InputDecoration(labelText: 'Statement Amount', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Statement Amount',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                               ),
                             ),
@@ -2324,7 +3080,10 @@ class CardsLoansView extends ConsumerWidget {
                             Expanded(
                               child: TextField(
                                 controller: stmtDayController,
-                                decoration: const InputDecoration(labelText: 'Statement Day (1-28)', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Statement Day (1-28)',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                               ),
                             ),
@@ -2332,7 +3091,10 @@ class CardsLoansView extends ConsumerWidget {
                             Expanded(
                               child: TextField(
                                 controller: dueDayController,
-                                decoration: const InputDecoration(labelText: 'Due Day (1-28)', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Due Day (1-28)',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                               ),
                             ),
@@ -2344,30 +3106,61 @@ class CardsLoansView extends ConsumerWidget {
                           children: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.neonTeal,
+                                foregroundColor: Colors.black,
+                              ),
                               onPressed: () {
                                 final name = nameController.text.trim();
                                 final last4 = last4Controller.text.trim();
-                                final stmt = int.tryParse(stmtDayController.text) ?? 15;
-                                final due = int.tryParse(dueDayController.text) ?? 5;
-                                final curSp = double.tryParse(currentSpendingsController.text) ?? 0.0;
-                                final stmAm = double.tryParse(statementAmountController.text) ?? 0.0;
+                                final stmt =
+                                    int.tryParse(stmtDayController.text) ?? 15;
+                                final due =
+                                    int.tryParse(dueDayController.text) ?? 5;
+                                final curSp =
+                                    double.tryParse(
+                                      currentSpendingsController.text,
+                                    ) ??
+                                    0.0;
+                                final stmAm =
+                                    double.tryParse(
+                                      statementAmountController.text,
+                                    ) ??
+                                    0.0;
 
                                 if (name.isEmpty || last4.length != 4) {
                                   showDialog(
                                     context: context,
                                     builder: (context) => AlertDialog(
-                                      backgroundColor: AppColors.obsidianSurface,
-                                      title: const Text('Invalid Input', style: TextStyle(color: Colors.white)),
-                                      content: const Text('Please fill Name and Last 4 digits accurately.', style: TextStyle(color: Colors.white70)),
+                                      backgroundColor:
+                                          AppColors.obsidianSurface,
+                                      title: const Text(
+                                        'Invalid Input',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      content: const Text(
+                                        'Please fill Name and Last 4 digits accurately.',
+                                        style: TextStyle(color: Colors.white70),
+                                      ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context),
-                                          child: const Text('OK', style: TextStyle(color: AppColors.neonTeal)),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text(
+                                            'OK',
+                                            style: TextStyle(
+                                              color: AppColors.neonTeal,
+                                            ),
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -2376,22 +3169,44 @@ class CardsLoansView extends ConsumerWidget {
                                 }
 
                                 // Duplicate Check
-                                final existingCards = ref.read(creditCardsProvider).value ?? [];
+                                final existingCards =
+                                    ref.read(creditCardsProvider).value ?? [];
                                 if (existingCard == null) {
-                                  final cardNumber = fullCardNumberController.text.trim();
+                                  final cardNumber = fullCardNumberController
+                                      .text
+                                      .trim();
                                   if (cardNumber.isNotEmpty) {
-                                    final isDuplicate = existingCards.any((c) => c.fullCardNumber == cardNumber);
+                                    final isDuplicate = existingCards.any(
+                                      (c) => c.fullCardNumber == cardNumber,
+                                    );
                                     if (isDuplicate) {
                                       showDialog(
                                         context: context,
                                         builder: (context) => AlertDialog(
-                                          backgroundColor: AppColors.obsidianSurface,
-                                          title: const Text('Duplicate Card', style: TextStyle(color: Colors.white)),
-                                          content: const Text('A card with this number already exists!', style: TextStyle(color: Colors.white70)),
+                                          backgroundColor:
+                                              AppColors.obsidianSurface,
+                                          title: const Text(
+                                            'Duplicate Card',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          content: const Text(
+                                            'A card with this number already exists!',
+                                            style: TextStyle(
+                                              color: Colors.white70,
+                                            ),
+                                          ),
                                           actions: [
                                             TextButton(
-                                              onPressed: () => Navigator.pop(context),
-                                              child: const Text('OK', style: TextStyle(color: AppColors.neonTeal)),
+                                              onPressed: () =>
+                                                  Navigator.pop(context),
+                                              child: const Text(
+                                                'OK',
+                                                style: TextStyle(
+                                                  color: AppColors.neonTeal,
+                                                ),
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -2407,8 +3222,11 @@ class CardsLoansView extends ConsumerWidget {
                                   ..last4 = last4
                                   ..statementDay = stmt
                                   ..dueDay = due
-                                  ..fullCardNumber = fullCardNumberController.text.trim()
-                                  ..expiryDate = expiryDateController.text.trim()
+                                  ..fullCardNumber = fullCardNumberController
+                                      .text
+                                      .trim()
+                                  ..expiryDate = expiryDateController.text
+                                      .trim()
                                   ..cvv = cvvController.text.trim()
                                   ..brand = selectedBrand
                                   ..imageUrl = selectedImage
@@ -2416,33 +3234,55 @@ class CardsLoansView extends ConsumerWidget {
                                   ..statementAmount = stmAm;
 
                                 if (existingCard == null) {
-                                  ref.read(creditCardsProvider.notifier).addCreditCard(card);
+                                  ref
+                                      .read(creditCardsProvider.notifier)
+                                      .addCreditCard(card);
                                 } else {
-                                  ref.read(creditCardsProvider.notifier).updateCreditCard(card);
+                                  ref
+                                      .read(creditCardsProvider.notifier)
+                                      .updateCreditCard(card);
                                 }
                                 Navigator.pop(context);
                               },
-                              child: Text(existingCard == null ? 'Add Card' : 'Save Changes'),
+                              child: Text(
+                                existingCard == null
+                                    ? 'Add Card'
+                                    : 'Save Changes',
+                              ),
                             ),
                           ],
-                        )
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
             );
-          }
+          },
         );
       },
     );
   }
 
-  void _showAddLoanDialog(BuildContext context, WidgetRef ref, {Loan? existingLoan}) {
-    final contactController = TextEditingController(text: existingLoan?.contactName ?? '');
-    final amountController = TextEditingController(text: existingLoan != null ? existingLoan.amount.toStringAsFixed(0) : '');
-    final rateController = TextEditingController(text: existingLoan != null ? existingLoan.interestRate.toString() : '0');
-    final emiController = TextEditingController(text: existingLoan != null ? existingLoan.emiAmount.toStringAsFixed(0) : '0');
+  void _showAddLoanDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    Loan? existingLoan,
+  }) {
+    final contactController = TextEditingController(
+      text: existingLoan?.contactName ?? '',
+    );
+    final amountController = TextEditingController(
+      text: existingLoan != null ? existingLoan.amount.toStringAsFixed(0) : '',
+    );
+    final rateController = TextEditingController(
+      text: existingLoan != null ? existingLoan.interestRate.toString() : '0',
+    );
+    final emiController = TextEditingController(
+      text: existingLoan != null
+          ? existingLoan.emiAmount.toStringAsFixed(0)
+          : '0',
+    );
     bool isLent = existingLoan?.isLent ?? false;
 
     showDialog(
@@ -2464,17 +3304,28 @@ class CardsLoansView extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          existingLoan != null ? 'Edit Loan / Debt' : 'Track Loan / Debt',
+                          existingLoan != null
+                              ? 'Edit Loan / Debt'
+                              : 'Track Loan / Debt',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<bool>(
                           value: isLent,
-                          decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Type',
+                            border: OutlineInputBorder(),
+                          ),
                           dropdownColor: AppColors.obsidianSurface,
                           items: const [
-                            DropdownMenuItem(value: false, child: Text('Borrowed (Debt)')),
-                            DropdownMenuItem(value: true, child: Text('Lent (Receivable)')),
+                            DropdownMenuItem(
+                              value: false,
+                              child: Text('Borrowed (Debt)'),
+                            ),
+                            DropdownMenuItem(
+                              value: true,
+                              child: Text('Lent (Receivable)'),
+                            ),
                           ],
                           onChanged: (val) {
                             if (val != null) setState(() => isLent = val);
@@ -2483,12 +3334,18 @@ class CardsLoansView extends ConsumerWidget {
                         const SizedBox(height: 12),
                         TextField(
                           controller: contactController,
-                          decoration: const InputDecoration(labelText: 'Contact / Lender Name', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Contact / Lender Name',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: amountController,
-                          decoration: const InputDecoration(labelText: 'Amount (INR)', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: 'Amount (INR)',
+                            border: OutlineInputBorder(),
+                          ),
                           keyboardType: TextInputType.number,
                         ),
                         const SizedBox(height: 12),
@@ -2497,7 +3354,10 @@ class CardsLoansView extends ConsumerWidget {
                             Expanded(
                               child: TextField(
                                 controller: rateController,
-                                decoration: const InputDecoration(labelText: 'Interest Rate (%)', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Interest Rate (%)',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                               ),
                             ),
@@ -2505,7 +3365,10 @@ class CardsLoansView extends ConsumerWidget {
                             Expanded(
                               child: TextField(
                                 controller: emiController,
-                                decoration: const InputDecoration(labelText: 'Monthly EMI (0 if none)', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                  labelText: 'Monthly EMI (0 if none)',
+                                  border: OutlineInputBorder(),
+                                ),
                                 keyboardType: TextInputType.number,
                               ),
                             ),
@@ -2517,24 +3380,40 @@ class CardsLoansView extends ConsumerWidget {
                           children: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.neonTeal,
+                                foregroundColor: Colors.black,
+                              ),
                               onPressed: () {
                                 final contact = contactController.text.trim();
-                                final amount = double.tryParse(amountController.text) ?? 0.0;
-                                final rate = double.tryParse(rateController.text) ?? 0.0;
-                                final emi = double.tryParse(emiController.text) ?? 0.0;
-  
+                                final amount =
+                                    double.tryParse(amountController.text) ??
+                                    0.0;
+                                final rate =
+                                    double.tryParse(rateController.text) ?? 0.0;
+                                final emi =
+                                    double.tryParse(emiController.text) ?? 0.0;
+
                                 if (contact.isEmpty || amount <= 0) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please enter name and valid amount')),
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please enter name and valid amount',
+                                      ),
+                                    ),
                                   );
                                   return;
                                 }
-  
+
                                 final loan = existingLoan ?? Loan();
                                 loan.contactName = contact;
                                 loan.isLent = isLent;
@@ -2543,20 +3422,25 @@ class CardsLoansView extends ConsumerWidget {
                                   loan.remainingBalance = amount;
                                   loan.startDate = DateTime.now();
                                 } else {
-                                  if (existingLoan.amount == existingLoan.remainingBalance) {
+                                  if (existingLoan.amount ==
+                                      existingLoan.remainingBalance) {
                                     loan.remainingBalance = amount;
                                   }
                                 }
                                 loan.interestRate = rate;
                                 loan.emiAmount = emi;
-  
+
                                 ref.read(loansProvider.notifier).addLoan(loan);
                                 Navigator.pop(context);
                               },
-                              child: Text(existingLoan != null ? 'Save Changes' : 'Add Loan'),
+                              child: Text(
+                                existingLoan != null
+                                    ? 'Save Changes'
+                                    : 'Add Loan',
+                              ),
                             ),
                           ],
-                        )
+                        ),
                       ],
                     ),
                   ),
@@ -2580,7 +3464,8 @@ class InvestmentsView extends ConsumerStatefulWidget {
   ConsumerState<InvestmentsView> createState() => _InvestmentsViewState();
 }
 
-class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTickerProviderStateMixin {
+class _InvestmentsViewState extends ConsumerState<InvestmentsView>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -2616,7 +3501,11 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.sync_rounded, color: AppColors.neonTeal, size: 20),
+                    icon: const Icon(
+                      Icons.sync_rounded,
+                      color: AppColors.neonTeal,
+                      size: 20,
+                    ),
                     tooltip: 'Refresh Prices',
                     onPressed: () => _refreshPrices(context),
                   ),
@@ -2651,7 +3540,9 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
               indicator: BoxDecoration(
                 color: AppColors.neonEmerald.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.neonEmerald.withOpacity(0.3)),
+                border: Border.all(
+                  color: AppColors.neonEmerald.withOpacity(0.3),
+                ),
               ),
               labelColor: AppColors.neonEmerald,
               unselectedLabelColor: AppColors.textSecondary,
@@ -2665,7 +3556,9 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
 
           // Total valuation banner & Asset Allocation Pie Chart
           holdingsState.when(
-            loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: AppColors.neonTeal),
+            ),
             error: (err, _) => Center(child: Text('Error: $err')),
             data: (holdings) {
               double currentVal = 0.0;
@@ -2685,12 +3578,18 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
               }
 
               final returnsAmt = currentVal - buyCost;
-              final returnsPct = buyCost > 0 ? (returnsAmt / buyCost) * 100 : 0.0;
+              final returnsPct = buyCost > 0
+                  ? (returnsAmt / buyCost) * 100
+                  : 0.0;
               final isNegative = returnsAmt < 0;
 
               final totalVal = stockVal + mfVal;
-              final double stockPct = totalVal > 0 ? (stockVal / totalVal) * 100 : 0.0;
-              final double mfPct = totalVal > 0 ? (mfVal / totalVal) * 100 : 0.0;
+              final double stockPct = totalVal > 0
+                  ? (stockVal / totalVal) * 100
+                  : 0.0;
+              final double mfPct = totalVal > 0
+                  ? (mfVal / totalVal) * 100
+                  : 0.0;
 
               String formatCurrency(double val) {
                 final sign = val < 0 ? '-' : '';
@@ -2703,29 +3602,53 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                     borderRadius: 16,
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Current Valuation', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              const Text(
+                                'Current Valuation',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                               const SizedBox(height: 4),
-                              Text(formatCurrency(currentVal), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                              Text(
+                                formatCurrency(currentVal),
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ],
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text('Total Returns', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              const Text(
+                                'Total Returns',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 '${isNegative ? "" : "+"}${formatCurrency(returnsAmt)} (${isNegative ? "" : "+"}${returnsPct.toStringAsFixed(1)}%)',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: isNegative ? Colors.redAccent : AppColors.neonEmerald,
+                                  color: isNegative
+                                      ? Colors.redAccent
+                                      : AppColors.neonEmerald,
                                 ),
                               ),
                             ],
@@ -2754,9 +3677,14 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                                       PieChartSectionData(
                                         color: AppColors.neonTeal,
                                         value: stockVal,
-                                        title: '${stockPct.toStringAsFixed(0)}%',
+                                        title:
+                                            '${stockPct.toStringAsFixed(0)}%',
                                         radius: 28,
-                                        titleStyle: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black),
+                                        titleStyle: const TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                        ),
                                       ),
                                     if (mfVal > 0)
                                       PieChartSectionData(
@@ -2764,7 +3692,11 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                                         value: mfVal,
                                         title: '${mfPct.toStringAsFixed(0)}%',
                                         radius: 28,
-                                        titleStyle: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black),
+                                        titleStyle: const TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                        ),
                                       ),
                                   ],
                                   sectionsSpace: 2,
@@ -2778,9 +3710,17 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildLegendItem('Stocks (Zerodha)', formatCurrency(stockVal), AppColors.neonTeal),
+                                  _buildLegendItem(
+                                    'Stocks (Zerodha)',
+                                    formatCurrency(stockVal),
+                                    AppColors.neonTeal,
+                                  ),
                                   const SizedBox(height: 8),
-                                  _buildLegendItem('Mutual Funds (Coin)', formatCurrency(mfVal), AppColors.neonEmerald),
+                                  _buildLegendItem(
+                                    'Mutual Funds (Coin)',
+                                    formatCurrency(mfVal),
+                                    AppColors.neonEmerald,
+                                  ),
                                 ],
                               ),
                             ),
@@ -2798,18 +3738,29 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
           // Tab content
           Expanded(
             child: holdingsState.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.neonTeal),
+              ),
               error: (err, _) => Center(child: Text('Error: $err')),
               data: (holdings) {
-                final stocks = holdings.where((h) => h.assetType == 'stock').toList();
-                final mutualFunds = holdings.where((h) => h.assetType == 'mutual_fund').toList();
+                final stocks = holdings
+                    .where((h) => h.assetType == 'stock')
+                    .toList();
+                final mutualFunds = holdings
+                    .where((h) => h.assetType == 'mutual_fund')
+                    .toList();
 
                 return TabBarView(
                   controller: _tabController,
                   children: [
                     // Stocks List
                     stocks.isEmpty
-                        ? const Center(child: Text('No stocks. Click Import to add holdings!', style: TextStyle(color: AppColors.textMuted)))
+                        ? const Center(
+                            child: Text(
+                              'No stocks. Click Import to add holdings!',
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
+                          )
                         : ListView.builder(
                             physics: const BouncingScrollPhysics(),
                             itemCount: stocks.length,
@@ -2833,7 +3784,12 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                           ),
                     // Mutual Funds List
                     mutualFunds.isEmpty
-                        ? const Center(child: Text('No mutual funds. Click Import to add holdings!', style: TextStyle(color: AppColors.textMuted)))
+                        ? const Center(
+                            child: Text(
+                              'No mutual funds. Click Import to add holdings!',
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
+                          )
                         : ListView.builder(
                             physics: const BouncingScrollPhysics(),
                             itemCount: mutualFunds.length,
@@ -2866,7 +3822,13 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
   }
 
   Widget _buildHoldingItem(
-      String symbol, String name, String qty, String avg, String current, String returns) {
+    String symbol,
+    String name,
+    String qty,
+    String avg,
+    String current,
+    String returns,
+  ) {
     final isNegative = returns.startsWith('-');
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -2876,7 +3838,14 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(symbol, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              Text(
+                symbol,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               Text(
                 returns,
                 style: TextStyle(
@@ -2890,8 +3859,20 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
           subtitle: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('$qty • $avg', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-              Text(current, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              Text(
+                '$qty • $avg',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Text(
+                current,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ],
           ),
         ),
@@ -2915,17 +3896,35 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Import Portfolio holdings', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'Import Portfolio holdings',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 12),
                   const Text(
                     'Select your holdings CSV or Excel export from Zerodha Console or Coin:',
-                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   ListTile(
-                    leading: const Icon(Icons.show_chart_rounded, color: AppColors.neonTeal),
-                    title: const Text('Zerodha Holdings (CSV/Excel)', style: TextStyle(fontSize: 14)),
-                    subtitle: const Text('Upload Console holdings sheet', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    leading: const Icon(
+                      Icons.show_chart_rounded,
+                      color: AppColors.neonTeal,
+                    ),
+                    title: const Text(
+                      'Zerodha Holdings (CSV/Excel)',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    subtitle: const Text(
+                      'Upload Console holdings sheet',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
                     onTap: () async {
                       Navigator.pop(context);
                       await _pickAndParseFile(context, 'zerodha');
@@ -2933,9 +3932,21 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                   ),
                   const Divider(height: 1, color: AppColors.glassBorder),
                   ListTile(
-                    leading: const Icon(Icons.pie_chart_rounded, color: AppColors.neonEmerald),
-                    title: const Text('Coin Mutual Funds (CSV/Excel)', style: TextStyle(fontSize: 14)),
-                    subtitle: const Text('Upload Coin holdings sheet', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    leading: const Icon(
+                      Icons.pie_chart_rounded,
+                      color: AppColors.neonEmerald,
+                    ),
+                    title: const Text(
+                      'Coin Mutual Funds (CSV/Excel)',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    subtitle: const Text(
+                      'Upload Coin holdings sheet',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
                     onTap: () async {
                       Navigator.pop(context);
                       await _pickAndParseFile(context, 'coin');
@@ -2943,12 +3954,26 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                   ),
                   const Divider(height: 1, color: AppColors.glassBorder),
                   ListTile(
-                    leading: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
-                    title: const Text('Clear All Holdings', style: TextStyle(fontSize: 14, color: Colors.redAccent)),
-                    subtitle: const Text('Reset local investments portfolio', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    leading: const Icon(
+                      Icons.delete_sweep_outlined,
+                      color: Colors.redAccent,
+                    ),
+                    title: const Text(
+                      'Clear All Holdings',
+                      style: TextStyle(fontSize: 14, color: Colors.redAccent),
+                    ),
+                    subtitle: const Text(
+                      'Reset local investments portfolio',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
                     onTap: () async {
                       Navigator.pop(context);
-                      await ref.read(holdingsProvider.notifier).clearAllHoldings();
+                      await ref
+                          .read(holdingsProvider.notifier)
+                          .clearAllHoldings();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('All holdings cleared.')),
                       );
@@ -2960,10 +3985,13 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
                     children: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                      )
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
@@ -3013,7 +4041,9 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
       if (holdings.isEmpty) {
         Navigator.pop(context); // close loader
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No valid holdings found in the selected file.')),
+          const SnackBar(
+            content: Text('No valid holdings found in the selected file.'),
+          ),
         );
         return;
       }
@@ -3032,7 +4062,9 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to import holdings: ${e.toString().replaceAll('Exception: ', '')}'),
+          content: Text(
+            'Failed to import holdings: ${e.toString().replaceAll('Exception: ', '')}',
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -3071,12 +4103,12 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
     try {
       final syncService = ref.read(investmentSyncServiceProvider);
       final count = await syncService.syncAllPrices();
-      
+
       // Reload holdings provider
       await ref.read(holdingsProvider.notifier).loadHoldings();
 
       Navigator.pop(context); // close loader
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Successfully updated $count asset prices!'),
@@ -3100,21 +4132,25 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView> with SingleTi
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
         Text(
           value,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       ],
     );
@@ -3131,7 +4167,8 @@ class AdvisorView extends ConsumerStatefulWidget {
   ConsumerState<AdvisorView> createState() => _AdvisorViewState();
 }
 
-class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+class _AdvisorViewState extends ConsumerState<AdvisorView>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _advisorTabController;
   final TextEditingController _chatInputController = TextEditingController();
   final List<Map<String, String>> _messages = [];
@@ -3145,7 +4182,8 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
     // Initialize welcome message
     _messages.add({
       'sender': 'AI',
-      'text': 'Hello Akshat! I am your local privacy-first financial advisor. Ask me anything about rebalancing your portfolio, check your emergency fund status, or ask for home/car loan pre-payment guidance!'
+      'text':
+          'Hello Akshat! I am your local privacy-first financial advisor. Ask me anything about rebalancing your portfolio, check your emergency fund status, or ask for home/car loan pre-payment guidance!',
     });
   }
 
@@ -3188,7 +4226,9 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
               indicator: BoxDecoration(
                 color: AppColors.neonPurple.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.neonPurple.withOpacity(0.3)),
+                border: Border.all(
+                  color: AppColors.neonPurple.withOpacity(0.3),
+                ),
               ),
               labelColor: AppColors.neonPurple,
               unselectedLabelColor: AppColors.textSecondary,
@@ -3219,25 +4259,34 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
   }
 
   Future<String> _getActiveEngineStatus() async {
-    final useLocalStr = await const FlutterSecureStorage().read(key: 'ai_use_local');
+    final useLocalStr = await const FlutterSecureStorage().read(
+      key: 'ai_use_local',
+    );
     final useLocal = useLocalStr == 'true';
     if (useLocal) {
       final prefs = await SharedPreferences.getInstance();
-      final selectedId = prefs.getString('selectedModelId') ?? 'gemma2_turbo_2b';
+      final selectedId =
+          prefs.getString('selectedModelId') ?? 'gemma2_turbo_2b';
       final meta = await ModelRepository.instance.getMeta(selectedId);
       if (meta != null) {
-        final localPath = await ModelRepository.instance.localModelPath(meta.assetPath);
+        final localPath = await ModelRepository.instance.localModelPath(
+          meta.assetPath,
+        );
         if (await File(localPath).exists()) {
           return 'Local LLM: ${meta.displayName}';
         }
       }
       return 'Local LLM (No downloaded model, using Quant Fallback)';
     }
-    final geminiKey = await const FlutterSecureStorage().read(key: 'ai_gemini_key');
+    final geminiKey = await const FlutterSecureStorage().read(
+      key: 'ai_gemini_key',
+    );
     if (geminiKey != null && geminiKey.isNotEmpty) {
       return 'Gemini Cloud API (Online)';
     }
-    final host = await const FlutterSecureStorage().read(key: 'ai_ollama_host') ?? 'http://localhost:11434';
+    final host =
+        await const FlutterSecureStorage().read(key: 'ai_ollama_host') ??
+        'http://localhost:11434';
     return 'Ollama Local Host ($host)';
   }
 
@@ -3245,8 +4294,15 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
     final forecastState = ref.watch(quantForecastResultProvider);
 
     return forecastState.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonPurple)),
-      error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.neonPurple),
+      ),
+      error: (err, stack) => Center(
+        child: Text(
+          'Error: $err',
+          style: const TextStyle(color: Colors.redAccent),
+        ),
+      ),
       data: (forecast) {
         String formatCurrency(double val) {
           final sign = val < 0 ? '-' : '';
@@ -3265,7 +4321,9 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
           return '$sign₹$result';
         }
 
-        double progress = forecast.projectedSpend > 0 ? (forecast.dailyVelocity * forecast.remainingDays) / 100000.0 : 0.0;
+        double progress = forecast.projectedSpend > 0
+            ? (forecast.dailyVelocity * forecast.remainingDays) / 100000.0
+            : 0.0;
         if (progress > 1.0) progress = 1.0;
         if (progress < 0.0) progress = 0.0;
 
@@ -3284,24 +4342,40 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
                       children: [
                         Icon(Icons.timeline_rounded, color: AppColors.neonTeal),
                         SizedBox(width: 8),
-                        Text('Cash Flow Forecast', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text(
+                          'Cash Flow Forecast',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'Projected Spend: ${formatCurrency(forecast.projectedSpend)}',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Based on current velocity (${formatCurrency(forecast.dailyVelocity)}/day) over ${forecast.remainingDays} remaining days + monthly EMIs (${formatCurrency(forecast.recurringEmis)}) + rent (${formatCurrency(forecast.detectedRent)}).',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     LinearProgressIndicator(
                       value: progress,
                       backgroundColor: Colors.white.withOpacity(0.05),
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.neonTeal),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.neonTeal,
+                      ),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ],
@@ -3320,9 +4394,19 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.pie_chart_outline_rounded, color: AppColors.neonEmerald),
+                        Icon(
+                          Icons.pie_chart_outline_rounded,
+                          color: AppColors.neonEmerald,
+                        ),
                         SizedBox(width: 8),
-                        Text('Advisor Recommendations', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text(
+                          'Advisor Recommendations',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -3364,12 +4448,20 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.chevron_right, color: AppColors.neonEmerald, size: 16),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.neonEmerald,
+              size: 16,
+            ),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
           ],
@@ -3378,7 +4470,10 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
           padding: const EdgeInsets.only(left: 20, top: 2, bottom: 8),
           child: Text(
             desc,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
       ],
@@ -3389,55 +4484,50 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
     return Column(
       children: [
         // Active AI Engine Status
-        FutureBuilder<String>(
-          future: _getActiveEngineStatus(),
-          builder: (context, snapshot) {
-            final engine = snapshot.data ?? 'Checking active engine...';
-            final isLocal = engine.contains('Local LLM');
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.neonPurple.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.neonPurple.withOpacity(0.2)),
+        Container(
+          margin: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.neonPurple.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.neonPurple.withOpacity(0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: AppColors.neonPurple,
+                  shape: BoxShape.circle,
+                ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: AppColors.neonPurple,
-                      shape: BoxShape.circle,
-                    ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Active Engine:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Active Engine: $engine',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (isLocal) ...[
-                    const SizedBox(width: 8),
-                    Theme(
-                      data: Theme.of(context).copyWith(
-                        canvasColor: Colors.grey[900],
-                      ),
-                      child: ModelSelector(
-                        onChanged: () {
-                          setState(() {});
-                        },
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
-            );
-          },
+              const SizedBox(width: 8),
+              Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(canvasColor: Colors.grey[900]),
+                child: ModelSelector(
+                  onChanged: () {
+                    setState(() {});
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
 
         // Chat History
@@ -3451,14 +4541,25 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
                 return Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    margin: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
+                    margin: const EdgeInsets.only(
+                      bottom: 12,
+                      left: 4,
+                      right: 4,
+                    ),
                     child: GlassBlur(
                       borderRadius: 16,
                       child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         child: Text(
                           'Typing advisor recommendations...',
-                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
                     ),
@@ -3472,16 +4573,26 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
                 alignment: isAI ? Alignment.centerLeft : Alignment.centerRight,
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                  ),
                   child: GlassBlur(
                     borderRadius: 16,
-                    cardColor: isAI ? AppColors.glassCard : AppColors.neonPurple.withOpacity(0.1),
-                    borderColor: isAI ? AppColors.glassBorder : AppColors.neonPurple.withOpacity(0.3),
+                    cardColor: isAI
+                        ? AppColors.glassCard
+                        : AppColors.neonPurple.withOpacity(0.1),
+                    borderColor: isAI
+                        ? AppColors.glassBorder
+                        : AppColors.neonPurple.withOpacity(0.3),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Text(
                         msg['text']!,
-                        style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.3),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.white,
+                          height: 1.3,
+                        ),
                       ),
                     ),
                   ),
@@ -3504,9 +4615,13 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
                   child: TextField(
                     controller: _chatInputController,
                     decoration: const InputDecoration(
-                      hintText: 'Ask advisor (e.g. should I pre-pay home loan?)',
+                      hintText:
+                          'Ask advisor (e.g. should I pre-pay home loan?)',
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     onSubmitted: (_) => _sendMessage(),
                   ),
@@ -3516,7 +4631,10 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
               GlassBlur(
                 borderRadius: 16,
                 child: IconButton(
-                  icon: const Icon(Icons.send_rounded, color: AppColors.neonTeal),
+                  icon: const Icon(
+                    Icons.send_rounded,
+                    color: AppColors.neonTeal,
+                  ),
                   onPressed: _sendMessage,
                 ),
               ),
@@ -3561,7 +4679,12 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
             totalDebts += l.remainingBalance;
           }
         }
-        double netWorth = totalHoldingsVal + forecast.cashAndBank + totalReceivables - totalCardOutstanding - totalDebts;
+        double netWorth =
+            totalHoldingsVal +
+            forecast.cashAndBank +
+            totalReceivables -
+            totalCardOutstanding -
+            totalDebts;
 
         final advisorService = ref.read(aiAdvisorServiceProvider);
 
@@ -3589,7 +4712,8 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
         setState(() {
           _messages.add({
             'sender': 'AI',
-            'text': 'I am still loading your financial profile. Please wait a moment.'
+            'text':
+                'I am still loading your financial profile. Please wait a moment.',
           });
           _isTyping = false;
         });
@@ -3598,7 +4722,8 @@ class _AdvisorViewState extends ConsumerState<AdvisorView> with SingleTickerProv
       setState(() {
         _messages.add({
           'sender': 'AI',
-          'text': 'Sorry, I encountered an error while processing your request: $e'
+          'text':
+              'Sorry, I encountered an error while processing your request: $e',
         });
         _isTyping = false;
       });
@@ -3640,12 +4765,16 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
   Future<void> _loadSettings() async {
     final bio = await _storage.read(key: 'settings_biometrics') ?? 'true';
     final localLLM = await _storage.read(key: 'ai_use_local') ?? 'false';
-    
-    String? lookbackValStr = await _storage.read(key: 'settings_sms_lookback_value');
-    String? lookbackUnitStr = await _storage.read(key: 'settings_sms_lookback_unit');
+
+    String? lookbackValStr = await _storage.read(
+      key: 'settings_sms_lookback_value',
+    );
+    String? lookbackUnitStr = await _storage.read(
+      key: 'settings_sms_lookback_unit',
+    );
     final startStr = await _storage.read(key: 'settings_sync_start_date');
     final endStr = await _storage.read(key: 'settings_sync_end_date');
-    
+
     if (lookbackValStr == null && startStr == null) {
       final legacy = await _storage.read(key: 'settings_sms_lookback_days');
       if (legacy != null) {
@@ -3656,7 +4785,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
         lookbackUnitStr = 'days';
       }
     }
-    
+
     setState(() {
       _biometricsEnabled = bio == 'true';
       _localLLMEnabled = localLLM == 'true';
@@ -3676,10 +4805,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       child: ListView(
         physics: const BouncingScrollPhysics(),
         children: [
-          Text(
-            'Settings',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
+          Text('Settings', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 16),
 
           // Security Group
@@ -3689,31 +4815,71 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
             child: Column(
               children: [
                 SwitchListTile(
-                  title: const Text('Biometric Authentication', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Lock app using Fingerprint / FaceID', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  title: const Text(
+                    'Biometric Authentication',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Lock app using Fingerprint / FaceID',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   value: _biometricsEnabled,
                   activeColor: AppColors.neonTeal,
                   onChanged: (val) async {
                     setState(() => _biometricsEnabled = val);
-                    await _storage.write(key: 'settings_biometrics', value: val.toString());
+                    await _storage.write(
+                      key: 'settings_biometrics',
+                      value: val.toString(),
+                    );
                   },
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
-                  title: const Text('Manage PDF Passwords', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Add decryption keys for CC Statements', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.vpn_key_outlined, size: 20, color: AppColors.textSecondary),
+                  title: const Text(
+                    'Manage PDF Passwords',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Add decryption keys for CC Statements',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.vpn_key_outlined,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
                   onTap: () => _showManagePasswordsDialog(context),
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
-                  title: const Text('Recovery Bin', style: TextStyle(fontSize: 14, color: AppColors.neonTeal)),
-                  subtitle: const Text('Restore recently deleted transactions', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.restore_from_trash_rounded, size: 20, color: AppColors.neonTeal),
+                  title: const Text(
+                    'Recovery Bin',
+                    style: TextStyle(fontSize: 14, color: AppColors.neonTeal),
+                  ),
+                  subtitle: const Text(
+                    'Restore recently deleted transactions',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.restore_from_trash_rounded,
+                    size: 20,
+                    color: AppColors.neonTeal,
+                  ),
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const RecoveryBinPage()),
+                      MaterialPageRoute(
+                        builder: (context) => const RecoveryBinPage(),
+                      ),
                     );
                   },
                 ),
@@ -3729,28 +4895,64 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
             child: Column(
               children: [
                 ListTile(
-                  title: const Text('Linked Google Accounts', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Manage backup, sync, and Gmail scanning accounts', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.account_tree_rounded, size: 20, color: AppColors.textSecondary),
+                  title: const Text(
+                    'Linked Google Accounts',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Manage backup, sync, and Gmail scanning accounts',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.account_tree_rounded,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
                   onTap: () => _showGoogleAccountsDialog(context),
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
-                  title: const Text('SMS Sync Lookback Window', style: TextStyle(fontSize: 14)),
+                  title: const Text(
+                    'SMS Sync Lookback Window',
+                    style: TextStyle(fontSize: 14),
+                  ),
                   subtitle: Text(
                     _syncStartDate != null && _syncEndDate != null
                         ? 'Custom Range: ${_formatDate(_syncStartDate!)} to ${_formatDate(_syncEndDate!)}'
                         : 'Scan window: $_smsLookbackValue $_smsLookbackUnit',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                  trailing: const Icon(Icons.edit_calendar_rounded, size: 20, color: AppColors.textSecondary),
+                  trailing: const Icon(
+                    Icons.edit_calendar_rounded,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
                   onTap: () => _showSmsLookbackDialog(context),
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
-                  title: const Text('Sync All Accounts Now', style: TextStyle(fontSize: 14, color: AppColors.neonTeal)),
-                  subtitle: const Text('Directly fetch transactions from Gmail & SMS', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.sync_rounded, size: 20, color: AppColors.neonTeal),
+                  title: const Text(
+                    'Sync All Accounts Now',
+                    style: TextStyle(fontSize: 14, color: AppColors.neonTeal),
+                  ),
+                  subtitle: const Text(
+                    'Directly fetch transactions from Gmail & SMS',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.sync_rounded,
+                    size: 20,
+                    color: AppColors.neonTeal,
+                  ),
                   onTap: () => _triggerAccountSync(context),
                 ),
               ],
@@ -3765,41 +4967,94 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
             child: Column(
               children: [
                 SwitchListTile(
-                  title: const Text('Enable On-Device LLM', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Run LLM locally on device via Flutter Gemma (Ollama on desktop)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  title: const Text(
+                    'Enable On-Device LLM',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Run LLM locally on device via Flutter Gemma (Ollama on desktop)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   value: _localLLMEnabled,
                   activeColor: AppColors.neonPurple,
                   onChanged: (val) async {
                     setState(() {
                       _localLLMEnabled = val;
                     });
-                    await _storage.write(key: 'ai_use_local', value: val.toString());
-                  },
-                ),
-                const Divider(height: 1, color: AppColors.glassBorder),
-                ListTile(
-                  title: const Text('Manage Local Models', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Download or delete on-device model files', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.download_rounded, size: 20, color: AppColors.textSecondary),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const ModelDownloadPage()),
+                    await _storage.write(
+                      key: 'ai_use_local',
+                      value: val.toString(),
                     );
                   },
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
-                  title: const Text('Cloud AI API Keys', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Configure personal Gemini or OpenAI keys', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.api_rounded, size: 20, color: AppColors.textSecondary),
+                  title: const Text(
+                    'Manage Local Models',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Download or delete on-device model files',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.download_rounded,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ModelDownloadPage(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
+                  title: const Text(
+                    'Cloud AI API Keys',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Configure personal Gemini or OpenAI keys',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.api_rounded,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
                   onTap: () => _showApiKeysDialog(context),
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
-                  title: const Text('HuggingFace Token', style: TextStyle(fontSize: 14)),
-                  subtitle: const Text('Configure HuggingFace access token for gated models', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.key_rounded, size: 20, color: AppColors.textSecondary),
+                  title: const Text(
+                    'HuggingFace Token',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Configure HuggingFace access token for gated models',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.key_rounded,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
                   onTap: () => _showHuggingFaceDialog(context),
                 ),
               ],
@@ -3814,24 +5069,68 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
             child: Column(
               children: [
                 ListTile(
-                  title: const Text('Clear All Transactions', style: TextStyle(fontSize: 14, color: Colors.orangeAccent)),
-                  subtitle: const Text('Erases transaction history. Cards & Bank Accounts remain intact.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.receipt_long_rounded, size: 20, color: Colors.orangeAccent),
-                  onTap: () => _showClearDataConfirmDialog(context, type: 'transactions'),
+                  title: const Text(
+                    'Clear All Transactions',
+                    style: TextStyle(fontSize: 14, color: Colors.orangeAccent),
+                  ),
+                  subtitle: const Text(
+                    'Erases transaction history. Cards & Bank Accounts remain intact.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.receipt_long_rounded,
+                    size: 20,
+                    color: Colors.orangeAccent,
+                  ),
+                  onTap: () => _showClearDataConfirmDialog(
+                    context,
+                    type: 'transactions',
+                  ),
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
-                  title: const Text('Clear All Debts & Loans', style: TextStyle(fontSize: 14, color: Colors.orangeAccent)),
-                  subtitle: const Text('Erases loan history and tracking. Cards & Bank Accounts remain intact.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.account_balance_wallet_rounded, size: 20, color: Colors.orangeAccent),
-                  onTap: () => _showClearDataConfirmDialog(context, type: 'loans'),
+                  title: const Text(
+                    'Clear All Debts & Loans',
+                    style: TextStyle(fontSize: 14, color: Colors.orangeAccent),
+                  ),
+                  subtitle: const Text(
+                    'Erases loan history and tracking. Cards & Bank Accounts remain intact.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.account_balance_wallet_rounded,
+                    size: 20,
+                    color: Colors.orangeAccent,
+                  ),
+                  onTap: () =>
+                      _showClearDataConfirmDialog(context, type: 'loans'),
                 ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
-                  title: const Text('Clear All Data', style: TextStyle(fontSize: 14, color: Colors.redAccent)),
-                  subtitle: const Text('Permanently erase all credit cards, loans, holdings, and transactions', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.delete_forever_rounded, size: 20, color: Colors.redAccent),
-                  onTap: () => _showClearDataConfirmDialog(context, type: 'all'),
+                  title: const Text(
+                    'Clear All Data',
+                    style: TextStyle(fontSize: 14, color: Colors.redAccent),
+                  ),
+                  subtitle: const Text(
+                    'Permanently erase all credit cards, loans, holdings, and transactions',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.delete_forever_rounded,
+                    size: 20,
+                    color: Colors.redAccent,
+                  ),
+                  onTap: () =>
+                      _showClearDataConfirmDialog(context, type: 'all'),
                 ),
               ],
             ),
@@ -3873,9 +5172,15 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     final portController = TextEditingController(text: '993');
 
     // Pre-populate if exists
-    _storage.read(key: 'imap_email').then((val) => emailController.text = val ?? '');
-    _storage.read(key: 'imap_host').then((val) => hostController.text = val ?? 'imap.gmail.com');
-    _storage.read(key: 'imap_port').then((val) => portController.text = val ?? '993');
+    _storage
+        .read(key: 'imap_email')
+        .then((val) => emailController.text = val ?? '');
+    _storage
+        .read(key: 'imap_host')
+        .then((val) => hostController.text = val ?? 'imap.gmail.com');
+    _storage
+        .read(key: 'imap_port')
+        .then((val) => portController.text = val ?? '993');
 
     showDialog(
       context: context,
@@ -3893,21 +5198,33 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Configure Gmail IMAP', style: Theme.of(context).textTheme.titleLarge),
+                    Text(
+                      'Configure Gmail IMAP',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                     const SizedBox(height: 10),
                     const Text(
                       'For Gmail, use a 16-digit Google App Password rather than your standard login password.',
-                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: emailController,
-                      decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Email Address',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: pwdController,
-                      decoration: const InputDecoration(labelText: 'Google App Password', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Google App Password',
+                        border: OutlineInputBorder(),
+                      ),
                       obscureText: true,
                     ),
                     const SizedBox(height: 12),
@@ -3916,14 +5233,20 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         Expanded(
                           child: TextField(
                             controller: hostController,
-                            decoration: const InputDecoration(labelText: 'IMAP Host', border: OutlineInputBorder()),
+                            decoration: const InputDecoration(
+                              labelText: 'IMAP Host',
+                              border: OutlineInputBorder(),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
                             controller: portController,
-                            decoration: const InputDecoration(labelText: 'Port', border: OutlineInputBorder()),
+                            decoration: const InputDecoration(
+                              labelText: 'Port',
+                              border: OutlineInputBorder(),
+                            ),
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -3935,34 +5258,49 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.neonTeal,
+                            foregroundColor: Colors.black,
+                          ),
                           onPressed: () async {
                             final email = emailController.text.trim();
                             final pwd = pwdController.text.trim();
                             final host = hostController.text.trim();
-                            final port = int.tryParse(portController.text.trim()) ?? 993;
+                            final port =
+                                int.tryParse(portController.text.trim()) ?? 993;
 
                             if (email.isEmpty || pwd.isEmpty || host.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please fill email and password')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Please fill email and password',
+                                  ),
+                                ),
                               );
                               return;
                             }
 
-                            await ref.read(emailSyncServiceProvider).saveCredentials(email, pwd, host, port);
+                            await ref
+                                .read(emailSyncServiceProvider)
+                                .saveCredentials(email, pwd, host, port);
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('IMAP credentials saved locally')),
+                              const SnackBar(
+                                content: Text('IMAP credentials saved locally'),
+                              ),
                             );
                           },
                           child: const Text('Save Config'),
                         ),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -3973,9 +5311,11 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     );
   }
 
-    void _showSmsLookbackDialog(BuildContext context) {
+  void _showSmsLookbackDialog(BuildContext context) {
     String selectedUnit = _smsLookbackUnit;
-    final valueController = TextEditingController(text: _smsLookbackValue.toString());
+    final valueController = TextEditingController(
+      text: _smsLookbackValue.toString(),
+    );
     DateTime? tempStart = _syncStartDate;
     DateTime? tempEnd = _syncEndDate;
     bool useCalendar = tempStart != null && tempEnd != null;
@@ -4007,7 +5347,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                       const SizedBox(height: 12),
                       const Text(
                         'Define how far back the app will scan your SMS and Gmail inbox for transactions.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                       const SizedBox(height: 20),
 
@@ -4018,7 +5361,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             child: GestureDetector(
                               onTap: () => setState(() => useCalendar = false),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: !useCalendar
                                       ? AppColors.neonTeal.withOpacity(0.15)
@@ -4034,8 +5379,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                   child: Text(
                                     'Relative Window',
                                     style: TextStyle(
-                                      color: !useCalendar ? Colors.white : AppColors.textSecondary,
-                                      fontWeight: !useCalendar ? FontWeight.bold : FontWeight.normal,
+                                      color: !useCalendar
+                                          ? Colors.white
+                                          : AppColors.textSecondary,
+                                      fontWeight: !useCalendar
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
                                     ),
                                   ),
                                 ),
@@ -4047,7 +5396,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             child: GestureDetector(
                               onTap: () => setState(() => useCalendar = true),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: useCalendar
                                       ? AppColors.neonTeal.withOpacity(0.15)
@@ -4063,8 +5414,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                   child: Text(
                                     'Calendar Range',
                                     style: TextStyle(
-                                      color: useCalendar ? Colors.white : AppColors.textSecondary,
-                                      fontWeight: useCalendar ? FontWeight.bold : FontWeight.normal,
+                                      color: useCalendar
+                                          ? Colors.white
+                                          : AppColors.textSecondary,
+                                      fontWeight: useCalendar
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
                                     ),
                                   ),
                                 ),
@@ -4081,9 +5436,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           children: [
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => setState(() => selectedUnit = 'days'),
+                                onTap: () =>
+                                    setState(() => selectedUnit = 'days'),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: selectedUnit == 'days'
                                         ? AppColors.neonTeal.withOpacity(0.15)
@@ -4099,8 +5457,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     child: Text(
                                       'Days',
                                       style: TextStyle(
-                                        color: selectedUnit == 'days' ? Colors.white : AppColors.textSecondary,
-                                        fontWeight: selectedUnit == 'days' ? FontWeight.bold : FontWeight.normal,
+                                        color: selectedUnit == 'days'
+                                            ? Colors.white
+                                            : AppColors.textSecondary,
+                                        fontWeight: selectedUnit == 'days'
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
                                       ),
                                     ),
                                   ),
@@ -4110,9 +5472,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => setState(() => selectedUnit = 'months'),
+                                onTap: () =>
+                                    setState(() => selectedUnit = 'months'),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: selectedUnit == 'months'
                                         ? AppColors.neonTeal.withOpacity(0.15)
@@ -4128,8 +5493,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     child: Text(
                                       'Months',
                                       style: TextStyle(
-                                        color: selectedUnit == 'months' ? Colors.white : AppColors.textSecondary,
-                                        fontWeight: selectedUnit == 'months' ? FontWeight.bold : FontWeight.normal,
+                                        color: selectedUnit == 'months'
+                                            ? Colors.white
+                                            : AppColors.textSecondary,
+                                        fontWeight: selectedUnit == 'months'
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
                                       ),
                                     ),
                                   ),
@@ -4145,16 +5514,25 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           keyboardType: TextInputType.number,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
-                            labelText: selectedUnit == 'days' ? 'Number of Days' : 'Number of Months',
-                            labelStyle: const TextStyle(color: AppColors.textSecondary),
+                            labelText: selectedUnit == 'days'
+                                ? 'Number of Days'
+                                : 'Number of Months',
+                            labelStyle: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
                             enabledBorder: const OutlineInputBorder(
-                              borderSide: BorderSide(color: AppColors.glassBorder),
+                              borderSide: BorderSide(
+                                color: AppColors.glassBorder,
+                              ),
                             ),
                             focusedBorder: const OutlineInputBorder(
                               borderSide: BorderSide(color: AppColors.neonTeal),
                             ),
                             border: const OutlineInputBorder(),
-                            prefixIcon: const Icon(Icons.date_range_rounded, color: AppColors.textSecondary),
+                            prefixIcon: const Icon(
+                              Icons.date_range_rounded,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
                       ] else ...[
@@ -4169,21 +5547,32 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           ),
                           child: Column(
                             children: [
-                              const Icon(Icons.calendar_month_rounded, color: AppColors.neonTeal, size: 36),
+                              const Icon(
+                                Icons.calendar_month_rounded,
+                                color: AppColors.neonTeal,
+                                size: 36,
+                              ),
                               const SizedBox(height: 10),
                               Text(
                                 tempStart != null && tempEnd != null
                                     ? '${_formatDate(tempStart!)}  ➔  ${_formatDate(tempEnd!)}'
                                     : 'No range selected',
-                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 16),
                               ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.neonTeal.withOpacity(0.2),
+                                  backgroundColor: AppColors.neonTeal
+                                      .withOpacity(0.2),
                                   foregroundColor: AppColors.neonTeal,
-                                  side: const BorderSide(color: AppColors.neonTeal),
+                                  side: const BorderSide(
+                                    color: AppColors.neonTeal,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -4192,9 +5581,15 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                   final picked = await showDateRangePicker(
                                     context: context,
                                     firstDate: DateTime(2020),
-                                    lastDate: DateTime.now().add(const Duration(days: 365)),
-                                    initialDateRange: tempStart != null && tempEnd != null
-                                        ? DateTimeRange(start: tempStart!, end: tempEnd!)
+                                    lastDate: DateTime.now().add(
+                                      const Duration(days: 365),
+                                    ),
+                                    initialDateRange:
+                                        tempStart != null && tempEnd != null
+                                        ? DateTimeRange(
+                                            start: tempStart!,
+                                            end: tempEnd!,
+                                          )
                                         : null,
                                     builder: (context, child) {
                                       return Theme(
@@ -4206,7 +5601,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                             onSurface: Colors.white,
                                           ),
                                           textButtonTheme: TextButtonThemeData(
-                                            style: TextButton.styleFrom(foregroundColor: AppColors.neonTeal),
+                                            style: TextButton.styleFrom(
+                                              foregroundColor:
+                                                  AppColors.neonTeal,
+                                            ),
                                           ),
                                         ),
                                         child: child!,
@@ -4233,7 +5631,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         children: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
                           ),
                           const SizedBox(width: 12),
                           ElevatedButton(
@@ -4249,17 +5650,29 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 if (tempStart == null || tempEnd == null) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Please select a date range first'),
+                                      content: Text(
+                                        'Please select a date range first',
+                                      ),
                                       backgroundColor: Colors.redAccent,
                                     ),
                                   );
                                   return;
                                 }
 
-                                await _storage.write(key: 'settings_sync_start_date', value: tempStart!.toIso8601String());
-                                await _storage.write(key: 'settings_sync_end_date', value: tempEnd!.toIso8601String());
-                                await _storage.delete(key: 'settings_sms_lookback_value');
-                                await _storage.delete(key: 'settings_sms_lookback_unit');
+                                await _storage.write(
+                                  key: 'settings_sync_start_date',
+                                  value: tempStart!.toIso8601String(),
+                                );
+                                await _storage.write(
+                                  key: 'settings_sync_end_date',
+                                  value: tempEnd!.toIso8601String(),
+                                );
+                                await _storage.delete(
+                                  key: 'settings_sms_lookback_value',
+                                );
+                                await _storage.delete(
+                                  key: 'settings_sms_lookback_unit',
+                                );
 
                                 this.setState(() {
                                   _syncStartDate = tempStart;
@@ -4271,17 +5684,29 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 if (val == null || val <= 0) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Please enter a valid positive number'),
+                                      content: Text(
+                                        'Please enter a valid positive number',
+                                      ),
                                       backgroundColor: Colors.redAccent,
                                     ),
                                   );
                                   return;
                                 }
 
-                                await _storage.write(key: 'settings_sms_lookback_value', value: val.toString());
-                                await _storage.write(key: 'settings_sms_lookback_unit', value: selectedUnit);
-                                await _storage.delete(key: 'settings_sync_start_date');
-                                await _storage.delete(key: 'settings_sync_end_date');
+                                await _storage.write(
+                                  key: 'settings_sms_lookback_value',
+                                  value: val.toString(),
+                                );
+                                await _storage.write(
+                                  key: 'settings_sms_lookback_unit',
+                                  value: selectedUnit,
+                                );
+                                await _storage.delete(
+                                  key: 'settings_sync_start_date',
+                                );
+                                await _storage.delete(
+                                  key: 'settings_sync_end_date',
+                                );
 
                                 this.setState(() {
                                   _smsLookbackValue = val;
@@ -4293,19 +5718,26 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
                               // Force full scan on next sync
                               await _storage.delete(key: 'last_sms_sync_time');
-                              final accounts = await ref.read(googleSyncServiceProvider).getLinkedAccounts();
+                              final accounts = await ref
+                                  .read(googleSyncServiceProvider)
+                                  .getLinkedAccounts();
                               for (var acc in accounts) {
-                                await _storage.delete(key: 'last_gmail_sync_time_${acc.email}');
+                                await _storage.delete(
+                                  key: 'last_gmail_sync_time_${acc.email}',
+                                );
                               }
 
                               Navigator.pop(context);
-                              
+
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(useCalendar 
-                                      ? 'Lookback range set to ${_formatDate(tempStart!)} - ${_formatDate(tempEnd!)}.' 
-                                      : 'Lookback set to ${valueController.text.trim()} $selectedUnit. Next sync will perform a full scan.'),
-                                  backgroundColor: AppColors.neonEmerald.withOpacity(0.9),
+                                  content: Text(
+                                    useCalendar
+                                        ? 'Lookback range set to ${_formatDate(tempStart!)} - ${_formatDate(tempEnd!)}.'
+                                        : 'Lookback set to ${valueController.text.trim()} $selectedUnit. Next sync will perform a full scan.',
+                                  ),
+                                  backgroundColor: AppColors.neonEmerald
+                                      .withOpacity(0.9),
                                 ),
                               );
                             },
@@ -4347,24 +5779,37 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Credit Card PDF Passwords', style: Theme.of(context).textTheme.titleLarge),
+                      Text(
+                        'Credit Card PDF Passwords',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
                       const SizedBox(height: 12),
                       const Text(
                         'Stored locally to decrypt downloaded bank statement PDFs at month-end.',
-                        style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<int>(
                         value: selectedCardId,
-                        decoration: const InputDecoration(labelText: 'Select Credit Card', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                          labelText: 'Select Credit Card',
+                          border: OutlineInputBorder(),
+                        ),
                         dropdownColor: AppColors.obsidianSurface,
                         items: cardsState.maybeWhen(
-                          data: (cards) => cards.map(
-                            (card) => DropdownMenuItem<int>(
-                              value: card.id,
-                              child: Text('${card.cardName} (..${card.last4})'),
-                            ),
-                          ).toList(),
+                          data: (cards) => cards
+                              .map(
+                                (card) => DropdownMenuItem<int>(
+                                  value: card.id,
+                                  child: Text(
+                                    '${card.cardName} (..${card.last4})',
+                                  ),
+                                ),
+                              )
+                              .toList(),
                           orElse: () => [],
                         ),
                         onChanged: (val) {
@@ -4380,7 +5825,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: passwordController,
-                        decoration: const InputDecoration(labelText: 'Statement PDF Password', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                          labelText: 'Statement PDF Password',
+                          border: OutlineInputBorder(),
+                        ),
                         obscureText: true,
                       ),
                       const SizedBox(height: 20),
@@ -4389,30 +5837,47 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         children: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.neonTeal,
+                              foregroundColor: Colors.black,
+                            ),
                             onPressed: () async {
                               final pwd = passwordController.text.trim();
                               if (selectedCardId == null || pwd.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please select card and enter password')),
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please select card and enter password',
+                                    ),
+                                  ),
                                 );
                                 return;
                               }
 
-                              await _storage.write(key: 'card_password_$selectedCardId', value: pwd);
+                              await _storage.write(
+                                key: 'card_password_$selectedCardId',
+                                value: pwd,
+                              );
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('PDF statement password saved securely')),
+                                const SnackBar(
+                                  content: Text(
+                                    'PDF statement password saved securely',
+                                  ),
+                                ),
                               );
                             },
                             child: const Text('Save Password'),
                           ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -4426,7 +5891,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
   void _showHuggingFaceDialog(BuildContext context) {
     final tokenController = TextEditingController();
-    _storage.read(key: 'huggingface_token').then((val) => tokenController.text = val ?? '');
+    _storage
+        .read(key: 'huggingface_token')
+        .then((val) => tokenController.text = val ?? '');
 
     showDialog(
       context: context,
@@ -4443,13 +5910,22 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('HuggingFace Token', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'HuggingFace Token',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 12),
-                  const Text('Enter your HuggingFace API key to download gated models.', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  const Text(
+                    'Enter your HuggingFace API key to download gated models.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: tokenController,
-                    decoration: const InputDecoration(labelText: 'HuggingFace Token', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'HuggingFace Token',
+                      border: OutlineInputBorder(),
+                    ),
                     obscureText: true,
                   ),
                   const SizedBox(height: 20),
@@ -4458,20 +5934,33 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     children: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.neonTeal,
+                          foregroundColor: Colors.black,
+                        ),
                         onPressed: () async {
-                          await _storage.write(key: 'huggingface_token', value: tokenController.text.trim());
+                          await _storage.write(
+                            key: 'huggingface_token',
+                            value: tokenController.text.trim(),
+                          );
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('HuggingFace Token saved.')));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('HuggingFace Token saved.'),
+                            ),
+                          );
                         },
                         child: const Text('Save Token'),
                       ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
@@ -4484,11 +5973,14 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
   Future<bool> _authenticateUserForClear(BuildContext context) async {
     final auth = LocalAuthentication();
     try {
-      final isAvailable = await auth.canCheckBiometrics || await auth.isDeviceSupported();
-      final bioEnabled = await _storage.read(key: 'settings_biometrics') ?? 'true';
+      final isAvailable =
+          await auth.canCheckBiometrics || await auth.isDeviceSupported();
+      final bioEnabled =
+          await _storage.read(key: 'settings_biometrics') ?? 'true';
       if (isAvailable && bioEnabled == 'true') {
         final didAuth = await auth.authenticate(
-          localizedReason: 'Confirm authentication to permanently delete all data',
+          localizedReason:
+              'Confirm authentication to permanently delete all data',
           options: const AuthenticationOptions(
             biometricOnly: false,
             stickyAuth: true,
@@ -4503,7 +5995,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     // Fallback to PIN dialog
     final storedPin = await _storage.read(key: 'settings_backup_pin') ?? '1234';
     final pinController = TextEditingController();
-    
+
     final pinMatched = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -4517,16 +6009,27 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.lock_outline_rounded, color: AppColors.neonPurple, size: 40),
+                  const Icon(
+                    Icons.lock_outline_rounded,
+                    color: AppColors.neonPurple,
+                    size: 40,
+                  ),
                   const SizedBox(height: 16),
                   const Text(
                     'Enter Backup PIN',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     'Please enter your 4-digit security PIN to authorize database wipe.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -4535,7 +6038,11 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     keyboardType: TextInputType.number,
                     obscureText: true,
                     maxLength: 4,
-                    style: const TextStyle(color: Colors.white, fontSize: 22, letterSpacing: 12),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      letterSpacing: 12,
+                    ),
                     textAlign: TextAlign.center,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
@@ -4551,7 +6058,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     children: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       ElevatedButton(
@@ -4565,16 +6075,18 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Incorrect PIN. Please try again.'),
+                                content: Text(
+                                  'Incorrect PIN. Please try again.',
+                                ),
                                 backgroundColor: Colors.redAccent,
                               ),
                             );
                           }
                         },
                         child: const Text('Confirm'),
-                      )
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
@@ -4585,18 +6097,24 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     return pinMatched ?? false;
   }
 
-  void _showClearDataConfirmDialog(BuildContext context, {String type = 'all'}) {
+  void _showClearDataConfirmDialog(
+    BuildContext context, {
+    String type = 'all',
+  }) {
     final textController = TextEditingController();
     bool canDelete = false;
 
     String title = 'Erase All Data';
-    String warning = 'This will permanently delete all transactions, credit cards, active loans, and portfolios from this device. This operation cannot be undone.';
+    String warning =
+        'This will permanently delete all transactions, credit cards, active loans, and portfolios from this device. This operation cannot be undone.';
     if (type == 'transactions') {
       title = 'Clear All Transactions';
-      warning = 'This will permanently delete all transaction history from this device. Your cards and bank accounts will remain intact.';
+      warning =
+          'This will permanently delete all transaction history from this device. Your cards and bank accounts will remain intact.';
     } else if (type == 'loans') {
       title = 'Clear All Debts & Loans';
-      warning = 'This will permanently delete all active loans and debtor/creditor ledgers. Your cards and bank accounts will remain intact.';
+      warning =
+          'This will permanently delete all active loans and debtor/creditor ledgers. Your cards and bank accounts will remain intact.';
     }
 
     showDialog(
@@ -4618,26 +6136,38 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: Colors.redAccent,
+                            size: 28,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             title,
-                            style: Theme.of(stateContext).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(stateContext).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
                       Text(
                         warning,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       Text(
                         'Type the word CLEAR below in uppercase to confirm:',
-                        style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -4647,7 +6177,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           hintText: 'CLEAR',
                           hintStyle: TextStyle(color: AppColors.textMuted),
                           enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.glassBorder),
+                            borderSide: BorderSide(
+                              color: AppColors.glassBorder,
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderSide: BorderSide(color: Colors.redAccent),
@@ -4666,14 +6198,24 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         children: [
                           TextButton(
                             onPressed: () => Navigator.pop(dialogContext),
-                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
                           ),
                           const SizedBox(width: 6),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: canDelete ? Colors.redAccent : Colors.redAccent.withOpacity(0.2),
-                              foregroundColor: canDelete ? Colors.white : Colors.white.withOpacity(0.3),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              backgroundColor: canDelete
+                                  ? Colors.redAccent
+                                  : Colors.redAccent.withOpacity(0.2),
+                              foregroundColor: canDelete
+                                  ? Colors.white
+                                  : Colors.white.withOpacity(0.3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 8,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -4681,42 +6223,81 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             onPressed: !canDelete
                                 ? null
                                 : () async {
-                                    final messenger = ScaffoldMessenger.of(context);
-                                    Navigator.pop(dialogContext); // Close confirm dialog
-                                    
+                                    final messenger = ScaffoldMessenger.of(
+                                      context,
+                                    );
+                                    Navigator.pop(
+                                      dialogContext,
+                                    ); // Close confirm dialog
+
                                     // Trigger security authentication layer
-                                    final authenticated = await _authenticateUserForClear(context);
+                                    final authenticated =
+                                        await _authenticateUserForClear(
+                                          context,
+                                        );
                                     if (authenticated) {
                                       // Clear DB based on type
                                       if (type == 'transactions') {
-                                        await ref.read(databaseServiceProvider).clearAllTransactions();
-                                        await _storage.delete(key: 'last_sms_sync_time');
-                                        await _storage.delete(key: 'last_email_sync_time');
-                                        ref.read(transactionsProvider.notifier).loadTransactions();
-                                        ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                        await ref
+                                            .read(databaseServiceProvider)
+                                            .clearAllTransactions();
+                                        await _storage.delete(
+                                          key: 'last_sms_sync_time',
+                                        );
+                                        await _storage.delete(
+                                          key: 'last_email_sync_time',
+                                        );
+                                        ref
+                                            .read(transactionsProvider.notifier)
+                                            .loadTransactions();
+                                        ref
+                                            .read(creditCardsProvider.notifier)
+                                            .loadCreditCards();
                                       } else if (type == 'loans') {
-                                        await ref.read(databaseServiceProvider).clearAllLoans();
-                                        ref.read(loansProvider.notifier).loadLoans();
+                                        await ref
+                                            .read(databaseServiceProvider)
+                                            .clearAllLoans();
+                                        ref
+                                            .read(loansProvider.notifier)
+                                            .loadLoans();
                                       } else {
-                                        await ref.read(databaseServiceProvider).clearAllData();
-                                        await _storage.delete(key: 'last_sms_sync_time');
-                                        await _storage.delete(key: 'last_email_sync_time');
-                                        ref.read(transactionsProvider.notifier).loadTransactions();
-                                        ref.read(creditCardsProvider.notifier).loadCreditCards();
-                                        ref.read(loansProvider.notifier).loadLoans();
-                                        ref.read(holdingsProvider.notifier).loadHoldings();
+                                        await ref
+                                            .read(databaseServiceProvider)
+                                            .clearAllData();
+                                        await _storage.delete(
+                                          key: 'last_sms_sync_time',
+                                        );
+                                        await _storage.delete(
+                                          key: 'last_email_sync_time',
+                                        );
+                                        ref
+                                            .read(transactionsProvider.notifier)
+                                            .loadTransactions();
+                                        ref
+                                            .read(creditCardsProvider.notifier)
+                                            .loadCreditCards();
+                                        ref
+                                            .read(loansProvider.notifier)
+                                            .loadLoans();
+                                        ref
+                                            .read(holdingsProvider.notifier)
+                                            .loadHoldings();
                                       }
-                                      
+
                                       messenger.showSnackBar(
                                         const SnackBar(
-                                          content: Text('Selected data successfully cleared from the database.'),
+                                          content: Text(
+                                            'Selected data successfully cleared from the database.',
+                                          ),
                                           backgroundColor: Colors.redAccent,
                                         ),
                                       );
                                     } else {
                                       messenger.showSnackBar(
                                         const SnackBar(
-                                          content: Text('Authentication failed. Data was not deleted.'),
+                                          content: Text(
+                                            'Authentication failed. Data was not deleted.',
+                                          ),
                                           backgroundColor: Colors.orangeAccent,
                                         ),
                                       );
@@ -4724,11 +6305,14 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                   },
                             child: const Text(
                               'Authenticate & Delete',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -4750,8 +6334,14 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               future: ref.read(googleSyncServiceProvider).getLinkedAccounts(),
               builder: (context, snapshot) {
                 final accounts = snapshot.data ?? [];
-                final primary = accounts.firstWhere((e) => e.isPrimary, orElse: () => LinkedGoogleAccount(email: 'Not Linked', isPrimary: true));
-                final secondaries = accounts.where((e) => !e.isPrimary).toList();
+                final primary = accounts.firstWhere(
+                  (e) => e.isPrimary,
+                  orElse: () =>
+                      LinkedGoogleAccount(email: 'Not Linked', isPrimary: true),
+                );
+                final secondaries = accounts
+                    .where((e) => !e.isPrimary)
+                    .toList();
 
                 return Dialog(
                   backgroundColor: Colors.transparent,
@@ -4765,20 +6355,33 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.account_tree_rounded, color: AppColors.neonTeal, size: 24),
+                              const Icon(
+                                Icons.account_tree_rounded,
+                                color: AppColors.neonTeal,
+                                size: 24,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Linked Google Accounts',
-                                style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 20),
-                          
+
                           // Primary backup section
                           const Text(
                             'PRIMARY SYNC & BACKUP ACCOUNT',
-                            style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           GlassBlur(
@@ -4789,17 +6392,29 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           primary.email,
-                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          primary.email == 'Not Linked' ? 'Sync and Cloud Backup disabled' : 'Sync & backups enabled',
-                                          style: TextStyle(fontSize: 11, color: primary.email == 'Not Linked' ? Colors.redAccent : AppColors.neonEmerald),
+                                          primary.email == 'Not Linked'
+                                              ? 'Sync and Cloud Backup disabled'
+                                              : 'Sync & backups enabled',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: primary.email == 'Not Linked'
+                                                ? Colors.redAccent
+                                                : AppColors.neonEmerald,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -4809,70 +6424,140 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppColors.neonTeal,
                                         foregroundColor: Colors.black,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
                                       ),
                                       onPressed: () async {
                                         try {
-                                          final acc = await ref.read(googleSyncServiceProvider).authenticateAccount(true);
+                                          final acc = await ref
+                                              .read(googleSyncServiceProvider)
+                                              .authenticateAccount(true);
                                           if (acc != null) {
                                             setState(() {});
                                           }
                                         } catch (e) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             SnackBar(
-                                              content: Text('Google Sign-In failed: $e'),
+                                              content: Text(
+                                                'Google Sign-In failed: $e',
+                                              ),
                                               backgroundColor: Colors.redAccent,
                                             ),
                                           );
                                         }
                                       },
-                                      child: const Text('Link', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      child: const Text(
+                                        'Link',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     )
                                   else ...[
                                     IconButton(
-                                      icon: const Icon(Icons.cloud_upload_rounded, color: AppColors.neonTeal),
+                                      icon: const Icon(
+                                        Icons.cloud_upload_rounded,
+                                        color: AppColors.neonTeal,
+                                      ),
                                       onPressed: () async {
-                                        final error = await ref.read(googleSyncServiceProvider).backupToCloud(ref.read(databaseServiceProvider));
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        final error = await ref
+                                            .read(googleSyncServiceProvider)
+                                            .backupToCloud(
+                                              ref.read(databaseServiceProvider),
+                                            );
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(
-                                            content: Text(error == null ? 'Backup saved successfully to Google Drive' : 'Backup failed: $error'),
-                                            backgroundColor: error == null ? AppColors.neonEmerald : Colors.redAccent,
+                                            content: Text(
+                                              error == null
+                                                  ? 'Backup saved successfully to Google Drive'
+                                                  : 'Backup failed: $error',
+                                            ),
+                                            backgroundColor: error == null
+                                                ? AppColors.neonEmerald
+                                                : Colors.redAccent,
                                           ),
                                         );
                                       },
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.sync_rounded, color: AppColors.neonTeal),
+                                      icon: const Icon(
+                                        Icons.sync_rounded,
+                                        color: AppColors.neonTeal,
+                                      ),
                                       onPressed: () async {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           const SnackBar(
-                                            content: Text('Checking cloud backup status...'),
+                                            content: Text(
+                                              'Checking cloud backup status...',
+                                            ),
                                             duration: Duration(seconds: 1),
                                           ),
                                         );
                                         try {
-                                          final restored = await ref.read(googleSyncServiceProvider).syncOnStartup(ref.read(databaseServiceProvider));
+                                          final restored = await ref
+                                              .read(googleSyncServiceProvider)
+                                              .syncOnStartup(
+                                                ref.read(
+                                                  databaseServiceProvider,
+                                                ),
+                                              );
                                           if (restored) {
-                                            ref.read(transactionsProvider.notifier).loadTransactions();
-                                            ref.read(creditCardsProvider.notifier).loadCreditCards();
-                                            ref.read(bankAccountsProvider.notifier).loadBankAccounts();
-                                            ref.read(loansProvider.notifier).loadLoans();
-                                            ref.read(holdingsProvider.notifier).loadHoldings();
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ref
+                                                .read(
+                                                  transactionsProvider.notifier,
+                                                )
+                                                .loadTransactions();
+                                            ref
+                                                .read(
+                                                  creditCardsProvider.notifier,
+                                                )
+                                                .loadCreditCards();
+                                            ref
+                                                .read(
+                                                  bankAccountsProvider.notifier,
+                                                )
+                                                .loadBankAccounts();
+                                            ref
+                                                .read(loansProvider.notifier)
+                                                .loadLoans();
+                                            ref
+                                                .read(holdingsProvider.notifier)
+                                                .loadHoldings();
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               const SnackBar(
-                                                content: Text('Sync completed. Newer data restored from Google Drive.'),
-                                                backgroundColor: AppColors.neonEmerald,
+                                                content: Text(
+                                                  'Sync completed. Newer data restored from Google Drive.',
+                                                ),
+                                                backgroundColor:
+                                                    AppColors.neonEmerald,
                                               ),
                                             );
                                           } else {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               const SnackBar(
-                                                content: Text('Your database is already in sync with Google Drive.'),
+                                                content: Text(
+                                                  'Your database is already in sync with Google Drive.',
+                                                ),
                                               ),
                                             );
                                           }
                                         } catch (e) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             SnackBar(
                                               content: Text('Sync failed: $e'),
                                               backgroundColor: Colors.redAccent,
@@ -4882,32 +6567,68 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                       },
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.cloud_download_rounded, color: AppColors.neonPurple),
+                                      icon: const Icon(
+                                        Icons.cloud_download_rounded,
+                                        color: AppColors.neonPurple,
+                                      ),
                                       onPressed: () async {
-                                        final error = await ref.read(googleSyncServiceProvider).restoreFromCloud(ref.read(databaseServiceProvider));
+                                        final error = await ref
+                                            .read(googleSyncServiceProvider)
+                                            .restoreFromCloud(
+                                              ref.read(databaseServiceProvider),
+                                            );
                                         if (error == null) {
-                                          ref.read(transactionsProvider.notifier).loadTransactions();
-                                          ref.read(creditCardsProvider.notifier).loadCreditCards();
-                                          ref.read(bankAccountsProvider.notifier).loadBankAccounts();
-                                          ref.read(loansProvider.notifier).loadLoans();
-                                          ref.read(holdingsProvider.notifier).loadHoldings();
+                                          ref
+                                              .read(
+                                                transactionsProvider.notifier,
+                                              )
+                                              .loadTransactions();
+                                          ref
+                                              .read(
+                                                creditCardsProvider.notifier,
+                                              )
+                                              .loadCreditCards();
+                                          ref
+                                              .read(
+                                                bankAccountsProvider.notifier,
+                                              )
+                                              .loadBankAccounts();
+                                          ref
+                                              .read(loansProvider.notifier)
+                                              .loadLoans();
+                                          ref
+                                              .read(holdingsProvider.notifier)
+                                              .loadHoldings();
                                         }
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(
-                                            content: Text(error == null ? 'Database restored from Google Drive' : 'Restore failed: $error'),
-                                            backgroundColor: error == null ? AppColors.neonEmerald : Colors.redAccent,
+                                            content: Text(
+                                              error == null
+                                                  ? 'Database restored from Google Drive'
+                                                  : 'Restore failed: $error',
+                                            ),
+                                            backgroundColor: error == null
+                                                ? AppColors.neonEmerald
+                                                : Colors.redAccent,
                                           ),
                                         );
                                       },
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+                                      icon: const Icon(
+                                        Icons.logout_rounded,
+                                        color: Colors.redAccent,
+                                      ),
                                       onPressed: () async {
-                                        await ref.read(googleSyncServiceProvider).removeAccount(primary.email);
+                                        await ref
+                                            .read(googleSyncServiceProvider)
+                                            .removeAccount(primary.email);
                                         setState(() {});
                                       },
                                     ),
-                                  ]
+                                  ],
                                 ],
                               ),
                             ),
@@ -4920,22 +6641,35 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             children: [
                               const Text(
                                 'SECONDARY SCANNING ACCOUNTS',
-                                style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.textMuted,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.neonTeal, size: 20),
+                                icon: const Icon(
+                                  Icons.add_circle_outline_rounded,
+                                  color: AppColors.neonTeal,
+                                  size: 20,
+                                ),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
                                 onPressed: () async {
                                   try {
-                                    final acc = await ref.read(googleSyncServiceProvider).authenticateAccount(false);
+                                    final acc = await ref
+                                        .read(googleSyncServiceProvider)
+                                        .authenticateAccount(false);
                                     if (acc != null) {
                                       setState(() {});
                                     }
                                   } catch (e) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Google Sign-In failed: $e'),
+                                        content: Text(
+                                          'Google Sign-In failed: $e',
+                                        ),
                                         backgroundColor: Colors.redAccent,
                                       ),
                                     );
@@ -4948,7 +6682,13 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           if (secondaries.isEmpty)
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text('No secondary emails linked.', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                              child: Text(
+                                'No secondary emails linked.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
                             )
                           else
                             ConstrainedBox(
@@ -4964,22 +6704,37 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     child: GlassBlur(
                                       borderRadius: 10,
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12.0,
+                                          vertical: 8.0,
+                                        ),
                                         child: Row(
                                           children: [
                                             Expanded(
                                               child: Text(
                                                 sec.email,
-                                                style: const TextStyle(fontSize: 12, color: Colors.white),
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.white,
+                                                ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                             IconButton(
-                                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                                              icon: const Icon(
+                                                Icons.delete_outline_rounded,
+                                                color: Colors.redAccent,
+                                                size: 18,
+                                              ),
                                               padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
+                                              constraints:
+                                                  const BoxConstraints(),
                                               onPressed: () async {
-                                                await ref.read(googleSyncServiceProvider).removeAccount(sec.email);
+                                                await ref
+                                                    .read(
+                                                      googleSyncServiceProvider,
+                                                    )
+                                                    .removeAccount(sec.email);
                                                 setState(() {});
                                               },
                                             ),
@@ -4996,9 +6751,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed: () => Navigator.pop(dialogContext),
-                              child: const Text('Close', style: TextStyle(color: AppColors.neonTeal)),
+                              child: const Text(
+                                'Close',
+                                style: TextStyle(color: AppColors.neonTeal),
+                              ),
                             ),
-                          )
+                          ),
                         ],
                       ),
                     ),
@@ -5048,7 +6806,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       }
 
       int emailCount = 0;
-      final parsedTxs = await ref.read(googleSyncServiceProvider).syncTransactionsFromGmail(ref.read(databaseServiceProvider));
+      final parsedTxs = await ref
+          .read(googleSyncServiceProvider)
+          .syncTransactionsFromGmail(ref.read(databaseServiceProvider));
       emailCount = parsedTxs.length;
 
       // Reload database providers
@@ -5069,7 +6829,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       Navigator.pop(context); // Close loading dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Sync failed: ${e.toString().replaceAll('Exception: ', '')}'),
+          content: Text(
+            'Sync failed: ${e.toString().replaceAll('Exception: ', '')}',
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -5079,17 +6841,30 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
   void _showApiKeysDialog(BuildContext context) {
     final geminiController = TextEditingController();
     final openaiController = TextEditingController();
-    final ollamaController = TextEditingController(text: 'http://localhost:11434');
+    final ollamaController = TextEditingController(
+      text: 'http://localhost:11434',
+    );
 
     // Pre-populate if exists
-    _storage.read(key: 'ai_gemini_key').then((val) => geminiController.text = val ?? '');
-    _storage.read(key: 'ai_openai_key').then((val) => openaiController.text = val ?? '');
-    _storage.read(key: 'ai_ollama_host').then((val) => ollamaController.text = val ?? 'http://localhost:11434');
+    _storage
+        .read(key: 'ai_gemini_key')
+        .then((val) => geminiController.text = val ?? '');
+    _storage
+        .read(key: 'ai_openai_key')
+        .then((val) => openaiController.text = val ?? '');
+    _storage
+        .read(key: 'ai_ollama_host')
+        .then((val) => ollamaController.text = val ?? 'http://localhost:11434');
 
     showDialog(
       context: context,
       builder: (context) {
-        return Dialog(
+        bool obscureGemini = true;
+        bool obscureOpenAI = true;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
           backgroundColor: Colors.transparent,
           child: GlassBlur(
             borderRadius: 24,
@@ -5102,28 +6877,91 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('AI Advisor API Keys', style: Theme.of(context).textTheme.titleLarge),
+                    Text(
+                      'AI Advisor API Keys',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                     const SizedBox(height: 10),
                     const Text(
                       'Provide keys for local Ollama host or cloud API fallbacks. Stored securely on-device.',
-                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: ollamaController,
-                      decoration: const InputDecoration(labelText: 'Local Ollama Host', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Local Ollama Host',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: geminiController,
-                      decoration: const InputDecoration(labelText: 'Gemini API Key', border: OutlineInputBorder()),
-                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Gemini API Key',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureGemini ? Icons.visibility_off : Icons.visibility,
+                            color: AppColors.textSecondary,
+                          ),
+                          onPressed: () async {
+                            if (obscureGemini) {
+                              final LocalAuthentication auth = LocalAuthentication();
+                              final bool didAuthenticate = await auth.authenticate(
+                                localizedReason: 'Please authenticate to view API Key',
+                                options: const AuthenticationOptions(biometricOnly: false),
+                              );
+                              if (didAuthenticate) {
+                                setState(() {
+                                  obscureGemini = false;
+                                });
+                              }
+                            } else {
+                              setState(() {
+                                obscureGemini = true;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      obscureText: obscureGemini,
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: openaiController,
-                      decoration: const InputDecoration(labelText: 'OpenAI API Key (Optional)', border: OutlineInputBorder()),
-                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'OpenAI API Key (Optional)',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureOpenAI ? Icons.visibility_off : Icons.visibility,
+                            color: AppColors.textSecondary,
+                          ),
+                          onPressed: () async {
+                            if (obscureOpenAI) {
+                              final LocalAuthentication auth = LocalAuthentication();
+                              final bool didAuthenticate = await auth.authenticate(
+                                localizedReason: 'Please authenticate to view API Key',
+                                options: const AuthenticationOptions(biometricOnly: false),
+                              );
+                              if (didAuthenticate) {
+                                setState(() {
+                                  obscureOpenAI = false;
+                                });
+                              }
+                            } else {
+                              setState(() {
+                                obscureOpenAI = true;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      obscureText: obscureOpenAI,
                     ),
                     const SizedBox(height: 20),
                     Row(
@@ -5131,11 +6969,17 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonPurple, foregroundColor: Colors.white),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.neonPurple,
+                            foregroundColor: Colors.white,
+                          ),
                           onPressed: () async {
                             final gemini = geminiController.text.trim();
                             final openai = openaiController.text.trim();
@@ -5146,17 +6990,24 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.neonPurple)),
+                                builder: (context) => const Center(
+                                  child: CircularProgressIndicator(
+                                    color: AppColors.neonPurple,
+                                  ),
+                                ),
                               );
 
                               try {
                                 final model = GenerativeModel(
-                                  model: 'gemini-1.5-flash',
+                                  model: 'gemini-3.1-flash-lite',
                                   apiKey: gemini,
                                 );
                                 final content = [Content.text("Ping")];
-                                final response = await model.generateContent(content).timeout(const Duration(seconds: 5));
-                                if (response.text == null || response.text!.isEmpty) {
+                                final response = await model
+                                    .generateContent(content)
+                                    .timeout(const Duration(seconds: 15));
+                                if (response.text == null ||
+                                    response.text!.isEmpty) {
                                   throw Exception("Verification failed");
                                 }
                                 Navigator.pop(context); // Close loader
@@ -5164,7 +7015,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 Navigator.pop(context); // Close loader
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Invalid Gemini API Key: ${e.toString().replaceAll('Exception: ', '')}'),
+                                    content: Text(
+                                      'Invalid Gemini API Key: ${e.toString().replaceAll('Exception: ', '')}',
+                                    ),
                                     backgroundColor: Colors.redAccent,
                                   ),
                                 );
@@ -5172,26 +7025,41 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                               }
                             }
 
-                            await _storage.write(key: 'ai_gemini_key', value: gemini);
-                            await _storage.write(key: 'ai_openai_key', value: openai);
-                            await _storage.write(key: 'ai_ollama_host', value: ollama);
+                            await _storage.write(
+                              key: 'ai_gemini_key',
+                              value: gemini,
+                            );
+                            await _storage.write(
+                              key: 'ai_openai_key',
+                              value: openai,
+                            );
+                            await _storage.write(
+                              key: 'ai_ollama_host',
+                              value: ollama,
+                            );
 
                             if (context.mounted) {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('AI Advisor configuration saved locally')),
-                              );
-                            }
-                          },
-                          child: const Text('Save Config'),
+                                    const SnackBar(
+                                      content: Text(
+                                        'AI Advisor configuration saved locally',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: const Text('Save Keys'),
+                            ),
+                          ],
                         ),
                       ],
-                    )
-                  ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -5227,32 +7095,50 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('WebDAV Sync & Backup', style: Theme.of(context).textTheme.titleLarge),
+                    Text(
+                      'WebDAV Sync & Backup',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                     const SizedBox(height: 10),
                     const Text(
                       'All exports are fully encrypted locally using AES-256 with your master password before upload.',
-                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: passwordController,
-                      decoration: const InputDecoration(labelText: 'Master Encryption Password', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Master Encryption Password',
+                        border: OutlineInputBorder(),
+                      ),
                       obscureText: true,
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: urlController,
-                      decoration: const InputDecoration(labelText: 'WebDAV Server URL', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'WebDAV Server URL',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: userController,
-                      decoration: const InputDecoration(labelText: 'WebDAV Username', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'WebDAV Username',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: tokenController,
-                      decoration: const InputDecoration(labelText: 'WebDAV App Password / Token', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'WebDAV App Password / Token',
+                        border: OutlineInputBorder(),
+                      ),
                       obscureText: true,
                     ),
                     const SizedBox(height: 20),
@@ -5261,10 +7147,16 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
                         ),
                         ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonPurple, foregroundColor: Colors.white),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.neonPurple,
+                            foregroundColor: Colors.white,
+                          ),
                           onPressed: () async {
                             final pw = passwordController.text.trim();
                             final url = urlController.text.trim();
@@ -5273,21 +7165,31 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
                             if (pw.isEmpty || url.isEmpty || user.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please fill master password, URL and username')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Please fill master password, URL and username',
+                                  ),
+                                ),
                               );
                               return;
                             }
 
-                            await ref.read(syncServiceProvider).saveSyncConfig(
-                              masterPassword: pw,
-                              webdavUrl: url,
-                              webdavUser: user,
-                              webdavPassword: token,
-                            );
+                            await ref
+                                .read(syncServiceProvider)
+                                .saveSyncConfig(
+                                  masterPassword: pw,
+                                  webdavUrl: url,
+                                  webdavUser: user,
+                                  webdavPassword: token,
+                                );
 
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Sync configuration saved locally')),
+                              const SnackBar(
+                                content: Text(
+                                  'Sync configuration saved locally',
+                                ),
+                              ),
                             );
                           },
                           child: const Text('Save Settings'),
@@ -5301,9 +7203,18 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
-                            icon: const Icon(Icons.cloud_upload_rounded, size: 16),
-                            label: const Text('Backup Now', style: TextStyle(fontSize: 12)),
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonTeal, foregroundColor: Colors.black),
+                            icon: const Icon(
+                              Icons.cloud_upload_rounded,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'Backup Now',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.neonTeal,
+                              foregroundColor: Colors.black,
+                            ),
                             onPressed: () async {
                               final pw = passwordController.text.trim();
                               final url = urlController.text.trim();
@@ -5311,30 +7222,47 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
                               if (pw.isEmpty || url.isEmpty || user.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please configure and save settings first')),
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please configure and save settings first',
+                                    ),
+                                  ),
                                 );
                                 return;
                               }
 
                               Navigator.pop(context); // close config dialog
-                              
+
                               // Show progress loader
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
+                                builder: (context) => const Center(
+                                  child: CircularProgressIndicator(
+                                    color: AppColors.neonTeal,
+                                  ),
+                                ),
                               );
 
                               try {
-                                await ref.read(syncServiceProvider).uploadBackup();
+                                await ref
+                                    .read(syncServiceProvider)
+                                    .uploadBackup();
                                 Navigator.pop(context); // close loader
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('AES-256 encrypted database backup uploaded successfully!')),
+                                  const SnackBar(
+                                    content: Text(
+                                      'AES-256 encrypted database backup uploaded successfully!',
+                                    ),
+                                  ),
                                 );
                               } catch (e) {
                                 Navigator.pop(context); // close loader
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Backup failed: $e'), backgroundColor: Colors.redAccent),
+                                  SnackBar(
+                                    content: Text('Backup failed: $e'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
                                 );
                               }
                             },
@@ -5343,9 +7271,18 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
-                            icon: const Icon(Icons.cloud_download_rounded, size: 16),
-                            label: const Text('Restore Now', style: TextStyle(fontSize: 12)),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
+                            icon: const Icon(
+                              Icons.cloud_download_rounded,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'Restore Now',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber,
+                              foregroundColor: Colors.black,
+                            ),
                             onPressed: () async {
                               final pw = passwordController.text.trim();
                               final url = urlController.text.trim();
@@ -5353,7 +7290,11 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
                               if (pw.isEmpty || url.isEmpty || user.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please configure and save settings first')),
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please configure and save settings first',
+                                    ),
+                                  ),
                                 );
                                 return;
                               }
@@ -5364,33 +7305,54 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.amber)),
+                                builder: (context) => const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.amber,
+                                  ),
+                                ),
                               );
 
                               try {
-                                await ref.read(syncServiceProvider).restoreBackup();
-                                
+                                await ref
+                                    .read(syncServiceProvider)
+                                    .restoreBackup();
+
                                 // Reload all providers
-                                await ref.read(transactionsProvider.notifier).loadTransactions();
-                                await ref.read(creditCardsProvider.notifier).loadCreditCards();
-                                await ref.read(loansProvider.notifier).loadLoans();
-                                await ref.read(holdingsProvider.notifier).loadHoldings();
+                                await ref
+                                    .read(transactionsProvider.notifier)
+                                    .loadTransactions();
+                                await ref
+                                    .read(creditCardsProvider.notifier)
+                                    .loadCreditCards();
+                                await ref
+                                    .read(loansProvider.notifier)
+                                    .loadLoans();
+                                await ref
+                                    .read(holdingsProvider.notifier)
+                                    .loadHoldings();
 
                                 Navigator.pop(context); // close loader
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Encrypted backup successfully restored and database re-initialized!')),
+                                  const SnackBar(
+                                    content: Text(
+                                      'Encrypted backup successfully restored and database re-initialized!',
+                                    ),
+                                  ),
                                 );
                               } catch (e) {
                                 Navigator.pop(context); // close loader
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Restore failed: $e'), backgroundColor: Colors.redAccent),
+                                  SnackBar(
+                                    content: Text('Restore failed: $e'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
                                 );
                               }
                             },
                           ),
                         ),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -5419,15 +7381,20 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.info_outline_rounded, color: AppColors.neonPurple, size: 28),
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        color: AppColors.neonPurple,
+                        size: 28,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'On-Device LLM Preparing',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
                       ),
                     ],
@@ -5435,14 +7402,22 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   const SizedBox(height: 16),
                   const Text(
                     'Your Samsung S24 Ultra supports running Gemini Nano locally on-device. Google AI Core is now preparing the model in the background.',
-                    style: TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.4),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   const Text(
                     '• AI Core will automatically download model files (~1GB) in the background.\n'
                     '• Please keep your device connected to Wi-Fi and power.\n'
                     '• The local AI advisor will automatically activate as soon as the system finishes downloading the model.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   Align(
@@ -5454,10 +7429,16 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
                       ),
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Got it',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -5506,26 +7487,31 @@ class _BankAccountCardState extends State<BankAccountCard> {
     final LocalAuthentication auth = LocalAuthentication();
     try {
       final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
-      final bool canAuthenticate = canAuthenticateWithBiometrics || await auth.isDeviceSupported();
-      
+      final bool canAuthenticate =
+          canAuthenticateWithBiometrics || await auth.isDeviceSupported();
+
       if (!canAuthenticate) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Biometric auth not available')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Biometric auth not available')),
+          );
         }
         return;
       }
-      
+
       final bool didAuthenticate = await auth.authenticate(
         localizedReason: 'Authenticate to view secure bank details',
         options: const AuthenticationOptions(biometricOnly: true),
       );
-      
+
       if (didAuthenticate && mounted) {
         setState(() => _isFlipped = true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Auth error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Auth error: $e')));
       }
     }
   }
@@ -5535,21 +7521,26 @@ class _BankAccountCardState extends State<BankAccountCard> {
     Color cardColor = AppColors.glassCard;
     if (widget.account.colorHex.isNotEmpty) {
       try {
-        cardColor = Color(int.parse(widget.account.colorHex.replaceFirst('#', '0xff'))).withOpacity(0.18);
+        cardColor = Color(
+          int.parse(widget.account.colorHex.replaceFirst('#', '0xff')),
+        ).withOpacity(0.18);
       } catch (_) {}
     }
 
     return Container(
       width: 165,
-      height: 165,
+      height: 185,
       margin: const EdgeInsets.only(right: 16),
       child: GestureDetector(
-        onLongPress: () => widget.onOptionsPressed(context, widget.ref, widget.account),
+        onLongPress: () =>
+            widget.onOptionsPressed(context, widget.ref, widget.account),
         onTap: () {
           if (!_isFlipped) {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => BankAccountDetailView(account: widget.account)),
+              MaterialPageRoute(
+                builder: (_) => BankAccountDetailView(account: widget.account),
+              ),
             );
           }
         },
@@ -5564,14 +7555,17 @@ class _BankAccountCardState extends State<BankAccountCard> {
               child: child,
               builder: (context, child) {
                 return Transform(
-                  transform: Matrix4.identity()..scale(flipAnimation.value, 1.0),
+                  transform: Matrix4.identity()
+                    ..scale(flipAnimation.value, 1.0),
                   alignment: Alignment.center,
                   child: child,
                 );
               },
             );
           },
-          child: _isFlipped ? _buildBackSide(cardColor) : _buildFrontSide(cardColor),
+          child: _isFlipped
+              ? _buildBackSide(cardColor)
+              : _buildFrontSide(cardColor),
         ),
       ),
     );
@@ -5624,7 +7618,11 @@ class _BankAccountCardState extends State<BankAccountCard> {
                     height: 20,
                   )
                 else
-                  const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 20),
+                  const Icon(
+                    Icons.account_balance_rounded,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
               ],
             ),
             const Spacer(),
@@ -5659,7 +7657,11 @@ class _BankAccountCardState extends State<BankAccountCard> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.visibility_rounded, color: AppColors.neonTeal, size: 18),
+                      icon: const Icon(
+                        Icons.visibility_rounded,
+                        color: AppColors.neonTeal,
+                        size: 18,
+                      ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: _authenticateAndFlip,
@@ -5698,7 +7700,11 @@ class _BankAccountCardState extends State<BankAccountCard> {
                 ),
                 GestureDetector(
                   onTap: () => setState(() => _isFlipped = false),
-                  child: const Icon(Icons.visibility_off_rounded, color: AppColors.textSecondary, size: 16),
+                  child: const Icon(
+                    Icons.visibility_off_rounded,
+                    color: AppColors.textSecondary,
+                    size: 16,
+                  ),
                 ),
               ],
             ),
@@ -5725,12 +7731,20 @@ class _BankAccountCardState extends State<BankAccountCard> {
             children: [
               Text(
                 label.toUpperCase(),
-                style: const TextStyle(fontSize: 8, color: AppColors.textMuted, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 8,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 1),
               Text(
                 displayValue,
-                style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
@@ -5746,7 +7760,11 @@ class _BankAccountCardState extends State<BankAccountCard> {
                 color: Colors.white.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(Icons.copy_rounded, color: AppColors.neonTeal, size: 14),
+              child: const Icon(
+                Icons.copy_rounded,
+                color: AppColors.neonTeal,
+                size: 14,
+              ),
             ),
           ),
       ],
@@ -5760,7 +7778,8 @@ class BankAccountDetailView extends ConsumerStatefulWidget {
   const BankAccountDetailView({super.key, required this.account});
 
   @override
-  ConsumerState<BankAccountDetailView> createState() => _BankAccountDetailViewState();
+  ConsumerState<BankAccountDetailView> createState() =>
+      _BankAccountDetailViewState();
 }
 
 class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
@@ -5771,7 +7790,9 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
   @override
   void initState() {
     super.initState();
-    _balanceController = TextEditingController(text: widget.account.balance.toStringAsFixed(0));
+    _balanceController = TextEditingController(
+      text: widget.account.balance.toStringAsFixed(0),
+    );
   }
 
   @override
@@ -5783,18 +7804,24 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
   void _saveBalance() async {
     final newBal = double.tryParse(_balanceController.text) ?? 0.0;
     final updatedAcc = widget.account..balance = newBal;
-    
+
     await ref.read(bankAccountsProvider.notifier).updateBankAccount(updatedAcc);
-    
+
     setState(() => _isEditingBalance = false);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Balance updated successfully'), backgroundColor: AppColors.obsidianSurface),
+        const SnackBar(
+          content: Text('Balance updated successfully'),
+          backgroundColor: AppColors.obsidianSurface,
+        ),
       );
     }
   }
 
-  void _showBankAccountDetailsBottomSheet(BuildContext context, BankAccount account) {
+  void _showBankAccountDetailsBottomSheet(
+    BuildContext context,
+    BankAccount account,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -5807,8 +7834,13 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.45),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.15),
+                width: 1,
+              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -5819,9 +7851,17 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                   children: [
                     Text(
                       account.bankName,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
-                    const Icon(Icons.lock_outline_rounded, color: AppColors.neonTeal, size: 20),
+                    const Icon(
+                      Icons.lock_outline_rounded,
+                      color: AppColors.neonTeal,
+                      size: 20,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -5831,7 +7871,10 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                 const SizedBox(height: 12),
                 _buildDetailRow('IFSC Code', account.ifscCode),
                 const SizedBox(height: 12),
-                _buildDetailRow('Balance', '₹${account.balance.toStringAsFixed(2)}'),
+                _buildDetailRow(
+                  'Balance',
+                  '₹${account.balance.toStringAsFixed(2)}',
+                ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -5839,7 +7882,9 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.neonTeal,
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Close'),
@@ -5863,7 +7908,11 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
         ),
         Text(
           value.isEmpty ? 'N/A' : value,
-          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
@@ -5889,7 +7938,11 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                     children: [
                       Text(
                         widget.account.bankName.toUpperCase(),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -5898,32 +7951,55 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                         children: [
                           Text(
                             'A/C: •••• ${widget.account.last4}',
-                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                           const SizedBox(width: 8),
                           IconButton(
-                            icon: const Icon(Icons.visibility_rounded, color: AppColors.neonTeal, size: 18),
+                            icon: const Icon(
+                              Icons.visibility_rounded,
+                              color: AppColors.neonTeal,
+                              size: 18,
+                            ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: () async {
-                              final LocalAuthentication auth = LocalAuthentication();
+                              final LocalAuthentication auth =
+                                  LocalAuthentication();
                               try {
-                                final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
-                                final bool canAuthenticate = canAuthenticateWithBiometrics || await auth.isDeviceSupported();
+                                final bool canAuthenticateWithBiometrics =
+                                    await auth.canCheckBiometrics;
+                                final bool canAuthenticate =
+                                    canAuthenticateWithBiometrics ||
+                                    await auth.isDeviceSupported();
                                 if (!canAuthenticate) {
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Biometric auth not available')));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Biometric auth not available',
+                                      ),
+                                    ),
+                                  );
                                   return;
                                 }
-                                final bool didAuthenticate = await auth.authenticate(
-                                  localizedReason: 'Authenticate to view secure bank details',
-                                  options: const AuthenticationOptions(biometricOnly: true),
+                                final bool
+                                didAuthenticate = await auth.authenticate(
+                                  localizedReason:
+                                      'Authenticate to view secure bank details',
+                                  options: const AuthenticationOptions(
+                                    biometricOnly: true,
+                                  ),
                                 );
                                 if (didAuthenticate && mounted) {
                                   setState(() => _isFlipped = true);
                                 }
                               } catch (e) {
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Auth error: $e')));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Auth error: $e')),
+                                  );
                                 }
                               }
                             },
@@ -5939,14 +8015,23 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                       height: 32,
                     )
                   else
-                    const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 32),
+                    const Icon(
+                      Icons.account_balance_rounded,
+                      color: Colors.white70,
+                      size: 32,
+                    ),
                 ],
               ),
               const Spacer(),
-              
+
               const Text(
                 'CURRENT BALANCE',
-                style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
               ),
               const SizedBox(height: 2),
               Row(
@@ -5954,11 +8039,19 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                   if (!_isEditingBalance) ...[
                     Text(
                       '₹${widget.account.balance.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     IconButton(
-                      icon: const Icon(Icons.edit_rounded, color: AppColors.neonTeal, size: 20),
+                      icon: const Icon(
+                        Icons.edit_rounded,
+                        color: AppColors.neonTeal,
+                        size: 20,
+                      ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: () => setState(() => _isEditingBalance = true),
@@ -5969,29 +8062,49 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                       child: TextField(
                         controller: _balanceController,
                         keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                         decoration: const InputDecoration(
                           prefixText: '₹',
-                          border: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.neonTeal)),
-                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.neonTeal, width: 2)),
+                          border: UnderlineInputBorder(
+                            borderSide: BorderSide(color: AppColors.neonTeal),
+                          ),
+                          focusedBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(
+                              color: AppColors.neonTeal,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.check_circle_rounded, color: AppColors.neonEmerald, size: 24),
+                      icon: const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.neonEmerald,
+                        size: 24,
+                      ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: _saveBalance,
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 24),
+                      icon: const Icon(
+                        Icons.cancel_rounded,
+                        color: Colors.redAccent,
+                        size: 24,
+                      ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: () {
                         setState(() {
-                          _balanceController.text = widget.account.balance.toStringAsFixed(0);
+                          _balanceController.text = widget.account.balance
+                              .toStringAsFixed(0);
                           _isEditingBalance = false;
                         });
                       },
@@ -6032,14 +8145,24 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                   ),
                   GestureDetector(
                     onTap: () => setState(() => _isFlipped = false),
-                    child: const Icon(Icons.visibility_off_rounded, color: Colors.white70, size: 24),
+                    child: const Icon(
+                      Icons.visibility_off_rounded,
+                      color: Colors.white70,
+                      size: 24,
+                    ),
                   ),
                 ],
               ),
               const Spacer(),
-              _buildBackDetailRow('Holder Name', widget.account.accountHolderName),
+              _buildBackDetailRow(
+                'Holder Name',
+                widget.account.accountHolderName,
+              ),
               const SizedBox(height: 12),
-              _buildBackDetailRow('Account Number', widget.account.fullAccountNumber),
+              _buildBackDetailRow(
+                'Account Number',
+                widget.account.fullAccountNumber,
+              ),
               const SizedBox(height: 12),
               _buildBackDetailRow('IFSC Code', widget.account.ifscCode),
               const Spacer(),
@@ -6060,12 +8183,20 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
             children: [
               Text(
                 label.toUpperCase(),
-                style: const TextStyle(fontSize: 8, color: AppColors.textMuted, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 8,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 1),
               Text(
                 displayValue,
-                style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
@@ -6090,7 +8221,11 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                 color: Colors.white.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(Icons.copy_rounded, color: AppColors.neonTeal, size: 14),
+              child: const Icon(
+                Icons.copy_rounded,
+                color: AppColors.neonTeal,
+                size: 14,
+              ),
             ),
           ),
       ],
@@ -6100,11 +8235,13 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
   @override
   Widget build(BuildContext context) {
     final txsState = ref.watch(transactionsProvider);
-    
+
     Color cardColor = AppColors.glassCard;
     if (widget.account.colorHex.isNotEmpty) {
       try {
-        cardColor = Color(int.parse(widget.account.colorHex.replaceFirst('#', '0xff'))).withOpacity(0.18);
+        cardColor = Color(
+          int.parse(widget.account.colorHex.replaceFirst('#', '0xff')),
+        ).withOpacity(0.18);
       } catch (_) {}
     }
 
@@ -6124,12 +8261,19 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                        ),
                         onPressed: () => Navigator.pop(context),
                       ),
                       Text(
                         'Account Detail',
-                        style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: GoogleFonts.montserrat(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 48),
                     ],
@@ -6138,40 +8282,68 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
 
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
-                    transitionBuilder: (Widget child, Animation<double> animation) {
-                      final flipAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-                        CurvedAnimation(parent: animation, curve: Curves.easeInOut),
-                      );
-                      return AnimatedBuilder(
-                        animation: flipAnimation,
-                        child: child,
-                        builder: (context, child) {
-                          return Transform(
-                            transform: Matrix4.identity()..scale(flipAnimation.value, 1.0),
-                            alignment: Alignment.center,
+                    transitionBuilder:
+                        (Widget child, Animation<double> animation) {
+                          final flipAnimation =
+                              Tween<double>(begin: 0.0, end: 1.0).animate(
+                                CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeInOut,
+                                ),
+                              );
+                          return AnimatedBuilder(
+                            animation: flipAnimation,
                             child: child,
+                            builder: (context, child) {
+                              return Transform(
+                                transform: Matrix4.identity()
+                                  ..scale(flipAnimation.value, 1.0),
+                                alignment: Alignment.center,
+                                child: child,
+                              );
+                            },
                           );
                         },
-                      );
-                    },
-                    child: _isFlipped ? _buildBackCard(cardColor) : _buildFrontCard(cardColor),
+                    child: _isFlipped
+                        ? _buildBackCard(cardColor)
+                        : _buildFrontCard(cardColor),
                   ),
-                  
+
                   const SizedBox(height: 28),
 
                   const Text(
                     'Transaction History',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 12),
 
                   Expanded(
                     child: txsState.when(
-                      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
-                      error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.neonTeal,
+                        ),
+                      ),
+                      error: (err, _) => Center(
+                        child: Text(
+                          'Error: $err',
+                          style: const TextStyle(color: Colors.redAccent),
+                        ),
+                      ),
                       data: (txs) {
-                        final accountTxs = txs.where((t) => t.accountName == 'bank:${widget.account.id}').toList();
-                        accountTxs.sort((a, b) => b.timestamp.compareTo(a.timestamp)); // recent to previous
+                        final accountTxs = txs
+                            .where(
+                              (t) =>
+                                  t.accountName == 'bank:${widget.account.id}',
+                            )
+                            .toList();
+                        accountTxs.sort(
+                          (a, b) => b.timestamp.compareTo(a.timestamp),
+                        ); // recent to previous
 
                         if (accountTxs.isEmpty) {
                           return const Center(
@@ -6188,10 +8360,25 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                           itemBuilder: (context, index) {
                             final tx = accountTxs[index];
                             final isIncome = tx.transactionType == 'income';
-                            final formattedAmt = '${isIncome ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
-                            
-                            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                            final dateStr = '${tx.timestamp.day} ${months[tx.timestamp.month - 1]}';
+                            final formattedAmt =
+                                '${isIncome ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
+
+                            const months = [
+                              'Jan',
+                              'Feb',
+                              'Mar',
+                              'Apr',
+                              'May',
+                              'Jun',
+                              'Jul',
+                              'Aug',
+                              'Sep',
+                              'Oct',
+                              'Nov',
+                              'Dec',
+                            ];
+                            final dateStr =
+                                '${tx.timestamp.day} ${months[tx.timestamp.month - 1]}';
 
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
@@ -6201,29 +8388,46 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                                   leading: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: (isIncome ? AppColors.neonEmerald : AppColors.neonTeal).withOpacity(0.1),
+                                      color:
+                                          (isIncome
+                                                  ? AppColors.neonEmerald
+                                                  : AppColors.neonTeal)
+                                              .withOpacity(0.1),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
-                                      isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-                                      color: isIncome ? AppColors.neonEmerald : AppColors.neonTeal,
+                                      isIncome
+                                          ? Icons.arrow_downward
+                                          : Icons.arrow_upward,
+                                      color: isIncome
+                                          ? AppColors.neonEmerald
+                                          : AppColors.neonTeal,
                                       size: 20,
                                     ),
                                   ),
                                   title: Text(
                                     tx.description,
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
                                   ),
                                   subtitle: Text(
                                     '${tx.category} • $dateStr',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ),
                                   trailing: Text(
                                     formattedAmt,
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
-                                      color: isIncome ? AppColors.neonEmerald : Colors.white,
+                                      color: isIncome
+                                          ? AppColors.neonEmerald
+                                          : Colors.white,
                                     ),
                                   ),
                                 ),
@@ -6250,7 +8454,8 @@ class CreditCardDetailView extends ConsumerStatefulWidget {
   const CreditCardDetailView({super.key, required this.card});
 
   @override
-  ConsumerState<CreditCardDetailView> createState() => _CreditCardDetailViewState();
+  ConsumerState<CreditCardDetailView> createState() =>
+      _CreditCardDetailViewState();
 }
 
 class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
@@ -6263,8 +8468,12 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
   @override
   void initState() {
     super.initState();
-    _spendController = TextEditingController(text: widget.card.currentSpendings.toStringAsFixed(0));
-    _statementController = TextEditingController(text: widget.card.statementAmount.toStringAsFixed(0));
+    _spendController = TextEditingController(
+      text: widget.card.currentSpendings.toStringAsFixed(0),
+    );
+    _statementController = TextEditingController(
+      text: widget.card.statementAmount.toStringAsFixed(0),
+    );
   }
 
   @override
@@ -6280,13 +8489,16 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
     final updatedCard = widget.card
       ..currentSpendings = newSpend
       ..statementAmount = newStatement;
-    
+
     await ref.read(creditCardsProvider.notifier).updateCreditCard(updatedCard);
-    
+
     setState(() => _isEditing = false);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Card details updated successfully'), backgroundColor: AppColors.obsidianSurface),
+        const SnackBar(
+          content: Text('Card details updated successfully'),
+          backgroundColor: AppColors.obsidianSurface,
+        ),
       );
     }
   }
@@ -6296,14 +8508,26 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: const TextStyle(color: AppColors.textMuted, fontSize: 8, fontWeight: FontWeight.bold)),
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 8,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 2),
         Row(
           children: [
             Expanded(
               child: Text(
                 displayValue,
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -6312,7 +8536,11 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: value));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied to clipboard'), backgroundColor: AppColors.obsidianSurface, duration: Duration(seconds: 1)),
+                    const SnackBar(
+                      content: Text('Copied to clipboard'),
+                      backgroundColor: AppColors.obsidianSurface,
+                      duration: Duration(seconds: 1),
+                    ),
                   );
                 },
                 child: Container(
@@ -6321,7 +8549,11 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                     color: Colors.white.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Icon(Icons.copy_rounded, color: AppColors.neonTeal, size: 14),
+                  child: const Icon(
+                    Icons.copy_rounded,
+                    color: AppColors.neonTeal,
+                    size: 14,
+                  ),
                 ),
               ),
           ],
@@ -6350,39 +8582,66 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                     children: [
                       Text(
                         widget.card.cardName.toUpperCase(),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
                           Text(
                             'A/C: •••• ${widget.card.last4}',
-                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                           const SizedBox(width: 8),
                           IconButton(
-                            icon: const Icon(Icons.visibility_rounded, color: AppColors.neonTeal, size: 18),
+                            icon: const Icon(
+                              Icons.visibility_rounded,
+                              color: AppColors.neonTeal,
+                              size: 18,
+                            ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: () async {
-                              final LocalAuthentication auth = LocalAuthentication();
+                              final LocalAuthentication auth =
+                                  LocalAuthentication();
                               try {
-                                final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
-                                final bool canAuthenticate = canAuthenticateWithBiometrics || await auth.isDeviceSupported();
+                                final bool canAuthenticateWithBiometrics =
+                                    await auth.canCheckBiometrics;
+                                final bool canAuthenticate =
+                                    canAuthenticateWithBiometrics ||
+                                    await auth.isDeviceSupported();
                                 if (!canAuthenticate) {
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Biometric auth not available')));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Biometric auth not available',
+                                      ),
+                                    ),
+                                  );
                                   return;
                                 }
-                                final bool didAuthenticate = await auth.authenticate(
-                                  localizedReason: 'Authenticate to view secure card details',
-                                  options: const AuthenticationOptions(biometricOnly: true),
+                                final bool
+                                didAuthenticate = await auth.authenticate(
+                                  localizedReason:
+                                      'Authenticate to view secure card details',
+                                  options: const AuthenticationOptions(
+                                    biometricOnly: true,
+                                  ),
                                 );
                                 if (didAuthenticate && mounted) {
                                   setState(() => _isFlipped = true);
                                 }
                               } catch (e) {
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Auth error: $e')));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Auth error: $e')),
+                                  );
                                 }
                               }
                             },
@@ -6392,7 +8651,11 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                     ],
                   ),
                   if (widget.card.imageUrl.isEmpty)
-                    const Icon(Icons.credit_card_rounded, color: Colors.white70, size: 32),
+                    const Icon(
+                      Icons.credit_card_rounded,
+                      color: Colors.white70,
+                      size: 32,
+                    ),
                 ],
               ),
               const Spacer(),
@@ -6403,47 +8666,92 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                     GestureDetector(
                       onTap: () => setState(() => _selectedFilter = 'spent'),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: _selectedFilter == 'spent' ? AppColors.neonTeal.withOpacity(0.15) : Colors.transparent,
+                          color: _selectedFilter == 'spent'
+                              ? AppColors.neonTeal.withOpacity(0.15)
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: _selectedFilter == 'spent' ? AppColors.neonTeal : Colors.transparent,
+                            color: _selectedFilter == 'spent'
+                                ? AppColors.neonTeal
+                                : Colors.transparent,
                             width: 1.0,
                           ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('CURRENT SPENT', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
-                            Text('₹${widget.card.currentSpendings.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                            const Text(
+                              'CURRENT SPENT',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                            Text(
+                              '₹${widget.card.currentSpendings.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ),
                     GestureDetector(
-                      onTap: () => setState(() => _selectedFilter = 'statement'),
+                      onTap: () =>
+                          setState(() => _selectedFilter = 'statement'),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: _selectedFilter == 'statement' ? AppColors.neonTeal.withOpacity(0.15) : Colors.transparent,
+                          color: _selectedFilter == 'statement'
+                              ? AppColors.neonTeal.withOpacity(0.15)
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: _selectedFilter == 'statement' ? AppColors.neonTeal : Colors.transparent,
+                            color: _selectedFilter == 'statement'
+                                ? AppColors.neonTeal
+                                : Colors.transparent,
                             width: 1.0,
                           ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('STATEMENT', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
-                            Text('₹${widget.card.statementAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                            const Text(
+                              'STATEMENT',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                            Text(
+                              '₹${widget.card.statementAmount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.edit_rounded, color: AppColors.neonTeal, size: 20),
+                      icon: const Icon(
+                        Icons.edit_rounded,
+                        color: AppColors.neonTeal,
+                        size: 20,
+                      ),
                       onPressed: () => setState(() => _isEditing = true),
                     ),
                   ],
@@ -6455,8 +8763,14 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                       child: TextField(
                         controller: _spendController,
                         keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 14, color: Colors.white),
-                        decoration: const InputDecoration(labelText: 'Spent', prefixText: '₹'),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Spent',
+                          prefixText: '₹',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -6464,21 +8778,39 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                       child: TextField(
                         controller: _statementController,
                         keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 14, color: Colors.white),
-                        decoration: const InputDecoration(labelText: 'Statement', prefixText: '₹'),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Statement',
+                          prefixText: '₹',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.check_circle_rounded, color: AppColors.neonEmerald, size: 28),
+                      icon: const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.neonEmerald,
+                        size: 28,
+                      ),
                       onPressed: _saveDetails,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 28),
+                      icon: const Icon(
+                        Icons.cancel_rounded,
+                        color: Colors.redAccent,
+                        size: 28,
+                      ),
                       onPressed: () {
                         setState(() {
-                          _spendController.text = widget.card.currentSpendings.toStringAsFixed(0);
-                          _statementController.text = widget.card.statementAmount.toStringAsFixed(0);
+                          _spendController.text = widget.card.currentSpendings
+                              .toStringAsFixed(0);
+                          _statementController.text = widget
+                              .card
+                              .statementAmount
+                              .toStringAsFixed(0);
                           _isEditing = false;
                         });
                       },
@@ -6519,18 +8851,38 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                   ),
                   GestureDetector(
                     onTap: () => setState(() => _isFlipped = false),
-                    child: const Icon(Icons.visibility_off_rounded, color: Colors.white70, size: 24),
+                    child: const Icon(
+                      Icons.visibility_off_rounded,
+                      color: Colors.white70,
+                      size: 24,
+                    ),
                   ),
                 ],
               ),
               const Spacer(),
-              _buildSecureFieldCompact('Card Number', widget.card.fullCardNumber, true),
+              _buildSecureFieldCompact(
+                'Card Number',
+                widget.card.fullCardNumber,
+                true,
+              ),
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(child: _buildSecureFieldCompact('Expiry Date', widget.card.expiryDate, false)),
+                  Expanded(
+                    child: _buildSecureFieldCompact(
+                      'Expiry Date',
+                      widget.card.expiryDate,
+                      false,
+                    ),
+                  ),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildSecureFieldCompact('CVV', widget.card.cvv, false)),
+                  Expanded(
+                    child: _buildSecureFieldCompact(
+                      'CVV',
+                      widget.card.cvv,
+                      false,
+                    ),
+                  ),
                 ],
               ),
               const Spacer(),
@@ -6544,7 +8896,7 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
   @override
   Widget build(BuildContext context) {
     final txsState = ref.watch(transactionsProvider);
-    
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -6560,12 +8912,19 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                        ),
                         onPressed: () => Navigator.pop(context),
                       ),
                       Text(
                         'Card Detail',
-                        style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: GoogleFonts.montserrat(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 48),
                     ],
@@ -6577,10 +8936,16 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                       width: double.infinity,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.0),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1.0,
+                        ),
                         gradient: widget.card.imageUrl.isEmpty
                             ? LinearGradient(
-                                colors: [AppColors.tealBlueGradient[0], AppColors.tealBlueGradient[1]],
+                                colors: [
+                                  AppColors.tealBlueGradient[0],
+                                  AppColors.tealBlueGradient[1],
+                                ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               )
@@ -6591,7 +8956,10 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                           if (widget.card.imageUrl.isNotEmpty)
                             ClipRRect(
                               borderRadius: BorderRadius.circular(20),
-                              child: widget.card.imageUrl.toLowerCase().endsWith('.svg')
+                              child:
+                                  widget.card.imageUrl.toLowerCase().endsWith(
+                                    '.svg',
+                                  )
                                   ? SvgPicture.asset(
                                       'assets/credit_card_images/${widget.card.imageUrl}',
                                       width: double.infinity,
@@ -6607,23 +8975,34 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                             ),
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (Widget child, Animation<double> animation) {
-                              final flipAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-                                CurvedAnimation(parent: animation, curve: Curves.easeInOut),
-                              );
-                              return AnimatedBuilder(
-                                animation: flipAnimation,
-                                child: child,
-                                builder: (context, child) {
-                                  return Transform(
-                                    transform: Matrix4.identity()..scale(flipAnimation.value, 1.0),
-                                    alignment: Alignment.center,
+                            transitionBuilder:
+                                (Widget child, Animation<double> animation) {
+                                  final flipAnimation =
+                                      Tween<double>(
+                                        begin: 0.0,
+                                        end: 1.0,
+                                      ).animate(
+                                        CurvedAnimation(
+                                          parent: animation,
+                                          curve: Curves.easeInOut,
+                                        ),
+                                      );
+                                  return AnimatedBuilder(
+                                    animation: flipAnimation,
                                     child: child,
+                                    builder: (context, child) {
+                                      return Transform(
+                                        transform: Matrix4.identity()
+                                          ..scale(flipAnimation.value, 1.0),
+                                        alignment: Alignment.center,
+                                        child: child,
+                                      );
+                                    },
                                   );
                                 },
-                              );
-                            },
-                            child: _isFlipped ? _buildBackCardContent() : _buildFrontCardContent(),
+                            child: _isFlipped
+                                ? _buildBackCardContent()
+                                : _buildFrontCardContent(),
                           ),
                         ],
                       ),
@@ -6635,12 +9014,21 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        _selectedFilter == 'spent' ? 'Spent Transactions' : 'Statement Contributions',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        _selectedFilter == 'spent'
+                            ? 'Spent Transactions'
+                            : 'Statement Contributions',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       Text(
                         'Stmt Day: ${widget.card.statementDay}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -6648,35 +9036,82 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
 
                   Expanded(
                     child: txsState.when(
-                      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonTeal)),
-                      error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.neonTeal,
+                        ),
+                      ),
+                      error: (err, _) => Center(
+                        child: Text(
+                          'Error: $err',
+                          style: const TextStyle(color: Colors.redAccent),
+                        ),
+                      ),
                       data: (txs) {
-                        var cardTxs = txs.where((t) => t.cardId == widget.card.id.toString()).toList();
-                        
+                        var cardTxs = txs
+                            .where((t) => t.cardId == widget.card.id.toString())
+                            .toList();
+
                         // Calculate statement date cycle bounds
                         final now = DateTime.now();
                         DateTime mostRecentStatementDate;
                         DateTime previousStatementDate;
-                        
+
                         if (now.day >= widget.card.statementDay) {
-                          mostRecentStatementDate = DateTime(now.year, now.month, widget.card.statementDay);
-                          previousStatementDate = DateTime(now.month == 1 ? now.year - 1 : now.year, now.month == 1 ? 12 : now.month - 1, widget.card.statementDay);
+                          mostRecentStatementDate = DateTime(
+                            now.year,
+                            now.month,
+                            widget.card.statementDay,
+                          );
+                          previousStatementDate = DateTime(
+                            now.month == 1 ? now.year - 1 : now.year,
+                            now.month == 1 ? 12 : now.month - 1,
+                            widget.card.statementDay,
+                          );
                         } else {
-                          mostRecentStatementDate = DateTime(now.month == 1 ? now.year - 1 : now.year, now.month == 1 ? 12 : now.month - 1, widget.card.statementDay);
+                          mostRecentStatementDate = DateTime(
+                            now.month == 1 ? now.year - 1 : now.year,
+                            now.month == 1 ? 12 : now.month - 1,
+                            widget.card.statementDay,
+                          );
                           final prevMonth = mostRecentStatementDate.month;
                           final prevYear = mostRecentStatementDate.year;
-                          previousStatementDate = DateTime(prevMonth == 1 ? prevYear - 1 : prevYear, prevMonth == 1 ? 12 : prevMonth - 1, widget.card.statementDay);
-                        }
-                        
-                        if (_selectedFilter == 'spent') {
-                          // transactions after the statement was generated
-                          cardTxs = cardTxs.where((t) => t.timestamp.isAfter(mostRecentStatementDate)).toList();
-                        } else {
-                          // transactions linked with the statement contribution (between previousStatementDate and mostRecentStatementDate)
-                          cardTxs = cardTxs.where((t) => t.timestamp.isAfter(previousStatementDate) && t.timestamp.isBefore(mostRecentStatementDate.add(const Duration(seconds: 1)))).toList();
+                          previousStatementDate = DateTime(
+                            prevMonth == 1 ? prevYear - 1 : prevYear,
+                            prevMonth == 1 ? 12 : prevMonth - 1,
+                            widget.card.statementDay,
+                          );
                         }
 
-                        cardTxs.sort((a, b) => b.timestamp.compareTo(a.timestamp)); // recent to previous
+                        if (_selectedFilter == 'spent') {
+                          // transactions after the statement was generated
+                          cardTxs = cardTxs
+                              .where(
+                                (t) => t.timestamp.isAfter(
+                                  mostRecentStatementDate,
+                                ),
+                              )
+                              .toList();
+                        } else {
+                          // transactions linked with the statement contribution (between previousStatementDate and mostRecentStatementDate)
+                          cardTxs = cardTxs
+                              .where(
+                                (t) =>
+                                    t.timestamp.isAfter(
+                                      previousStatementDate,
+                                    ) &&
+                                    t.timestamp.isBefore(
+                                      mostRecentStatementDate.add(
+                                        const Duration(seconds: 1),
+                                      ),
+                                    ),
+                              )
+                              .toList();
+                        }
+
+                        cardTxs.sort(
+                          (a, b) => b.timestamp.compareTo(a.timestamp),
+                        ); // recent to previous
 
                         if (cardTxs.isEmpty) {
                           return Center(
@@ -6684,7 +9119,9 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                               _selectedFilter == 'spent'
                                   ? 'No transactions since the last statement.'
                                   : 'No transactions in this statement period.',
-                              style: const TextStyle(color: AppColors.textMuted),
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                              ),
                             ),
                           );
                         }
@@ -6694,10 +9131,25 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                           itemCount: cardTxs.length,
                           itemBuilder: (context, index) {
                             final tx = cardTxs[index];
-                            final formattedAmt = '-₹${tx.amount.toStringAsFixed(0)}';
-                            
-                            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                            final dateStr = '${tx.timestamp.day} ${months[tx.timestamp.month - 1]}';
+                            final formattedAmt =
+                                '-₹${tx.amount.toStringAsFixed(0)}';
+
+                            const months = [
+                              'Jan',
+                              'Feb',
+                              'Mar',
+                              'Apr',
+                              'May',
+                              'Jun',
+                              'Jul',
+                              'Aug',
+                              'Sep',
+                              'Oct',
+                              'Nov',
+                              'Dec',
+                            ];
+                            final dateStr =
+                                '${tx.timestamp.day} ${months[tx.timestamp.month - 1]}';
 
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
@@ -6707,7 +9159,9 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                                   leading: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: AppColors.neonTeal.withOpacity(0.1),
+                                      color: AppColors.neonTeal.withOpacity(
+                                        0.1,
+                                      ),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
@@ -6718,11 +9172,18 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                                   ),
                                   title: Text(
                                     tx.description,
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
                                   ),
                                   subtitle: Text(
                                     '${tx.category} • $dateStr',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ),
                                   trailing: Text(
                                     formattedAmt,
@@ -6769,7 +9230,9 @@ class _RecoveryBinPageState extends ConsumerState<RecoveryBinPage> {
 
   Future<void> _loadDeletedTransactions() async {
     setState(() => _isLoading = true);
-    final txs = await ref.read(databaseServiceProvider).getDeletedTransactions();
+    final txs = await ref
+        .read(databaseServiceProvider)
+        .getDeletedTransactions();
     if (mounted) {
       setState(() {
         _deletedTxs = txs;
@@ -6785,7 +9248,10 @@ class _RecoveryBinPageState extends ConsumerState<RecoveryBinPage> {
     _loadDeletedTransactions();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transaction successfully restored'), backgroundColor: AppColors.neonEmerald),
+        const SnackBar(
+          content: Text('Transaction successfully restored'),
+          backgroundColor: AppColors.neonEmerald,
+        ),
       );
     }
   }
@@ -6795,7 +9261,10 @@ class _RecoveryBinPageState extends ConsumerState<RecoveryBinPage> {
     _loadDeletedTransactions();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transaction permanently deleted'), backgroundColor: Colors.redAccent),
+        const SnackBar(
+          content: Text('Transaction permanently deleted'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
@@ -6816,81 +9285,124 @@ class _RecoveryBinPageState extends ConsumerState<RecoveryBinPage> {
                   Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                        ),
                         onPressed: () => Navigator.pop(context),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Recovery Bin',
-                        style: GoogleFonts.montserrat(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: GoogleFonts.montserrat(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   Expanded(
                     child: _isLoading
-                        ? const Center(child: CircularProgressIndicator(color: AppColors.neonTeal))
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.neonTeal,
+                            ),
+                          )
                         : _deletedTxs.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'No recently deleted transactions.',
-                                  style: TextStyle(color: AppColors.textMuted),
-                                ),
-                              )
-                            : ListView.builder(
-                                physics: const BouncingScrollPhysics(),
-                                itemCount: _deletedTxs.length,
-                                itemBuilder: (context, index) {
-                                  final tx = _deletedTxs[index];
-                                  final isIncome = tx.transactionType == 'income';
-                                  final formattedAmt = '${isIncome ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
-                                  
-                                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                                  final dateStr = '${tx.timestamp.day} ${months[tx.timestamp.month - 1]}';
-                                  final deletedStr = tx.deletedAt != null 
-                                      ? 'Deleted: ${tx.deletedAt!.day} ${months[tx.deletedAt!.month - 1]}'
-                                      : '';
+                        ? const Center(
+                            child: Text(
+                              'No recently deleted transactions.',
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
+                          )
+                        : ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: _deletedTxs.length,
+                            itemBuilder: (context, index) {
+                              final tx = _deletedTxs[index];
+                              final isIncome = tx.transactionType == 'income';
+                              final formattedAmt =
+                                  '${isIncome ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
 
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: GlassBlur(
-                                      borderRadius: 16,
-                                      child: ListTile(
-                                        title: Text(
-                                          tx.description,
-                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                                        ),
-                                        subtitle: Text(
-                                          '${tx.category} • $dateStr\n$deletedStr',
-                                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                                        ),
-                                        trailing: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              formattedAmt,
-                                              style: TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.bold,
-                                                color: isIncome ? AppColors.neonEmerald : Colors.white,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            IconButton(
-                                              icon: const Icon(Icons.restore_rounded, color: AppColors.neonTeal, size: 20),
-                                              onPressed: () => _restoreTx(tx),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 20),
-                                              onPressed: () => _purgeTx(tx),
-                                            ),
-                                          ],
-                                        ),
+                              const months = [
+                                'Jan',
+                                'Feb',
+                                'Mar',
+                                'Apr',
+                                'May',
+                                'Jun',
+                                'Jul',
+                                'Aug',
+                                'Sep',
+                                'Oct',
+                                'Nov',
+                                'Dec',
+                              ];
+                              final dateStr =
+                                  '${tx.timestamp.day} ${months[tx.timestamp.month - 1]}';
+                              final deletedStr = tx.deletedAt != null
+                                  ? 'Deleted: ${tx.deletedAt!.day} ${months[tx.deletedAt!.month - 1]}'
+                                  : '';
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: GlassBlur(
+                                  borderRadius: 16,
+                                  child: ListTile(
+                                    title: Text(
+                                      tx.description,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
-                                  );
-                                },
-                              ),
+                                    subtitle: Text(
+                                      '${tx.category} • $dateStr\n$deletedStr',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          formattedAmt,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: isIncome
+                                                ? AppColors.neonEmerald
+                                                : Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.restore_rounded,
+                                            color: AppColors.neonTeal,
+                                            size: 20,
+                                          ),
+                                          onPressed: () => _restoreTx(tx),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.delete_forever_rounded,
+                                            color: Colors.redAccent,
+                                            size: 20,
+                                          ),
+                                          onPressed: () => _purgeTx(tx),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
