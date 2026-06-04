@@ -62,34 +62,39 @@ const TransactionSchema = CollectionSchema(
       name: r'isSplit',
       type: IsarType.bool,
     ),
-    r'parserSource': PropertySchema(
+    r'linkedLoanId': PropertySchema(
       id: 9,
+      name: r'linkedLoanId',
+      type: IsarType.long,
+    ),
+    r'parserSource': PropertySchema(
+      id: 10,
       name: r'parserSource',
       type: IsarType.string,
     ),
     r'rawMessage': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'rawMessage',
       type: IsarType.string,
     ),
     r'source': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'source',
       type: IsarType.string,
     ),
     r'splitDetails': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'splitDetails',
       type: IsarType.objectList,
       target: r'TransactionSplitDetail',
     ),
     r'timestamp': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'timestamp',
       type: IsarType.dateTime,
     ),
     r'transactionType': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'transactionType',
       type: IsarType.string,
     )
@@ -175,17 +180,18 @@ void _transactionSerialize(
   writer.writeString(offsets[6], object.description);
   writer.writeBool(offsets[7], object.isDeleted);
   writer.writeBool(offsets[8], object.isSplit);
-  writer.writeString(offsets[9], object.parserSource);
-  writer.writeString(offsets[10], object.rawMessage);
-  writer.writeString(offsets[11], object.source);
+  writer.writeLong(offsets[9], object.linkedLoanId);
+  writer.writeString(offsets[10], object.parserSource);
+  writer.writeString(offsets[11], object.rawMessage);
+  writer.writeString(offsets[12], object.source);
   writer.writeObjectList<TransactionSplitDetail>(
-    offsets[12],
+    offsets[13],
     allOffsets,
     TransactionSplitDetailSchema.serialize,
     object.splitDetails,
   );
-  writer.writeDateTime(offsets[13], object.timestamp);
-  writer.writeString(offsets[14], object.transactionType);
+  writer.writeDateTime(offsets[14], object.timestamp);
+  writer.writeString(offsets[15], object.transactionType);
 }
 
 Transaction _transactionDeserialize(
@@ -205,18 +211,19 @@ Transaction _transactionDeserialize(
   object.id = id;
   object.isDeleted = reader.readBool(offsets[7]);
   object.isSplit = reader.readBool(offsets[8]);
-  object.parserSource = reader.readStringOrNull(offsets[9]);
-  object.rawMessage = reader.readStringOrNull(offsets[10]);
-  object.source = reader.readString(offsets[11]);
+  object.linkedLoanId = reader.readLongOrNull(offsets[9]);
+  object.parserSource = reader.readStringOrNull(offsets[10]);
+  object.rawMessage = reader.readStringOrNull(offsets[11]);
+  object.source = reader.readString(offsets[12]);
   object.splitDetails = reader.readObjectList<TransactionSplitDetail>(
-        offsets[12],
+        offsets[13],
         TransactionSplitDetailSchema.deserialize,
         allOffsets,
         TransactionSplitDetail(),
       ) ??
       [];
-  object.timestamp = reader.readDateTime(offsets[13]);
-  object.transactionType = reader.readString(offsets[14]);
+  object.timestamp = reader.readDateTime(offsets[14]);
+  object.transactionType = reader.readString(offsets[15]);
   return object;
 }
 
@@ -246,12 +253,14 @@ P _transactionDeserializeProp<P>(
     case 8:
       return (reader.readBool(offset)) as P;
     case 9:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 10:
       return (reader.readStringOrNull(offset)) as P;
     case 11:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 12:
+      return (reader.readString(offset)) as P;
+    case 13:
       return (reader.readObjectList<TransactionSplitDetail>(
             offset,
             TransactionSplitDetailSchema.deserialize,
@@ -259,9 +268,9 @@ P _transactionDeserializeProp<P>(
             TransactionSplitDetail(),
           ) ??
           []) as P;
-    case 13:
-      return (reader.readDateTime(offset)) as P;
     case 14:
+      return (reader.readDateTime(offset)) as P;
+    case 15:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1302,6 +1311,80 @@ extension TransactionQueryFilter
   }
 
   QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      linkedLoanIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'linkedLoanId',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      linkedLoanIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'linkedLoanId',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      linkedLoanIdEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'linkedLoanId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      linkedLoanIdGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'linkedLoanId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      linkedLoanIdLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'linkedLoanId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      linkedLoanIdBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'linkedLoanId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
       parserSourceIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -2150,6 +2233,19 @@ extension TransactionQuerySortBy
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByLinkedLoanId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'linkedLoanId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy>
+      sortByLinkedLoanIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'linkedLoanId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByParserSource() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'parserSource', Sort.asc);
@@ -2337,6 +2433,19 @@ extension TransactionQuerySortThenBy
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByLinkedLoanId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'linkedLoanId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy>
+      thenByLinkedLoanIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'linkedLoanId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByParserSource() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'parserSource', Sort.asc);
@@ -2462,6 +2571,12 @@ extension TransactionQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QDistinct> distinctByLinkedLoanId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'linkedLoanId');
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QDistinct> distinctByParserSource(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -2558,6 +2673,12 @@ extension TransactionQueryProperty
   QueryBuilder<Transaction, bool, QQueryOperations> isSplitProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isSplit');
+    });
+  }
+
+  QueryBuilder<Transaction, int?, QQueryOperations> linkedLoanIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'linkedLoanId');
     });
   }
 

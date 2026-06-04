@@ -1572,6 +1572,21 @@ class DashboardView extends ConsumerWidget {
     final paybackContactController = TextEditingController();
     DateTime paybackDate = DateTime.now().add(const Duration(days: 30));
     int? selectedDebtId;
+    int? selectedLinkedLoanId = existingTransaction?.linkedLoanId;
+
+    if (existingTransaction != null && existingTransaction.linkedLoanId != null) {
+      final allLoans = ref.read(loansProvider).valueOrNull ?? [];
+      try {
+        final linkedLoan = allLoans.firstWhere((l) => l.id == existingTransaction.linkedLoanId);
+        if (existingTransaction.transactionType == 'income' && !linkedLoan.isLent) {
+          isPayback = true;
+          paybackContactController.text = linkedLoan.contactName;
+          paybackDate = linkedLoan.paybackDate ?? DateTime.now().add(const Duration(days: 30));
+        } else if (existingTransaction.transactionType == 'expense' || existingTransaction.transactionType == 'transfer') {
+          selectedDebtId = linkedLoan.id;
+        }
+      } catch (_) {}
+    }
 
     // To Account for transfer type
     String selectedToAccountType = 'Cash';
@@ -2071,6 +2086,72 @@ class DashboardView extends ConsumerWidget {
                           ),
                         ],
 
+                        // Link to any Loan (all loans dropdown)
+                        // Only shown when not using isPayback or debt repayment (those auto-link)
+                        if (!isPayback && selectedDebtId == null)
+                        loansState.maybeWhen(
+                          data: (allLoans) {
+                            final activeLoansList = allLoans.where((l) => l.remainingBalance > 0).toList();
+                            if (activeLoansList.isEmpty) return const SizedBox.shrink();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                DropdownButtonFormField<int?>(
+                                  value: selectedLinkedLoanId,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'Link to Loan / Debt',
+                                    hintText: 'Optionally associate with a loan',
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: Icon(
+                                      Icons.link_rounded,
+                                      color: selectedLinkedLoanId != null
+                                          ? AppColors.neonPurple
+                                          : AppColors.textMuted,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  dropdownColor: AppColors.obsidianSurface,
+                                  items: [
+                                    const DropdownMenuItem<int?>(
+                                      value: null,
+                                      child: Text('No linked loan'),
+                                    ),
+                                    ...activeLoansList.map((loan) => DropdownMenuItem<int?>(
+                                      value: loan.id,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            loan.isLent
+                                                ? Icons.call_made_rounded
+                                                : Icons.call_received_rounded,
+                                            color: loan.isLent
+                                                ? AppColors.neonEmerald
+                                                : Colors.redAccent,
+                                            size: 14,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Text(
+                                              '${loan.contactName} (₹${loan.remainingBalance.toStringAsFixed(0)})',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )),
+                                  ],
+                                  onChanged: (val) {
+                                    setState(() => selectedLinkedLoanId = val);
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                            );
+                          },
+                          orElse: () => const SizedBox.shrink(),
+                        ),
+
                         // Date & Time Picker
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2286,7 +2367,7 @@ class DashboardView extends ConsumerWidget {
                                 backgroundColor: AppColors.neonTeal,
                                 foregroundColor: Colors.black,
                               ),
-                              onPressed: () {
+                              onPressed: () async {
                                 final amount =
                                     double.tryParse(amountController.text) ??
                                     0.0;
@@ -2375,12 +2456,11 @@ class DashboardView extends ConsumerWidget {
                                 } else {
                                   tx.isSplit = false;
                                   tx.splitDetails = [];
-                                }
 
-                                if (selectedType == 'income' && isPayback) {
-                                  final contact = paybackContactController.text.trim();
-                                  if (contact.isNotEmpty) {
-                                    loansState.whenData((allLoans) async {
+                                  if (selectedType == 'income' && isPayback) {
+                                    final contact = paybackContactController.text.trim();
+                                    if (contact.isNotEmpty) {
+                                      final allLoans = ref.read(loansProvider).valueOrNull ?? [];
                                       try {
                                         final existing = allLoans.firstWhere(
                                           (l) => !l.isLent && l.remainingBalance > 0 && l.contactName.trim().toLowerCase() == contact.toLowerCase(),
@@ -2388,7 +2468,8 @@ class DashboardView extends ConsumerWidget {
                                         existing.amount += amount;
                                         existing.remainingBalance += amount;
                                         existing.paybackDate = paybackDate;
-                                        await ref.read(loansProvider.notifier).addLoan(existing);
+                                        final savedId = await ref.read(loansProvider.notifier).addLoan(existing);
+                                        tx.linkedLoanId = savedId; // auto-link
                                       } catch (_) {
                                         final loan = Loan()
                                           ..contactName = contact
@@ -2400,20 +2481,23 @@ class DashboardView extends ConsumerWidget {
                                           ..interestRate = 0.0
                                           ..compoundInterval = 'none'
                                           ..emiAmount = 0.0;
-                                        await ref.read(loansProvider.notifier).addLoan(loan);
+                                        final savedId = await ref.read(loansProvider.notifier).addLoan(loan);
+                                        tx.linkedLoanId = savedId; // auto-link new loan
                                       }
-                                    });
-                                  }
-                                }
-
-                                if ((selectedType == 'expense' || selectedType == 'transfer') && selectedDebtId != null) {
-                                  loansState.whenData((allLoans) {
+                                    }
+                                  } else if ((selectedType == 'expense' || selectedType == 'transfer') && selectedDebtId != null) {
+                                    // Repaying a debt — link and reduce balance
+                                    final allLoans = ref.read(loansProvider).valueOrNull ?? [];
                                     try {
                                       final target = allLoans.firstWhere((l) => l.id == selectedDebtId);
                                       target.remainingBalance = (target.remainingBalance - amount).clamp(0.0, double.infinity);
-                                      ref.read(loansProvider.notifier).addLoan(target);
+                                      await ref.read(loansProvider.notifier).addLoan(target);
                                     } catch (_) {}
-                                  });
+                                    tx.linkedLoanId = selectedDebtId; // auto-link repaid loan
+                                  } else {
+                                    // Use manual dropdown selection only when no auto-linking applies
+                                    tx.linkedLoanId = selectedLinkedLoanId;
+                                  }
                                 }
 
                                 ref
@@ -2579,10 +2663,14 @@ class CardsLoansView extends ConsumerWidget {
                         );
                       },
                       child: GestureDetector(
-                        onTap: () => _showAddLoanDialog(
+                        onTap: () => Navigator.push(
                           context,
-                          ref,
-                          existingLoan: loan,
+                          MaterialPageRoute(
+                            builder: (_) => LoanDetailPage(
+                              loan: loan,
+                              onEdit: () => _showAddLoanDialog(context, ref, existingLoan: loan),
+                            ),
+                          ),
                         ),
                         child: _buildLoanItem(
                           loan.contactName,
@@ -3857,6 +3945,312 @@ class CardsLoansView extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LOAN DETAIL PAGE
+// ---------------------------------------------------------------------------
+class LoanDetailPage extends ConsumerWidget {
+  final Loan loan;
+  final VoidCallback onEdit;
+
+  const LoanDetailPage({super.key, required this.loan, required this.onEdit});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final txsState = ref.watch(transactionsProvider);
+    final typeColor = loan.isLent ? AppColors.neonEmerald : Colors.redAccent;
+    final typeLabel = loan.isLent ? 'Lent (Receivable)' : 'Borrowed (Debt)';
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          const AnimatedGradientBackground(),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // App bar row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          loan.contactName,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit_rounded, color: AppColors.neonTeal, size: 20),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          onEdit();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Loan summary card
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: GlassBlur(
+                    borderRadius: 20,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                typeLabel,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: typeColor,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              if (loan.interestRate > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amberAccent.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.amberAccent.withOpacity(0.3)),
+                                  ),
+                                  child: Text(
+                                    '${loan.interestRate}% APR',
+                                    style: const TextStyle(fontSize: 11, color: Colors.amberAccent),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Original Amount', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '₹${loan.amount.toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    const Text('Remaining Balance', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '₹${loan.remainingBalance.toStringAsFixed(0)}',
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: typeColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (loan.emiAmount > 0) ...[
+                            const SizedBox(height: 8),
+                            Divider(color: Colors.white.withOpacity(0.08)),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Monthly EMI: ₹${loan.emiAmount.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                ),
+                                if (loan.paybackDate != null)
+                                  Text(
+                                    'Due: ${loan.paybackDate!.day}/${loan.paybackDate!.month}/${loan.paybackDate!.year}',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                  ),
+                              ],
+                            ),
+                          ],
+                          if (loan.paybackDate != null && loan.emiAmount == 0) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Due by: ${loan.paybackDate!.day}/${loan.paybackDate!.month}/${loan.paybackDate!.year}',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Linked transactions section header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.link_rounded, color: AppColors.neonPurple, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Linked Transactions',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppColors.neonPurple,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Linked transactions list
+                Expanded(
+                  child: txsState.when(
+                    loading: () => const Center(child: CircularProgressIndicator(color: AppColors.neonPurple)),
+                    error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
+                    data: (allTxs) {
+                      final linked = allTxs.where((t) => t.linkedLoanId == loan.id).toList();
+                      if (linked.isEmpty) {
+                        return const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.link_off_rounded, color: AppColors.textMuted, size: 40),
+                              SizedBox(height: 10),
+                              Text(
+                                'No transactions linked to this loan yet.',
+                                style: TextStyle(color: AppColors.textMuted),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Link transactions using the "Link to Loan" option\nwhen adding or editing a transaction.',
+                                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // Summary strip
+                      final totalLinked = linked.fold<double>(0.0, (sum, t) => sum + t.amount);
+
+                      return Column(
+                        children: [
+                          // Summary banner
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: GlassBlur(
+                              borderRadius: 12,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '${linked.length} transaction${linked.length == 1 ? '' : 's'}',
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                    ),
+                                    Text(
+                                      'Total: ₹${totalLinked.toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.neonPurple),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Transaction list
+                          Expanded(
+                            child: ListView.builder(
+                              physics: const BouncingScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: linked.length,
+                              itemBuilder: (context, index) {
+                                final tx = linked[index];
+                                final isIncome = tx.transactionType == 'income';
+                                final amtColor = isIncome ? AppColors.neonEmerald : Colors.redAccent;
+                                final amtStr = '${isIncome ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
+                                final dateStr = '${tx.timestamp.day}/${tx.timestamp.month}/${tx.timestamp.year}';
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: GlassBlur(
+                                    borderRadius: 14,
+                                    child: ListTile(
+                                      leading: Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: amtColor.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                          color: amtColor,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        tx.description,
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      subtitle: Text(
+                                        '${tx.category} • $dateStr',
+                                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                      ),
+                                      trailing: Text(
+                                        amtStr,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: amtColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -5424,7 +5818,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     'Add or remove custom categories for Expense, Income, and Transfer',
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
+                      color: AppColors.neonPurple,
                     ),
                   ),
                   trailing: const Icon(
@@ -8559,42 +8953,41 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     if (selectedType == 'income' && isPayback) {
                                       final contact = paybackContactController.text.trim();
                                       if (contact.isNotEmpty) {
-                                        final loansState = ref.read(loansProvider);
-                                        loansState.whenData((allLoans) async {
-                                          try {
-                                            final existing = allLoans.firstWhere(
-                                              (l) => !l.isLent && l.remainingBalance > 0 && l.contactName.trim().toLowerCase() == contact.toLowerCase(),
-                                            );
-                                            existing.amount += amt;
-                                            existing.remainingBalance += amt;
-                                            existing.paybackDate = paybackDate;
-                                            await ref.read(loansProvider.notifier).addLoan(existing);
-                                          } catch (_) {
-                                            final loan = Loan()
-                                              ..contactName = contact
-                                              ..isLent = false // borrowed debt
-                                              ..amount = amt
-                                              ..remainingBalance = amt
-                                              ..startDate = DateTime.now()
-                                              ..paybackDate = paybackDate
-                                              ..interestRate = 0.0
-                                              ..compoundInterval = 'none'
-                                              ..emiAmount = 0.0;
-                                            await ref.read(loansProvider.notifier).addLoan(loan);
-                                          }
-                                        });
+                                        final allLoans = ref.read(loansProvider).valueOrNull ?? [];
+                                        try {
+                                          final existing = allLoans.firstWhere(
+                                            (l) => !l.isLent && l.remainingBalance > 0 && l.contactName.trim().toLowerCase() == contact.toLowerCase(),
+                                          );
+                                          existing.amount += amt;
+                                          existing.remainingBalance += amt;
+                                          existing.paybackDate = paybackDate;
+                                          final savedId = await ref.read(loansProvider.notifier).addLoan(existing);
+                                          tx.linkedLoanId = savedId;
+                                        } catch (_) {
+                                          final loan = Loan()
+                                            ..contactName = contact
+                                            ..isLent = false // borrowed debt
+                                            ..amount = amt
+                                            ..remainingBalance = amt
+                                            ..startDate = DateTime.now()
+                                            ..paybackDate = paybackDate
+                                            ..interestRate = 0.0
+                                            ..compoundInterval = 'none'
+                                            ..emiAmount = 0.0;
+                                          final savedId = await ref.read(loansProvider.notifier).addLoan(loan);
+                                          tx.linkedLoanId = savedId;
+                                        }
                                       }
                                     }
 
                                     if ((selectedType == 'expense' || selectedType == 'transfer') && selectedDebtId != null) {
-                                      final loansState = ref.read(loansProvider);
-                                      loansState.whenData((allLoans) async {
-                                        try {
-                                          final target = allLoans.firstWhere((l) => l.id == selectedDebtId);
-                                          target.remainingBalance = (target.remainingBalance - amt).clamp(0.0, double.infinity);
-                                          await ref.read(loansProvider.notifier).addLoan(target);
-                                        } catch (_) {}
-                                      });
+                                      final allLoans = ref.read(loansProvider).valueOrNull ?? [];
+                                      try {
+                                        final target = allLoans.firstWhere((l) => l.id == selectedDebtId);
+                                        target.remainingBalance = (target.remainingBalance - amt).clamp(0.0, double.infinity);
+                                        await ref.read(loansProvider.notifier).addLoan(target);
+                                      } catch (_) {}
+                                      tx.linkedLoanId = selectedDebtId;
                                     }
 
                                     await ref.read(transactionsProvider.notifier).addTransaction(tx);

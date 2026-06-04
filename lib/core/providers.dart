@@ -180,12 +180,14 @@ class LoansNotifier extends StateNotifier<AsyncValue<List<Loan>>> {
     }
   }
 
-  Future<void> addLoan(Loan loan) async {
+  Future<int> addLoan(Loan loan) async {
     try {
-      await _dbService.saveLoan(loan);
+      final id = await _dbService.saveLoan(loan);
       await loadLoans();
+      return id;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 

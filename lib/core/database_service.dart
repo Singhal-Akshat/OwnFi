@@ -433,11 +433,12 @@ class DatabaseService {
     return isar.loans.where().findAll();
   }
 
-  Future<void> saveLoan(Loan loan) async {
-    await isar.writeTxn(() async {
-      await isar.loans.put(loan);
+  Future<int> saveLoan(Loan loan) async {
+    final id = await isar.writeTxn(() async {
+      return await isar.loans.put(loan);
     });
     onChanged?.call();
+    return id;
   }
 
   Future<void> deleteLoan(int id) async {
