@@ -369,27 +369,81 @@ class DashboardView extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back,',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    Text(
+                      'Akshat',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'Welcome back,',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  GlassBlur(
+                    borderRadius: 14,
+                    child: IconButton(
+                      icon: const Icon(Icons.sync_rounded, color: AppColors.neonTeal),
+                      onPressed: () async {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Checking cloud backup status...'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                        try {
+                          final restored = await ref.read(googleSyncServiceProvider).syncOnStartup(ref.read(databaseServiceProvider));
+                          if (restored) {
+                            ref.read(transactionsProvider.notifier).loadTransactions();
+                            ref.read(creditCardsProvider.notifier).loadCreditCards();
+                            ref.read(bankAccountsProvider.notifier).loadBankAccounts();
+                            ref.read(loansProvider.notifier).loadLoans();
+                            ref.read(holdingsProvider.notifier).loadHoldings();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Sync completed. Newer data restored from Google Drive.'),
+                                backgroundColor: AppColors.neonEmerald,
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Your database is already in sync with Google Drive.'),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Sync failed: $e'),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      },
+                    ),
                   ),
-                  Text(
-                    'Akshat',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                  const SizedBox(width: 10),
+                  GlassBlur(
+                    borderRadius: 14,
+                    child: IconButton(
+                      icon: const Icon(Icons.add, color: AppColors.neonTeal),
+                      onPressed: () {
+                        _showAddExpenseDialog(context, ref);
+                      },
+                    ),
                   ),
                 ],
-              ),
-              GlassBlur(
-                borderRadius: 14,
-                child: IconButton(
-                  icon: const Icon(Icons.add, color: AppColors.neonTeal),
-                  onPressed: () {
-                    _showAddExpenseDialog(context, ref);
-                  },
-                ),
               ),
             ],
           ),
@@ -3496,8 +3550,14 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
   bool _checkingLocalLLM = false;
   int _smsLookbackValue = 180;
   String _smsLookbackUnit = 'days';
+  DateTime? _syncStartDate;
+  DateTime? _syncEndDate;
 
   final _storage = const FlutterSecureStorage();
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
 
   @override
   void initState() {
@@ -3511,8 +3571,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     
     String? lookbackValStr = await _storage.read(key: 'settings_sms_lookback_value');
     String? lookbackUnitStr = await _storage.read(key: 'settings_sms_lookback_unit');
+    final startStr = await _storage.read(key: 'settings_sync_start_date');
+    final endStr = await _storage.read(key: 'settings_sync_end_date');
     
-    if (lookbackValStr == null) {
+    if (lookbackValStr == null && startStr == null) {
       final legacy = await _storage.read(key: 'settings_sms_lookback_days');
       if (legacy != null) {
         lookbackValStr = legacy;
@@ -3526,8 +3588,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     setState(() {
       _biometricsEnabled = bio == 'true';
       _localLLMEnabled = localLLM == 'true';
-      _smsLookbackValue = int.tryParse(lookbackValStr!) ?? 180;
+      if (lookbackValStr != null) {
+        _smsLookbackValue = int.tryParse(lookbackValStr) ?? 180;
+      }
       _smsLookbackUnit = lookbackUnitStr ?? 'days';
+      if (startStr != null) _syncStartDate = DateTime.parse(startStr);
+      if (endStr != null) _syncEndDate = DateTime.parse(endStr);
     });
   }
 
@@ -3599,7 +3665,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
                   title: const Text('SMS Sync Lookback Window', style: TextStyle(fontSize: 14)),
-                  subtitle: Text('Scan window: $_smsLookbackValue $_smsLookbackUnit', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  subtitle: Text(
+                    _syncStartDate != null && _syncEndDate != null
+                        ? 'Custom Range: ${_formatDate(_syncStartDate!)} to ${_formatDate(_syncEndDate!)}'
+                        : 'Scan window: $_smsLookbackValue $_smsLookbackUnit',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
                   trailing: const Icon(Icons.edit_calendar_rounded, size: 20, color: AppColors.textSecondary),
                   onTap: () => _showSmsLookbackDialog(context),
                 ),
@@ -3830,9 +3901,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     );
   }
 
-  void _showSmsLookbackDialog(BuildContext context) {
+    void _showSmsLookbackDialog(BuildContext context) {
     String selectedUnit = _smsLookbackUnit;
     final valueController = TextEditingController(text: _smsLookbackValue.toString());
+    DateTime? tempStart = _syncStartDate;
+    DateTime? tempEnd = _syncEndDate;
+    bool useCalendar = tempStart != null && tempEnd != null;
 
     showDialog(
       context: context,
@@ -3852,7 +3926,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'SMS Lookback Window',
+                        'Sync Scan Window',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -3860,35 +3934,36 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'Define how far back the app will scan your SMS inbox for transactions. Changing this resets the last sync time to perform a full scan.',
+                        'Define how far back the app will scan your SMS and Gmail inbox for transactions.',
                         style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                       ),
                       const SizedBox(height: 20),
-                      // Unit Selector (Days vs Months)
+
+                      // Toggle Lookback Type
                       Row(
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => setState(() => selectedUnit = 'days'),
+                              onTap: () => setState(() => useCalendar = false),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: selectedUnit == 'days'
+                                  color: !useCalendar
                                       ? AppColors.neonTeal.withOpacity(0.15)
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: selectedUnit == 'days'
+                                    color: !useCalendar
                                         ? AppColors.neonTeal
                                         : AppColors.glassBorder,
                                   ),
                                 ),
                                 child: Center(
                                   child: Text(
-                                    'Days',
+                                    'Relative Window',
                                     style: TextStyle(
-                                      color: selectedUnit == 'days' ? Colors.white : AppColors.textSecondary,
-                                      fontWeight: selectedUnit == 'days' ? FontWeight.bold : FontWeight.normal,
+                                      color: !useCalendar ? Colors.white : AppColors.textSecondary,
+                                      fontWeight: !useCalendar ? FontWeight.bold : FontWeight.normal,
                                     ),
                                   ),
                                 ),
@@ -3898,26 +3973,26 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => setState(() => selectedUnit = 'months'),
+                              onTap: () => setState(() => useCalendar = true),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: selectedUnit == 'months'
+                                  color: useCalendar
                                       ? AppColors.neonTeal.withOpacity(0.15)
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: selectedUnit == 'months'
+                                    color: useCalendar
                                         ? AppColors.neonTeal
                                         : AppColors.glassBorder,
                                   ),
                                 ),
                                 child: Center(
                                   child: Text(
-                                    'Months',
+                                    'Calendar Range',
                                     style: TextStyle(
-                                      color: selectedUnit == 'months' ? Colors.white : AppColors.textSecondary,
-                                      fontWeight: selectedUnit == 'months' ? FontWeight.bold : FontWeight.normal,
+                                      color: useCalendar ? Colors.white : AppColors.textSecondary,
+                                      fontWeight: useCalendar ? FontWeight.bold : FontWeight.normal,
                                     ),
                                   ),
                                 ),
@@ -3927,24 +4002,159 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      // Value Input
-                      TextField(
-                        controller: valueController,
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: selectedUnit == 'days' ? 'Number of Days' : 'Number of Months',
-                          labelStyle: const TextStyle(color: AppColors.textSecondary),
-                          enabledBorder: const OutlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.glassBorder),
-                          ),
-                          focusedBorder: const OutlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.neonTeal),
-                          ),
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.date_range_rounded, color: AppColors.textSecondary),
+
+                      if (!useCalendar) ...[
+                        // Unit Selector (Days vs Months)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => selectedUnit = 'days'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: selectedUnit == 'days'
+                                        ? AppColors.neonTeal.withOpacity(0.15)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: selectedUnit == 'days'
+                                          ? AppColors.neonTeal
+                                          : AppColors.glassBorder,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Days',
+                                      style: TextStyle(
+                                        color: selectedUnit == 'days' ? Colors.white : AppColors.textSecondary,
+                                        fontWeight: selectedUnit == 'days' ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => selectedUnit = 'months'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: selectedUnit == 'months'
+                                        ? AppColors.neonTeal.withOpacity(0.15)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: selectedUnit == 'months'
+                                          ? AppColors.neonTeal
+                                          : AppColors.glassBorder,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Months',
+                                      style: TextStyle(
+                                        color: selectedUnit == 'months' ? Colors.white : AppColors.textSecondary,
+                                        fontWeight: selectedUnit == 'months' ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                        const SizedBox(height: 20),
+                        // Value Input
+                        TextField(
+                          controller: valueController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: selectedUnit == 'days' ? 'Number of Days' : 'Number of Months',
+                            labelStyle: const TextStyle(color: AppColors.textSecondary),
+                            enabledBorder: const OutlineInputBorder(
+                              borderSide: BorderSide(color: AppColors.glassBorder),
+                            ),
+                            focusedBorder: const OutlineInputBorder(
+                              borderSide: BorderSide(color: AppColors.neonTeal),
+                            ),
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.date_range_rounded, color: AppColors.textSecondary),
+                          ),
+                        ),
+                      ] else ...[
+                        // Calendar Picker UI
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.glassCard,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.glassBorder),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(Icons.calendar_month_rounded, color: AppColors.neonTeal, size: 36),
+                              const SizedBox(height: 10),
+                              Text(
+                                tempStart != null && tempEnd != null
+                                    ? '${_formatDate(tempStart!)}  ➔  ${_formatDate(tempEnd!)}'
+                                    : 'No range selected',
+                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.neonTeal.withOpacity(0.2),
+                                  foregroundColor: AppColors.neonTeal,
+                                  side: const BorderSide(color: AppColors.neonTeal),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  final picked = await showDateRangePicker(
+                                    context: context,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                                    initialDateRange: tempStart != null && tempEnd != null
+                                        ? DateTimeRange(start: tempStart!, end: tempEnd!)
+                                        : null,
+                                    builder: (context, child) {
+                                      return Theme(
+                                        data: Theme.of(context).copyWith(
+                                          colorScheme: const ColorScheme.dark(
+                                            primary: AppColors.neonTeal,
+                                            onPrimary: Colors.black,
+                                            surface: AppColors.obsidianSurface,
+                                            onSurface: Colors.white,
+                                          ),
+                                          textButtonTheme: TextButtonThemeData(
+                                            style: TextButton.styleFrom(foregroundColor: AppColors.neonTeal),
+                                          ),
+                                        ),
+                                        child: child!,
+                                      );
+                                    },
+                                  );
+                                  if (picked != null) {
+                                    setState(() {
+                                      tempStart = picked.start;
+                                      tempEnd = picked.end;
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.edit_calendar_rounded),
+                                label: const Text('Select Date Range'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -3963,35 +4173,66 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                               ),
                             ),
                             onPressed: () async {
-                              final text = valueController.text.trim();
-                              final val = int.tryParse(text);
-                              if (val == null || val <= 0) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please enter a valid positive number'),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                                return;
+                              if (useCalendar) {
+                                if (tempStart == null || tempEnd == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Please select a date range first'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                await _storage.write(key: 'settings_sync_start_date', value: tempStart!.toIso8601String());
+                                await _storage.write(key: 'settings_sync_end_date', value: tempEnd!.toIso8601String());
+                                await _storage.delete(key: 'settings_sms_lookback_value');
+                                await _storage.delete(key: 'settings_sms_lookback_unit');
+
+                                this.setState(() {
+                                  _syncStartDate = tempStart;
+                                  _syncEndDate = tempEnd;
+                                });
+                              } else {
+                                final text = valueController.text.trim();
+                                final val = int.tryParse(text);
+                                if (val == null || val <= 0) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Please enter a valid positive number'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                await _storage.write(key: 'settings_sms_lookback_value', value: val.toString());
+                                await _storage.write(key: 'settings_sms_lookback_unit', value: selectedUnit);
+                                await _storage.delete(key: 'settings_sync_start_date');
+                                await _storage.delete(key: 'settings_sync_end_date');
+
+                                this.setState(() {
+                                  _smsLookbackValue = val;
+                                  _smsLookbackUnit = selectedUnit;
+                                  _syncStartDate = null;
+                                  _syncEndDate = null;
+                                });
                               }
 
-                              // Update secure storage
-                              await _storage.write(key: 'settings_sms_lookback_value', value: val.toString());
-                              await _storage.write(key: 'settings_sms_lookback_unit', value: selectedUnit);
                               // Force full scan on next sync
                               await _storage.delete(key: 'last_sms_sync_time');
-
-                              // Update screen state
-                              this.setState(() {
-                                _smsLookbackValue = val;
-                                _smsLookbackUnit = selectedUnit;
-                              });
+                              final accounts = await ref.read(googleSyncServiceProvider).getLinkedAccounts();
+                              for (var acc in accounts) {
+                                await _storage.delete(key: 'last_gmail_sync_time_${acc.email}');
+                              }
 
                               Navigator.pop(context);
                               
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Lookback set to $val $selectedUnit. Next SMS sync will perform a full scan.'),
+                                  content: Text(useCalendar 
+                                      ? 'Lookback range set to ${_formatDate(tempStart!)} - ${_formatDate(tempEnd!)}.' 
+                                      : 'Lookback set to ${valueController.text.trim()} $selectedUnit. Next sync will perform a full scan.'),
                                   backgroundColor: AppColors.neonEmerald.withOpacity(0.9),
                                 ),
                               );
@@ -3999,7 +4240,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             child: const Text('Save Window'),
                           ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -4355,11 +4596,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             onPressed: () => Navigator.pop(dialogContext),
                             child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 6),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: canDelete ? Colors.redAccent : Colors.redAccent.withOpacity(0.2),
                               foregroundColor: canDelete ? Colors.white : Colors.white.withOpacity(0.3),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -4408,7 +4650,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                       );
                                     }
                                   },
-                            child: const Text('Authenticate & Delete'),
+                            child: const Text(
+                              'Authenticate & Delete',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       )
@@ -4522,6 +4767,46 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                             backgroundColor: error == null ? AppColors.neonEmerald : Colors.redAccent,
                                           ),
                                         );
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.sync_rounded, color: AppColors.neonTeal),
+                                      onPressed: () async {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Checking cloud backup status...'),
+                                            duration: Duration(seconds: 1),
+                                          ),
+                                        );
+                                        try {
+                                          final restored = await ref.read(googleSyncServiceProvider).syncOnStartup(ref.read(databaseServiceProvider));
+                                          if (restored) {
+                                            ref.read(transactionsProvider.notifier).loadTransactions();
+                                            ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                            ref.read(bankAccountsProvider.notifier).loadBankAccounts();
+                                            ref.read(loansProvider.notifier).loadLoans();
+                                            ref.read(holdingsProvider.notifier).loadHoldings();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Sync completed. Newer data restored from Google Drive.'),
+                                                backgroundColor: AppColors.neonEmerald,
+                                              ),
+                                            );
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Your database is already in sync with Google Drive.'),
+                                              ),
+                                            );
+                                          }
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Sync failed: $e'),
+                                              backgroundColor: Colors.redAccent,
+                                            ),
+                                          );
+                                        }
                                       },
                                     ),
                                     IconButton(

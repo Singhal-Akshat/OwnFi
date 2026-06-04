@@ -25,47 +25,59 @@ class SmsSyncService {
       }
     }
 
-    // 2. Fetch last sync timestamp
-    final lastSyncStr = await _storage.read(key: 'last_sms_sync_time');
-    DateTime lastSyncTime;
-    if (lastSyncStr != null) {
-      lastSyncTime = DateTime.parse(lastSyncStr);
-    } else {
-      // Calculate dynamic lookback time based on user settings
-      String? lookbackValueStr = await _storage.read(key: 'settings_sms_lookback_value');
-      String? lookbackUnit = await _storage.read(key: 'settings_sms_lookback_unit');
+    // Check if user set a custom calendar range
+    final customStartStr = await _storage.read(key: 'settings_sync_start_date');
+    final customEndStr = await _storage.read(key: 'settings_sync_end_date');
+    DateTime? customStart;
+    DateTime? customEnd;
+    if (customStartStr != null && customEndStr != null) {
+      customStart = DateTime.parse(customStartStr);
+      customEnd = DateTime.parse(customEndStr);
+    }
 
-      if (lookbackValueStr == null) {
-        // Fallback to legacy key settings_sms_lookback_days
-        final legacyDays = await _storage.read(key: 'settings_sms_lookback_days');
-        if (legacyDays != null) {
-          lookbackValueStr = legacyDays;
-          lookbackUnit = 'days';
-        }
-      }
-
-      final lookbackValue = int.tryParse(lookbackValueStr ?? '180') ?? 180;
-      final unit = lookbackUnit ?? 'days';
-
-      if (unit == 'months') {
-        final now = DateTime.now();
-        int years = lookbackValue ~/ 12;
-        int months = lookbackValue % 12;
-        int targetYear = now.year - years;
-        int targetMonth = now.month - months;
-        if (targetMonth <= 0) {
-          targetYear -= 1;
-          targetMonth += 12;
-        }
-        int targetDay = now.day;
-        final daysInMonth = DateTime(targetYear, targetMonth + 1, 0).day;
-        if (targetDay > daysInMonth) {
-          targetDay = daysInMonth;
-        }
-        lastSyncTime = DateTime(targetYear, targetMonth, targetDay, now.hour, now.minute, now.second);
+    DateTime? lastSyncTime;
+    if (customStart == null || customEnd == null) {
+      // 2. Fetch last sync timestamp
+      final lastSyncStr = await _storage.read(key: 'last_sms_sync_time');
+      if (lastSyncStr != null) {
+        lastSyncTime = DateTime.parse(lastSyncStr);
       } else {
-        // days
-        lastSyncTime = DateTime.now().subtract(Duration(days: lookbackValue));
+        // Calculate dynamic lookback time based on user settings
+        String? lookbackValueStr = await _storage.read(key: 'settings_sms_lookback_value');
+        String? lookbackUnit = await _storage.read(key: 'settings_sms_lookback_unit');
+
+        if (lookbackValueStr == null) {
+          // Fallback to legacy key settings_sms_lookback_days
+          final legacyDays = await _storage.read(key: 'settings_sms_lookback_days');
+          if (legacyDays != null) {
+            lookbackValueStr = legacyDays;
+            lookbackUnit = 'days';
+          }
+        }
+
+        final lookbackValue = int.tryParse(lookbackValueStr ?? '180') ?? 180;
+        final unit = lookbackUnit ?? 'days';
+
+        if (unit == 'months') {
+          final now = DateTime.now();
+          int years = lookbackValue ~/ 12;
+          int months = lookbackValue % 12;
+          int targetYear = now.year - years;
+          int targetMonth = now.month - months;
+          if (targetMonth <= 0) {
+            targetYear -= 1;
+            targetMonth += 12;
+          }
+          int targetDay = now.day;
+          final daysInMonth = DateTime(targetYear, targetMonth + 1, 0).day;
+          if (targetDay > daysInMonth) {
+            targetDay = daysInMonth;
+          }
+          lastSyncTime = DateTime(targetYear, targetMonth, targetDay, now.hour, now.minute, now.second);
+        } else {
+          // days
+          lastSyncTime = DateTime.now().subtract(Duration(days: lookbackValue));
+        }
       }
     }
 
@@ -80,10 +92,13 @@ class SmsSyncService {
       throw Exception('SMS reading is only supported on Android: $e');
     }
 
-    // 4. Filter messages that are newer than lastSyncTime
+    // 4. Filter messages that are newer than lastSyncTime or within custom range
     final newMessages = messages.where((msg) {
       if (msg.date == null || msg.body == null) return false;
-      return msg.date!.isAfter(lastSyncTime);
+      if (customStart != null && customEnd != null) {
+        return msg.date!.isAfter(customStart!) && msg.date!.isBefore(customEnd!.add(const Duration(days: 1)));
+      }
+      return msg.date!.isAfter(lastSyncTime!);
     }).toList();
 
     if (newMessages.isEmpty) {

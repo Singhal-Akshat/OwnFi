@@ -410,14 +410,26 @@ class GoogleSyncService {
 
         final gmailApi = gmail.GmailApi(client);
 
-        // Fetch last sync timestamp for this specific email account
         final lastSyncKey = 'last_gmail_sync_time_${acc.email}';
-        final lastSyncStr = await _storage.read(key: lastSyncKey);
-        final lastSyncTime = lastSyncStr != null ? DateTime.parse(lastSyncStr) : DateTime.now().subtract(const Duration(days: 7));
 
-        // Format query parameter (after:YYYY/MM/DD)
-        final dateFilter = '${lastSyncTime.year}/${lastSyncTime.month.toString().padLeft(2, '0')}/${lastSyncTime.day.toString().padLeft(2, '0')}';
-        final query = 'subject:(Alert OR Transaction OR statement OR e-statement) after:$dateFilter';
+        // Fetch last sync timestamp for this specific email account or custom range
+        final customStartStr = await _storage.read(key: 'settings_sync_start_date');
+        final customEndStr = await _storage.read(key: 'settings_sync_end_date');
+
+        String query;
+        if (customStartStr != null && customEndStr != null) {
+          final start = DateTime.parse(customStartStr);
+          final end = DateTime.parse(customEndStr);
+          final startFilter = '${start.year}/${start.month.toString().padLeft(2, '0')}/${start.day.toString().padLeft(2, '0')}';
+          final endInclusive = end.add(const Duration(days: 1));
+          final endFilter = '${endInclusive.year}/${endInclusive.month.toString().padLeft(2, '0')}/${endInclusive.day.toString().padLeft(2, '0')}';
+          query = 'subject:(Alert OR Transaction OR statement OR e-statement) after:$startFilter before:$endFilter';
+        } else {
+          final lastSyncStr = await _storage.read(key: lastSyncKey);
+          final lastSyncTime = lastSyncStr != null ? DateTime.parse(lastSyncStr) : DateTime.now().subtract(const Duration(days: 7));
+          final dateFilter = '${lastSyncTime.year}/${lastSyncTime.month.toString().padLeft(2, '0')}/${lastSyncTime.day.toString().padLeft(2, '0')}';
+          query = 'subject:(Alert OR Transaction OR statement OR e-statement) after:$dateFilter';
+        }
 
         final listRes = await gmailApi.users.messages.list('me', q: query);
         if (listRes.messages == null || listRes.messages!.isEmpty) continue;
