@@ -324,7 +324,8 @@ class DashboardView extends ConsumerWidget {
     double cashAndBank = 0.0;
     txsState.whenData((txs) {
       for (final tx in txs) {
-        if (tx.cardId == null) {
+        // Only adjust dynamic cash balance for manual Cash transactions
+        if (tx.cardId == null && (tx.accountName == 'Cash' || tx.accountName == null || (!tx.accountName!.startsWith('bank:') && tx.accountName != 'Credit Card'))) {
           if (tx.transactionType == 'income') {
             cashAndBank += tx.amount;
           } else if (tx.transactionType == 'expense') {
@@ -1105,6 +1106,7 @@ class DashboardView extends ConsumerWidget {
           ? existingTransaction.splitDetails.first.amount.toStringAsFixed(0)
           : ''
     );
+    DateTime selectedDateTime = existingTransaction?.timestamp ?? DateTime.now();
 
     showDialog(
       context: context,
@@ -1346,6 +1348,76 @@ class DashboardView extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
 
+                        // Date & Time Picker
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Date & Time',
+                              style: TextStyle(fontSize: 14, color: Colors.white70),
+                            ),
+                            TextButton.icon(
+                              onPressed: () async {
+                                final datePicked = await showDatePicker(
+                                  context: context,
+                                  initialDate: selectedDateTime,
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                  builder: (context, child) {
+                                    return Theme(
+                                      data: Theme.of(context).copyWith(
+                                        colorScheme: const ColorScheme.dark(
+                                          primary: AppColors.neonTeal,
+                                          onPrimary: Colors.black,
+                                          surface: AppColors.obsidianSurface,
+                                          onSurface: Colors.white,
+                                        ),
+                                      ),
+                                      child: child!,
+                                    );
+                                  },
+                                );
+                                if (datePicked != null) {
+                                  final timePicked = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+                                    builder: (context, child) {
+                                      return Theme(
+                                        data: Theme.of(context).copyWith(
+                                          colorScheme: const ColorScheme.dark(
+                                            primary: AppColors.neonTeal,
+                                            onPrimary: Colors.black,
+                                            surface: AppColors.obsidianSurface,
+                                            onSurface: Colors.white,
+                                          ),
+                                        ),
+                                        child: child!,
+                                      );
+                                    },
+                                  );
+                                  if (timePicked != null) {
+                                    setState(() {
+                                      selectedDateTime = DateTime(
+                                        datePicked.year,
+                                        datePicked.month,
+                                        datePicked.day,
+                                        timePicked.hour,
+                                        timePicked.minute,
+                                      );
+                                    });
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.calendar_today_rounded, color: AppColors.neonTeal, size: 16),
+                              label: Text(
+                                '${selectedDateTime.day}/${selectedDateTime.month}/${selectedDateTime.year}  ${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}',
+                                style: const TextStyle(color: AppColors.neonTeal, fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
                         // Split Toggle
                         CheckboxListTile(
                           title: const Text('Split Expense?', style: TextStyle(fontSize: 14)),
@@ -1420,8 +1492,8 @@ class DashboardView extends ConsumerWidget {
                                 tx.amount = amount;
                                 tx.description = desc;
                                 tx.category = category;
+                                tx.timestamp = selectedDateTime;
                                 if (existingTransaction == null) {
-                                  tx.timestamp = DateTime.now();
                                   tx.source = 'manual';
                                 }
                                 tx.transactionType = selectedType;

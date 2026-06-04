@@ -140,7 +140,9 @@ class DatabaseService {
         ..timestamp = DateTime.now().subtract(const Duration(days: 1))
         ..transactionType = 'expense'
         ..category = 'Entertainment'
-        ..source = 'card:1';
+        ..cardId = '1'
+        ..accountName = 'Credit Card'
+        ..source = 'demo';
 
       final tx2 = Transaction()
         ..amount = 1200.0
@@ -148,7 +150,9 @@ class DatabaseService {
         ..timestamp = DateTime.now().subtract(const Duration(days: 2))
         ..transactionType = 'expense'
         ..category = 'Food'
-        ..source = 'cash';
+        ..cardId = null
+        ..accountName = 'Cash'
+        ..source = 'demo';
 
       final tx3 = Transaction()
         ..amount = 75000.0
@@ -156,7 +160,9 @@ class DatabaseService {
         ..timestamp = DateTime.now().subtract(const Duration(days: 5))
         ..transactionType = 'income'
         ..category = 'Salary'
-        ..source = 'bank:1';
+        ..cardId = null
+        ..accountName = 'bank:1'
+        ..source = 'demo';
 
       await isar.transactions.putAll([tx1, tx2, tx3]);
 
@@ -217,6 +223,22 @@ class DatabaseService {
           }
         }
       }
+
+      // Adjust bank account balance if transaction is linked to a bank
+      if (transaction.accountName != null && transaction.accountName!.startsWith('bank:') && !transaction.isDeleted) {
+        final bankIdInt = int.tryParse(transaction.accountName!.substring(5));
+        if (bankIdInt != null) {
+          final bank = await isar.bankAccounts.get(bankIdInt);
+          if (bank != null) {
+            if (transaction.transactionType == 'expense' || transaction.transactionType == 'transfer') {
+              bank.balance -= transaction.amount;
+            } else if (transaction.transactionType == 'income') {
+              bank.balance += transaction.amount;
+            }
+            await isar.bankAccounts.put(bank);
+          }
+        }
+      }
     });
     onChanged?.call();
   }
@@ -241,6 +263,22 @@ class DatabaseService {
                 card.balance += transaction.amount;
               }
               await isar.creditCards.put(card);
+            }
+          }
+        }
+
+        if (transaction.accountName != null && transaction.accountName!.startsWith('bank:')) {
+          // Revert bank balance adjustment
+          final bankIdInt = int.tryParse(transaction.accountName!.substring(5));
+          if (bankIdInt != null) {
+            final bank = await isar.bankAccounts.get(bankIdInt);
+            if (bank != null) {
+              if (transaction.transactionType == 'expense' || transaction.transactionType == 'transfer') {
+                bank.balance += transaction.amount;
+              } else if (transaction.transactionType == 'income') {
+                bank.balance -= transaction.amount;
+              }
+              await isar.bankAccounts.put(bank);
             }
           }
         }
@@ -276,6 +314,22 @@ class DatabaseService {
             }
           }
         }
+
+        if (transaction.accountName != null && transaction.accountName!.startsWith('bank:')) {
+          // Re-apply bank balance adjustment
+          final bankIdInt = int.tryParse(transaction.accountName!.substring(5));
+          if (bankIdInt != null) {
+            final bank = await isar.bankAccounts.get(bankIdInt);
+            if (bank != null) {
+              if (transaction.transactionType == 'expense' || transaction.transactionType == 'transfer') {
+                bank.balance -= transaction.amount;
+              } else if (transaction.transactionType == 'income') {
+                bank.balance += transaction.amount;
+              }
+              await isar.bankAccounts.put(bank);
+            }
+          }
+        }
       }
     });
     onChanged?.call();
@@ -291,6 +345,20 @@ class DatabaseService {
   Future<void> clearAllTransactions() async {
     await isar.writeTxn(() async {
       await isar.transactions.clear();
+      
+      // Reset card balances to 0.0 when clearing all transactions
+      final cards = await isar.creditCards.where().findAll();
+      for (var card in cards) {
+        card.balance = 0.0;
+        await isar.creditCards.put(card);
+      }
+
+      // Reset bank account balances to 0.0 when clearing all transactions
+      final banks = await isar.bankAccounts.where().findAll();
+      for (var bank in banks) {
+        bank.balance = 0.0;
+        await isar.bankAccounts.put(bank);
+      }
     });
     onChanged?.call();
   }

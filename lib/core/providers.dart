@@ -12,8 +12,9 @@ import '../features/investments/services/investment_sync_service.dart';
 // --- TRANSACTIONS NOTIFIER ---
 class TransactionsNotifier extends StateNotifier<AsyncValue<List<Transaction>>> {
   final DatabaseService _dbService;
+  final Ref _ref;
 
-  TransactionsNotifier(this._dbService) : super(const AsyncValue.loading()) {
+  TransactionsNotifier(this._dbService, this._ref) : super(const AsyncValue.loading()) {
     loadTransactions();
   }
 
@@ -31,6 +32,10 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<List<Transaction>>> 
     try {
       await _dbService.saveTransaction(transaction);
       await loadTransactions();
+      // Reload dependent providers to update Net Worth instantly
+      _ref.read(creditCardsProvider.notifier).loadCreditCards();
+      _ref.read(bankAccountsProvider.notifier).loadBankAccounts();
+      _ref.read(loansProvider.notifier).loadLoans();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -40,6 +45,10 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<List<Transaction>>> 
     try {
       await _dbService.deleteTransaction(id);
       await loadTransactions();
+      // Reload dependent providers to update Net Worth instantly
+      _ref.read(creditCardsProvider.notifier).loadCreditCards();
+      _ref.read(bankAccountsProvider.notifier).loadBankAccounts();
+      _ref.read(loansProvider.notifier).loadLoans();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -48,7 +57,7 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<List<Transaction>>> 
 
 final transactionsProvider = StateNotifierProvider<TransactionsNotifier, AsyncValue<List<Transaction>>>((ref) {
   final dbService = ref.watch(databaseServiceProvider);
-  return TransactionsNotifier(dbService);
+  return TransactionsNotifier(dbService, ref);
 });
 
 // --- CREDIT CARDS NOTIFIER ---
