@@ -1940,17 +1940,56 @@ class DashboardView extends ConsumerWidget {
                             activeColor: AppColors.neonEmerald,
                             contentPadding: EdgeInsets.zero,
                             onChanged: (val) {
-                              if (val != null) setState(() => isPayback = val);
+                              if (val != null) {
+                                setState(() {
+                                  isPayback = val;
+                                  if (val && paybackContactController.text.isEmpty) {
+                                    paybackContactController.text = descController.text.trim();
+                                  }
+                                });
+                              }
                             },
                           ),
                           if (isPayback) ...[
                             const SizedBox(height: 8),
-                            TextField(
-                              controller: paybackContactController,
-                              decoration: const InputDecoration(
-                                labelText: 'Contact / Friend Name',
-                                border: OutlineInputBorder(),
-                              ),
+                            Autocomplete<String>(
+                              optionsBuilder: (TextEditingValue textEditingValue) {
+                                final borrowedContacts = loansState.maybeWhen(
+                                  data: (allLoans) => allLoans
+                                      .where((l) => !l.isLent && l.remainingBalance > 0)
+                                      .map((l) => l.contactName)
+                                      .toSet()
+                                      .toList(),
+                                  orElse: () => <String>[],
+                                );
+                                if (textEditingValue.text.isEmpty) {
+                                  return borrowedContacts;
+                                }
+                                return borrowedContacts.where((String option) {
+                                  return option
+                                      .toLowerCase()
+                                      .contains(textEditingValue.text.toLowerCase());
+                                });
+                              },
+                              onSelected: (String selection) {
+                                paybackContactController.text = selection;
+                              },
+                              fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                                if (textEditingController.text != paybackContactController.text) {
+                                  textEditingController.text = paybackContactController.text;
+                                }
+                                textEditingController.addListener(() {
+                                  paybackContactController.text = textEditingController.text;
+                                });
+                                return TextField(
+                                  controller: textEditingController,
+                                  focusNode: focusNode,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Contact / Friend Name',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(height: 12),
                             Row(
@@ -2341,17 +2380,29 @@ class DashboardView extends ConsumerWidget {
                                 if (selectedType == 'income' && isPayback) {
                                   final contact = paybackContactController.text.trim();
                                   if (contact.isNotEmpty) {
-                                    final loan = Loan()
-                                      ..contactName = contact
-                                      ..isLent = false // borrowed debt
-                                      ..amount = amount
-                                      ..remainingBalance = amount
-                                      ..startDate = DateTime.now()
-                                      ..paybackDate = paybackDate
-                                      ..interestRate = 0.0
-                                      ..compoundInterval = 'none'
-                                      ..emiAmount = 0.0;
-                                    ref.read(loansProvider.notifier).addLoan(loan);
+                                    loansState.whenData((allLoans) async {
+                                      try {
+                                        final existing = allLoans.firstWhere(
+                                          (l) => !l.isLent && l.remainingBalance > 0 && l.contactName.trim().toLowerCase() == contact.toLowerCase(),
+                                        );
+                                        existing.amount += amount;
+                                        existing.remainingBalance += amount;
+                                        existing.paybackDate = paybackDate;
+                                        await ref.read(loansProvider.notifier).addLoan(existing);
+                                      } catch (_) {
+                                        final loan = Loan()
+                                          ..contactName = contact
+                                          ..isLent = false // borrowed debt
+                                          ..amount = amount
+                                          ..remainingBalance = amount
+                                          ..startDate = DateTime.now()
+                                          ..paybackDate = paybackDate
+                                          ..interestRate = 0.0
+                                          ..compoundInterval = 'none'
+                                          ..emiAmount = 0.0;
+                                        await ref.read(loansProvider.notifier).addLoan(loan);
+                                      }
+                                    });
                                   }
                                 }
 
@@ -5542,6 +5593,29 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                 const Divider(height: 1, color: AppColors.glassBorder),
                 ListTile(
                   title: const Text(
+                    'Reset Sync History',
+                    style: TextStyle(fontSize: 14, color: Colors.orangeAccent),
+                  ),
+                  subtitle: const Text(
+                    'Resets sync timestamps and erases records of skipped/ignored messages to trigger a clean re-scan.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.history_toggle_off_rounded,
+                    size: 20,
+                    color: Colors.orangeAccent,
+                  ),
+                  onTap: () => _showClearDataConfirmDialog(
+                    context,
+                    type: 'sync_history',
+                  ),
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
+                  title: const Text(
                     'Clear All Data',
                     style: TextStyle(fontSize: 14, color: Colors.redAccent),
                   ),
@@ -6721,6 +6795,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       title = 'Clear All Debts & Loans';
       warning =
           'This will permanently delete all active loans and debtor/creditor ledgers. Your cards and bank accounts will remain intact.';
+    } else if (type == 'sync_history') {
+      title = 'Reset Sync History';
+      warning =
+          'This will clear all records of skipped/ignored messages and delete the last sync timestamps for all accounts. The next sync will perform a complete scan from the beginning.';
     }
 
     showDialog(
@@ -6843,7 +6921,24 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                         );
                                     if (authenticated) {
                                       // Clear DB based on type
-                                      if (type == 'transactions') {
+                                      if (type == 'sync_history') {
+                                        final prefs = await SharedPreferences.getInstance();
+                                        await prefs.remove('skipped_sms_messages');
+
+                                        await _storage.delete(key: 'last_sms_sync_time');
+                                        await _storage.delete(key: 'last_email_sync_time');
+                                        final accounts = await ref.read(googleSyncServiceProvider).getLinkedAccounts();
+                                        for (var acc in accounts) {
+                                          await _storage.delete(key: 'last_gmail_sync_time_${acc.email}');
+                                        }
+
+                                        messenger.showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Sync history and skipped messages cleared successfully!'),
+                                            backgroundColor: AppColors.neonEmerald,
+                                          ),
+                                        );
+                                      } else if (type == 'transactions') {
                                         await ref
                                             .read(databaseServiceProvider)
                                             .clearAllTransactions();
@@ -8258,17 +8353,56 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             activeColor: AppColors.neonEmerald,
                             contentPadding: EdgeInsets.zero,
                             onChanged: (val) {
-                              if (val != null) setState(() => isPayback = val);
+                              if (val != null) {
+                                setState(() {
+                                  isPayback = val;
+                                  if (val && paybackContactController.text.isEmpty) {
+                                    paybackContactController.text = merchantController.text.trim();
+                                  }
+                                });
+                              }
                             },
                           ),
                           if (isPayback) ...[
                             const SizedBox(height: 8),
-                            TextField(
-                              controller: paybackContactController,
-                              decoration: const InputDecoration(
-                                labelText: 'Contact / Friend Name',
-                                border: OutlineInputBorder(),
-                              ),
+                            Autocomplete<String>(
+                              optionsBuilder: (TextEditingValue textEditingValue) {
+                                final borrowedContacts = loansState.maybeWhen(
+                                  data: (allLoans) => allLoans
+                                      .where((l) => !l.isLent && l.remainingBalance > 0)
+                                      .map((l) => l.contactName)
+                                      .toSet()
+                                      .toList(),
+                                  orElse: () => <String>[],
+                                );
+                                if (textEditingValue.text.isEmpty) {
+                                  return borrowedContacts;
+                                }
+                                return borrowedContacts.where((String option) {
+                                  return option
+                                      .toLowerCase()
+                                      .contains(textEditingValue.text.toLowerCase());
+                                });
+                              },
+                              onSelected: (String selection) {
+                                paybackContactController.text = selection;
+                              },
+                              fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                                if (textEditingController.text != paybackContactController.text) {
+                                  textEditingController.text = paybackContactController.text;
+                                }
+                                textEditingController.addListener(() {
+                                  paybackContactController.text = textEditingController.text;
+                                });
+                                return TextField(
+                                  controller: textEditingController,
+                                  focusNode: focusNode,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Contact / Friend Name',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(height: 12),
                             Row(
@@ -8425,17 +8559,30 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     if (selectedType == 'income' && isPayback) {
                                       final contact = paybackContactController.text.trim();
                                       if (contact.isNotEmpty) {
-                                        final loan = Loan()
-                                          ..contactName = contact
-                                          ..isLent = false // borrowed debt
-                                          ..amount = amt
-                                          ..remainingBalance = amt
-                                          ..startDate = DateTime.now()
-                                          ..paybackDate = paybackDate
-                                          ..interestRate = 0.0
-                                          ..compoundInterval = 'none'
-                                          ..emiAmount = 0.0;
-                                        await ref.read(loansProvider.notifier).addLoan(loan);
+                                        final loansState = ref.read(loansProvider);
+                                        loansState.whenData((allLoans) async {
+                                          try {
+                                            final existing = allLoans.firstWhere(
+                                              (l) => !l.isLent && l.remainingBalance > 0 && l.contactName.trim().toLowerCase() == contact.toLowerCase(),
+                                            );
+                                            existing.amount += amt;
+                                            existing.remainingBalance += amt;
+                                            existing.paybackDate = paybackDate;
+                                            await ref.read(loansProvider.notifier).addLoan(existing);
+                                          } catch (_) {
+                                            final loan = Loan()
+                                              ..contactName = contact
+                                              ..isLent = false // borrowed debt
+                                              ..amount = amt
+                                              ..remainingBalance = amt
+                                              ..startDate = DateTime.now()
+                                              ..paybackDate = paybackDate
+                                              ..interestRate = 0.0
+                                              ..compoundInterval = 'none'
+                                              ..emiAmount = 0.0;
+                                            await ref.read(loansProvider.notifier).addLoan(loan);
+                                          }
+                                        });
                                       }
                                     }
 

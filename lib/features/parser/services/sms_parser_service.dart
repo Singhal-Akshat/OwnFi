@@ -358,7 +358,7 @@ $cardListText$bankListText
 Fields required in the JSON:
 - "amount": numeric value of the transaction
 - "transactionType": "expense", "income", or "transfer" (use "transfer" if the SMS indicates a transfer between own accounts/self-transfer, sending money to a contact/person, or a payment/deposit credited to a credit card to pay its bill).
-- "merchant": the name of the store, person, or beneficiary. Note: The user of this app is "Akshat Singhal" (so any transfer sent to "Akshat Singhal" is a self-transfer to himself). For self-transfers (where transactionType is "transfer" and the beneficiary is "Akshat Singhal" or yourself), the merchant MUST be the destination bank account (e.g. if sent from HDFC Bank, the merchant should be "SBI Account" or "SBI Bank", and vice versa). Do NOT return "Akshat Singhal" as the merchant for self-transfers.
+- "merchant": the name of the store, person, or beneficiary. Note: The user of this app is "Akshat Singhal" (so any transfer sent to "Akshat Singhal" is a self-transfer to himself). For self-transfers (where transactionType is "transfer" and the beneficiary is "Akshat Singhal" or yourself), the merchant MUST be the destination bank account (e.g. if sent from HDFC Bank, the merchant should be "SBI Account" or "SBI Bank", and vice versa). Do NOT return "Akshat Singhal" as the merchant for self-transfers. For any merchant name that is a UPI VPA/ID or email-style address (containing @, e.g. "anshikajain0203@okaxis" or "merchant@upi"), you MUST clean it to be just the name before the @ symbol, and strip any numbers, punctuation, or spaces (e.g. "anshikajain0203@okaxis" should be cleaned to "Anshikajain" or "Anshika Jain").
 - "category": choose from these based on transactionType:
   * For "expense": choose from (${expenseCats.join(', ')})
   * For "income": choose from (${incomeCats.join(', ')})
@@ -470,7 +470,7 @@ SMS: "$sms"
   String _extractMerchant(String body) {
     // Look for merchant keywords: "at <merchant>", "to <merchant>", "info: <merchant>", "vpa <merchant>"
     // Case 1: HDFC/ICICI "at [Merchant] on" or "at [Merchant] Ref"
-    var match = RegExp(r'(?:at|to|vpa)\s+([A-Za-z0-9\- \.\@]+?)(?:\s+on|\s+ref|\s+bal|\s+limit|\s+via|\.|$)', caseSensitive: false).firstMatch(body);
+    var match = RegExp(r'(?:at|to|vpa|from\s+vpa|from)\s+([A-Za-z0-9\- \.\@]+?)(?:\s+on|\s+ref|\s+bal|\s+limit|\s+via|\.|$)', caseSensitive: false).firstMatch(body);
     if (match != null) {
       final m = match.group(1)!.trim();
       if (m.isNotEmpty && m.length < 30) {

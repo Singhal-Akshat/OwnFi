@@ -215,10 +215,13 @@ class SmsSyncService {
       customEnd = DateTime.parse(customEndStr);
     }
 
+    final allowDuplicatesStr = await _storage.read(key: 'settings_sms_sync_allow_duplicates') ?? 'false';
+    final bool allowDuplicates = allowDuplicatesStr == 'true';
+
     DateTime? lastSyncTime;
     if (customStart == null || customEnd == null) {
       final lastSyncStr = await _storage.read(key: 'last_sms_sync_time');
-      if (lastSyncStr != null) {
+      if (lastSyncStr != null && !allowDuplicates) {
         lastSyncTime = DateTime.parse(lastSyncStr);
       } else {
         final lookbackValueStr = await _storage.read(key: 'settings_sms_lookback_value');
@@ -248,8 +251,7 @@ class SmsSyncService {
     newMessages.sort((a, b) => (b.date ?? DateTime.now()).compareTo(a.date ?? DateTime.now()));
     await _parser.logDebug('Filtered to ${newMessages.length} new messages after date check.');
 
-    final allowDuplicatesStr = await _storage.read(key: 'settings_sms_sync_allow_duplicates') ?? 'false';
-    final bool allowDuplicates = allowDuplicatesStr == 'true';
+
 
     List<Map<String, dynamic>> results = [];
     final isar = _dbService.isar;
