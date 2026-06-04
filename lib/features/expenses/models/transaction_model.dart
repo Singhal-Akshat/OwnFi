@@ -16,7 +16,8 @@ class Transaction {
   String category = '';
   String source = 'manual'; // manual, sms, imap
 
-  String? cardId; // Reference to CreditCard's ID (stored as string or parsed number)
+  String?
+  cardId; // Reference to CreditCard's ID (stored as string or parsed number)
   String? accountName; // Cash, Bank, etc.
 
   bool isSplit = false;
@@ -24,6 +25,10 @@ class Transaction {
 
   bool isDeleted = false;
   DateTime? deletedAt;
+
+  String? parserSource; // e.g., 'gemini', 'gemma', 'regex'
+  String? aiComparisonNotes; // A/B testing comparison
+  String? rawMessage; // Store original SMS or Email body
 }
 
 @embedded

@@ -282,6 +282,36 @@ class _MainNavigationShellState extends State<MainNavigationShell>
 class DashboardView extends ConsumerWidget {
   const DashboardView({super.key});
 
+  static IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Food': return Icons.fastfood_rounded;
+      case 'Shopping': return Icons.shopping_bag_rounded;
+      case 'Bills': return Icons.receipt_long_rounded;
+      case 'Entertainment': return Icons.movie_rounded;
+      case 'Travel': return Icons.directions_car_rounded;
+      case 'Salary': return Icons.wallet_rounded;
+      case 'Investment': return Icons.trending_up_rounded;
+      case 'Health': return Icons.health_and_safety_rounded;
+      case 'Education': return Icons.school_rounded;
+      default: return Icons.category_rounded;
+    }
+  }
+
+  static Color _getCategoryColor(String category, Color defaultColor) {
+    switch (category) {
+      case 'Food': return Colors.orangeAccent;
+      case 'Shopping': return Colors.pinkAccent;
+      case 'Bills': return AppColors.neonTeal;
+      case 'Entertainment': return AppColors.neonPurple;
+      case 'Travel': return Colors.blueAccent;
+      case 'Salary': return AppColors.neonEmerald;
+      case 'Investment': return Colors.amberAccent;
+      case 'Health': return Colors.redAccent;
+      case 'Education': return Colors.indigoAccent;
+      default: return defaultColor;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final txsState = ref.watch(transactionsProvider);
@@ -611,17 +641,105 @@ class DashboardView extends ConsumerWidget {
                               existingTransaction: tx,
                             ),
                             leading: Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: iconColor.withOpacity(0.1),
-                                shape: BoxShape.circle,
+                                color: _getCategoryColor(tx.category, iconColor).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(
-                                tx.transactionType == 'income'
-                                    ? Icons.arrow_downward
-                                    : Icons.arrow_upward,
-                                color: iconColor,
-                                size: 20,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _getCategoryIcon(tx.category),
+                                    color: _getCategoryColor(tx.category, iconColor),
+                                    size: 16,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  () {
+                                    Widget accountIcon = Icon(
+                                      tx.cardId != null
+                                          ? Icons.credit_card_rounded
+                                          : (tx.accountName != null &&
+                                                  (tx.accountName!.startsWith('bank:') ||
+                                                      tx.accountName == 'Bank')
+                                              ? Icons.account_balance_rounded
+                                              : Icons.wallet_rounded),
+                                      color: tx.cardId != null
+                                          ? Colors.white70
+                                          : (tx.accountName != null &&
+                                                  (tx.accountName!.startsWith('bank:') ||
+                                                      tx.accountName == 'Bank')
+                                              ? Colors.white70
+                                              : AppColors.neonEmerald),
+                                      size: 16,
+                                    );
+                                    if (tx.cardId != null) {
+                                      final cardId = int.tryParse(tx.cardId!);
+                                      final card = cardsState.valueOrNull?.firstWhere(
+                                        (c) => c.id == cardId,
+                                        orElse: () => CreditCard(),
+                                      );
+                                      if (card != null && card.imageUrl.isNotEmpty) {
+                                        accountIcon = ClipRRect(
+                                          borderRadius: BorderRadius.circular(3),
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 14,
+                                            child: card.imageUrl
+                                                    .toLowerCase()
+                                                    .endsWith('.svg')
+                                                ? SvgPicture.asset(
+                                                    'assets/credit_card_images/${card.imageUrl}',
+                                                    fit: BoxFit.fill,
+                                                  )
+                                                : Image.asset(
+                                                    'assets/credit_card_images/${card.imageUrl}',
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                          ),
+                                        );
+                                      } else {
+                                        accountIcon = Container(
+                                          width: 20,
+                                          height: 14,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey,
+                                            borderRadius: BorderRadius.circular(3),
+                                          ),
+                                          child: const Icon(
+                                            Icons.credit_card_rounded,
+                                            color: Colors.white,
+                                            size: 10,
+                                          ),
+                                        );
+                                      }
+                                    } else if (tx.accountName != null &&
+                                        tx.accountName!.startsWith('bank:')) {
+                                      final bankId = int.tryParse(
+                                        tx.accountName!.substring(5),
+                                      );
+                                      final bank = bankAccountsState.valueOrNull?.firstWhere(
+                                        (b) => b.id == bankId,
+                                        orElse: () => BankAccount(),
+                                      );
+                                      if (bank != null && bank.logoAsset.isNotEmpty) {
+                                        accountIcon = SvgPicture.asset(
+                                          'assets/bank_logos/${bank.logoAsset}',
+                                          width: 18,
+                                          height: 18,
+                                        );
+                                      } else {
+                                        accountIcon = const Icon(
+                                          Icons.account_balance_rounded,
+                                          color: Colors.white70,
+                                          size: 18,
+                                        );
+                                      }
+                                    }
+                                    return accountIcon;
+                                  }(),
+                                ],
                               ),
                             ),
                             title: Text(
@@ -654,12 +772,37 @@ class DashboardView extends ConsumerWidget {
                                   accountDisplayName = tx.accountName!;
                                 }
                               }
-                              return Text(
-                                '${tx.category} • $accountDisplayName • $dateStr',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${tx.category} • $accountDisplayName • $dateStr',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  if (tx.source != 'manual' || tx.parserSource != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4.0),
+                                      child: Row(
+                                        children: [
+                                          if (tx.source == 'sms') const Text('📱 SMS', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                          if (tx.source == 'email') const Text('📧 Email', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                          if (tx.source != 'manual' && tx.parserSource != null) const Text(' • ', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                          if (tx.parserSource != null)
+                                            Text(
+                                              tx.parserSource == 'gemini' ? '✨ Gemini' : (tx.parserSource == 'gemma' ? '🧠 Gemma' : '⚙️ Regex'),
+                                              style: TextStyle(
+                                                fontSize: 10, 
+                                                color: tx.parserSource == 'gemini' ? AppColors.neonPurple : (tx.parserSource == 'gemma' ? AppColors.neonTeal : AppColors.textMuted),
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
                               );
                             }(),
                             trailing: Text(
@@ -1909,6 +2052,64 @@ class DashboardView extends ConsumerWidget {
                                 ),
                               ),
                             ],
+                          ),
+                        ],
+                        if (existingTransaction?.aiComparisonNotes != null &&
+                            existingTransaction!.aiComparisonNotes!.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.neonPurple.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.neonPurple.withOpacity(0.3)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: const [
+                                    Icon(Icons.science_rounded, size: 16, color: AppColors.neonPurple),
+                                    SizedBox(width: 8),
+                                    Text('AI Parser Comparison', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.neonPurple)),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  existingTransaction!.aiComparisonNotes!,
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (existingTransaction?.rawMessage != null &&
+                            existingTransaction!.rawMessage!.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.neonTeal.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.neonTeal.withOpacity(0.3)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(existingTransaction!.source == 'email' ? Icons.email_rounded : Icons.sms_rounded, size: 16, color: AppColors.neonTeal),
+                                    const SizedBox(width: 8),
+                                    Text(existingTransaction!.source == 'email' ? 'Original Email' : 'Original SMS', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.neonTeal)),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  existingTransaction!.rawMessage!,
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                         const SizedBox(height: 24),

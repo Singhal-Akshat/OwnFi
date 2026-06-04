@@ -77,6 +77,13 @@ class EmailSyncService {
       'BODY.PEEK[]', // Fetch full email body and attachments
     );
 
+    // Pre-validate Gemini key for bulk
+    final apiKey = await _storage.read(key: 'ai_gemini_key');
+    if (apiKey == null || apiKey.isEmpty) {
+      await client.logout();
+      throw Exception('Gemini API Key missing! Please configure it in AI Advisor settings before performing an email sync.');
+    }
+
     int count = 0;
     final isar = _dbService.isar;
     final cards = await _dbService.getAllCreditCards();
@@ -88,7 +95,7 @@ class EmailSyncService {
 
       // Case 1: Detect transaction alert emails
       if (_isTransactionSubject(subject) || _isTransactionBody(bodyText)) {
-        final parsed = _parser.parse(bodyText);
+        final parsed = await _parser.parseAsync(bodyText, isBulk: true);
         if (parsed != null) {
           await isar.writeTxn(() async {
             // Deduplicate
@@ -125,7 +132,10 @@ class EmailSyncService {
                 ..transactionType = parsed.transactionType
                 ..source = 'email'
                 ..cardId = cardId
-                ..accountName = accountName;
+                ..accountName = accountName
+                ..parserSource = parsed.parserSource
+                ..aiComparisonNotes = parsed.aiComparisonNotes
+                ..rawMessage = bodyText;
 
               await isar.transactions.put(tx);
               count++;

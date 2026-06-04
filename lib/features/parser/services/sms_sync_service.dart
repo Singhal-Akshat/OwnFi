@@ -111,13 +111,28 @@ class SmsSyncService {
     // Load credit cards to match last4 digits
     final cards = await _dbService.getAllCreditCards();
 
-    // 5. Process and insert transactions
-    await isar.writeTxn(() async {
-      for (final msg in newMessages) {
-        final parsed = _parser.parse(msg.body!);
-        if (parsed == null) continue;
+    // Pre-validate Gemini key for bulk
+    final apiKey = await _storage.read(key: 'ai_gemini_key');
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('Gemini API Key missing! Please configure it in AI Advisor settings before performing a bulk sync.');
+    }
 
+    // 5. Pre-parse all messages via API before opening a DB transaction
+    List<MapEntry<SmsMessage, ParsedSmsTransaction>> parsedMessages = [];
+    for (final msg in newMessages) {
+      if (msg.body == null) continue;
+      final parsed = await _parser.parseAsync(msg.body!, isBulk: true);
+      if (parsed != null) {
+        parsedMessages.add(MapEntry(msg, parsed));
+      }
+    }
+
+    // 6. Process and insert transactions
+    await isar.writeTxn(() async {
+      for (final entry in parsedMessages) {
+        final msg = entry.key;
         final txDate = msg.date ?? DateTime.now();
+        final parsed = entry.value;
 
         // Idempotency check: verify this transaction doesn't already exist
         final existing = await isar.transactions
@@ -161,7 +176,10 @@ class SmsSyncService {
           ..transactionType = parsed.transactionType
           ..source = 'sms'
           ..cardId = matchedCardId
-          ..accountName = accountName;
+          ..accountName = accountName
+          ..parserSource = parsed.parserSource
+          ..aiComparisonNotes = parsed.aiComparisonNotes
+          ..rawMessage = msg.body;
 
         await isar.transactions.put(tx);
         importedCount++;

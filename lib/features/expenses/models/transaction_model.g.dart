@@ -22,59 +22,74 @@ const TransactionSchema = CollectionSchema(
       name: r'accountName',
       type: IsarType.string,
     ),
-    r'amount': PropertySchema(
+    r'aiComparisonNotes': PropertySchema(
       id: 1,
+      name: r'aiComparisonNotes',
+      type: IsarType.string,
+    ),
+    r'amount': PropertySchema(
+      id: 2,
       name: r'amount',
       type: IsarType.double,
     ),
     r'cardId': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'cardId',
       type: IsarType.string,
     ),
     r'category': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'category',
       type: IsarType.string,
     ),
     r'deletedAt': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'deletedAt',
       type: IsarType.dateTime,
     ),
     r'description': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'description',
       type: IsarType.string,
     ),
     r'isDeleted': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'isDeleted',
       type: IsarType.bool,
     ),
     r'isSplit': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'isSplit',
       type: IsarType.bool,
     ),
+    r'parserSource': PropertySchema(
+      id: 9,
+      name: r'parserSource',
+      type: IsarType.string,
+    ),
+    r'rawMessage': PropertySchema(
+      id: 10,
+      name: r'rawMessage',
+      type: IsarType.string,
+    ),
     r'source': PropertySchema(
-      id: 8,
+      id: 11,
       name: r'source',
       type: IsarType.string,
     ),
     r'splitDetails': PropertySchema(
-      id: 9,
+      id: 12,
       name: r'splitDetails',
       type: IsarType.objectList,
       target: r'TransactionSplitDetail',
     ),
     r'timestamp': PropertySchema(
-      id: 10,
+      id: 13,
       name: r'timestamp',
       type: IsarType.dateTime,
     ),
     r'transactionType': PropertySchema(
-      id: 11,
+      id: 14,
       name: r'transactionType',
       type: IsarType.string,
     )
@@ -106,6 +121,12 @@ int _transactionEstimateSize(
     }
   }
   {
+    final value = object.aiComparisonNotes;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.cardId;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -113,6 +134,18 @@ int _transactionEstimateSize(
   }
   bytesCount += 3 + object.category.length * 3;
   bytesCount += 3 + object.description.length * 3;
+  {
+    final value = object.parserSource;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.rawMessage;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.source.length * 3;
   bytesCount += 3 + object.splitDetails.length * 3;
   {
@@ -134,22 +167,25 @@ void _transactionSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.accountName);
-  writer.writeDouble(offsets[1], object.amount);
-  writer.writeString(offsets[2], object.cardId);
-  writer.writeString(offsets[3], object.category);
-  writer.writeDateTime(offsets[4], object.deletedAt);
-  writer.writeString(offsets[5], object.description);
-  writer.writeBool(offsets[6], object.isDeleted);
-  writer.writeBool(offsets[7], object.isSplit);
-  writer.writeString(offsets[8], object.source);
+  writer.writeString(offsets[1], object.aiComparisonNotes);
+  writer.writeDouble(offsets[2], object.amount);
+  writer.writeString(offsets[3], object.cardId);
+  writer.writeString(offsets[4], object.category);
+  writer.writeDateTime(offsets[5], object.deletedAt);
+  writer.writeString(offsets[6], object.description);
+  writer.writeBool(offsets[7], object.isDeleted);
+  writer.writeBool(offsets[8], object.isSplit);
+  writer.writeString(offsets[9], object.parserSource);
+  writer.writeString(offsets[10], object.rawMessage);
+  writer.writeString(offsets[11], object.source);
   writer.writeObjectList<TransactionSplitDetail>(
-    offsets[9],
+    offsets[12],
     allOffsets,
     TransactionSplitDetailSchema.serialize,
     object.splitDetails,
   );
-  writer.writeDateTime(offsets[10], object.timestamp);
-  writer.writeString(offsets[11], object.transactionType);
+  writer.writeDateTime(offsets[13], object.timestamp);
+  writer.writeString(offsets[14], object.transactionType);
 }
 
 Transaction _transactionDeserialize(
@@ -160,24 +196,27 @@ Transaction _transactionDeserialize(
 ) {
   final object = Transaction();
   object.accountName = reader.readStringOrNull(offsets[0]);
-  object.amount = reader.readDouble(offsets[1]);
-  object.cardId = reader.readStringOrNull(offsets[2]);
-  object.category = reader.readString(offsets[3]);
-  object.deletedAt = reader.readDateTimeOrNull(offsets[4]);
-  object.description = reader.readString(offsets[5]);
+  object.aiComparisonNotes = reader.readStringOrNull(offsets[1]);
+  object.amount = reader.readDouble(offsets[2]);
+  object.cardId = reader.readStringOrNull(offsets[3]);
+  object.category = reader.readString(offsets[4]);
+  object.deletedAt = reader.readDateTimeOrNull(offsets[5]);
+  object.description = reader.readString(offsets[6]);
   object.id = id;
-  object.isDeleted = reader.readBool(offsets[6]);
-  object.isSplit = reader.readBool(offsets[7]);
-  object.source = reader.readString(offsets[8]);
+  object.isDeleted = reader.readBool(offsets[7]);
+  object.isSplit = reader.readBool(offsets[8]);
+  object.parserSource = reader.readStringOrNull(offsets[9]);
+  object.rawMessage = reader.readStringOrNull(offsets[10]);
+  object.source = reader.readString(offsets[11]);
   object.splitDetails = reader.readObjectList<TransactionSplitDetail>(
-        offsets[9],
+        offsets[12],
         TransactionSplitDetailSchema.deserialize,
         allOffsets,
         TransactionSplitDetail(),
       ) ??
       [];
-  object.timestamp = reader.readDateTime(offsets[10]);
-  object.transactionType = reader.readString(offsets[11]);
+  object.timestamp = reader.readDateTime(offsets[13]);
+  object.transactionType = reader.readString(offsets[14]);
   return object;
 }
 
@@ -191,22 +230,28 @@ P _transactionDeserializeProp<P>(
     case 0:
       return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readDouble(offset)) as P;
-    case 2:
       return (reader.readStringOrNull(offset)) as P;
+    case 2:
+      return (reader.readDouble(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 4:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 5:
       return (reader.readString(offset)) as P;
+    case 5:
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 6:
-      return (reader.readBool(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 7:
       return (reader.readBool(offset)) as P;
     case 8:
-      return (reader.readString(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
+      return (reader.readStringOrNull(offset)) as P;
+    case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
       return (reader.readObjectList<TransactionSplitDetail>(
             offset,
             TransactionSplitDetailSchema.deserialize,
@@ -214,9 +259,9 @@ P _transactionDeserializeProp<P>(
             TransactionSplitDetail(),
           ) ??
           []) as P;
-    case 10:
+    case 13:
       return (reader.readDateTime(offset)) as P;
-    case 11:
+    case 14:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -465,6 +510,160 @@ extension TransactionQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'accountName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'aiComparisonNotes',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'aiComparisonNotes',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'aiComparisonNotes',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'aiComparisonNotes',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'aiComparisonNotes',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'aiComparisonNotes',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'aiComparisonNotes',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'aiComparisonNotes',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'aiComparisonNotes',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'aiComparisonNotes',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'aiComparisonNotes',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      aiComparisonNotesIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'aiComparisonNotes',
         value: '',
       ));
     });
@@ -1102,6 +1301,314 @@ extension TransactionQueryFilter
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'parserSource',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'parserSource',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'parserSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'parserSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'parserSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'parserSource',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'parserSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'parserSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'parserSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'parserSource',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'parserSource',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      parserSourceIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'parserSource',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'rawMessage',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'rawMessage',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'rawMessage',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'rawMessage',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'rawMessage',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'rawMessage',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'rawMessage',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'rawMessage',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'rawMessage',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'rawMessage',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'rawMessage',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      rawMessageIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'rawMessage',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterFilterCondition> sourceEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -1545,6 +2052,20 @@ extension TransactionQuerySortBy
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterSortBy>
+      sortByAiComparisonNotes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiComparisonNotes', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy>
+      sortByAiComparisonNotesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiComparisonNotes', Sort.desc);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'amount', Sort.asc);
@@ -1629,6 +2150,31 @@ extension TransactionQuerySortBy
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByParserSource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'parserSource', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy>
+      sortByParserSourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'parserSource', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByRawMessage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rawMessage', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByRawMessageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rawMessage', Sort.desc);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterSortBy> sortBySource() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'source', Sort.asc);
@@ -1678,6 +2224,20 @@ extension TransactionQuerySortThenBy
   QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByAccountNameDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'accountName', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy>
+      thenByAiComparisonNotes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiComparisonNotes', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy>
+      thenByAiComparisonNotesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiComparisonNotes', Sort.desc);
     });
   }
 
@@ -1777,6 +2337,31 @@ extension TransactionQuerySortThenBy
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByParserSource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'parserSource', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy>
+      thenByParserSourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'parserSource', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByRawMessage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rawMessage', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByRawMessageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rawMessage', Sort.desc);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterSortBy> thenBySource() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'source', Sort.asc);
@@ -1821,6 +2406,14 @@ extension TransactionQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'accountName', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QDistinct> distinctByAiComparisonNotes(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'aiComparisonNotes',
+          caseSensitive: caseSensitive);
     });
   }
 
@@ -1869,6 +2462,20 @@ extension TransactionQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QDistinct> distinctByParserSource(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'parserSource', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QDistinct> distinctByRawMessage(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'rawMessage', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QDistinct> distinctBySource(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1902,6 +2509,13 @@ extension TransactionQueryProperty
   QueryBuilder<Transaction, String?, QQueryOperations> accountNameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'accountName');
+    });
+  }
+
+  QueryBuilder<Transaction, String?, QQueryOperations>
+      aiComparisonNotesProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'aiComparisonNotes');
     });
   }
 
@@ -1944,6 +2558,18 @@ extension TransactionQueryProperty
   QueryBuilder<Transaction, bool, QQueryOperations> isSplitProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isSplit');
+    });
+  }
+
+  QueryBuilder<Transaction, String?, QQueryOperations> parserSourceProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'parserSource');
+    });
+  }
+
+  QueryBuilder<Transaction, String?, QQueryOperations> rawMessageProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'rawMessage');
     });
   }
 

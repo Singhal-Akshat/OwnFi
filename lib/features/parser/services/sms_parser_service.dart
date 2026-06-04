@@ -1,3 +1,11 @@
+import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../services/model_repository.dart';
+import 'dart:io';
+
 class ParsedSmsTransaction {
   final double amount;
   final String description;
@@ -6,6 +14,8 @@ class ParsedSmsTransaction {
   final String? cardLast4;
   final String? accountLast4;
   final String merchant;
+  final String? parserSource;
+  final String? aiComparisonNotes;
 
   ParsedSmsTransaction({
     required this.amount,
@@ -15,26 +25,199 @@ class ParsedSmsTransaction {
     this.cardLast4,
     this.accountLast4,
     required this.merchant,
+    this.parserSource,
+    this.aiComparisonNotes,
   });
 
   @override
   String toString() {
-    return 'ParsedSmsTransaction(amount: $amount, desc: $description, type: $transactionType, cat: $category, card: $cardLast4, acct: $accountLast4, merchant: $merchant)';
+    return 'ParsedSmsTransaction(amount: $amount, desc: $description, type: $transactionType, cat: $category, card: $cardLast4, acct: $accountLast4, merchant: $merchant, src: $parserSource)';
   }
 }
 
 class SmsParserService {
+  final _storage = const FlutterSecureStorage();
+
   // Common keywords to identify financial transactions
   static final RegExp _financialKeywords = RegExp(
     r'(debited|spent|charged|withdrawn|sent|paid|credited|received|deposited|added)',
     caseSensitive: false,
   );
 
-  ParsedSmsTransaction? parse(String smsBody) {
+  Future<ParsedSmsTransaction?> parseAsync(String smsBody, {bool isBulk = false}) async {
     final body = smsBody.trim();
     if (!_financialKeywords.hasMatch(body)) {
       return null; // Not a financial transaction SMS
     }
+
+    final regexResult = _parseRegex(body);
+
+    if (isBulk) {
+      final key = await _storage.read(key: 'ai_gemini_key');
+      if (key == null || key.isEmpty) {
+        throw Exception("Gemini API Key missing for Bulk Sync.");
+      }
+      final aiResultStr = await _parseWithGeminiRaw(body, key);
+      final aiResult = _decodeAiJson(aiResultStr);
+      if (aiResult != null) {
+        return ParsedSmsTransaction(
+          amount: aiResult.amount,
+          description: aiResult.description,
+          transactionType: aiResult.transactionType,
+          category: aiResult.category,
+          cardLast4: aiResult.cardLast4 ?? regexResult?.cardLast4,
+          accountLast4: aiResult.accountLast4 ?? regexResult?.accountLast4,
+          merchant: aiResult.merchant,
+          parserSource: 'gemini',
+        );
+      }
+      if (regexResult != null) {
+        return ParsedSmsTransaction(
+          amount: regexResult.amount,
+          description: regexResult.description,
+          transactionType: regexResult.transactionType,
+          category: regexResult.category,
+          cardLast4: regexResult.cardLast4,
+          accountLast4: regexResult.accountLast4,
+          merchant: regexResult.merchant,
+          parserSource: 'regex_fallback',
+        );
+      }
+      return null;
+    } else {
+      final key = await _storage.read(key: 'ai_gemini_key');
+      String? geminiJson;
+      String? gemmaJson;
+
+      if (key != null && key.isNotEmpty) {
+        final results = await Future.wait([
+          _parseWithGeminiRaw(body, key),
+          _parseWithGemmaRaw(body),
+        ]);
+        geminiJson = results[0];
+        gemmaJson = results[1];
+      } else {
+        gemmaJson = await _parseWithGemmaRaw(body);
+      }
+
+      final geminiParsed = _decodeAiJson(geminiJson);
+      final gemmaParsed = _decodeAiJson(gemmaJson);
+
+      String notes = "";
+      if (geminiJson != null) notes += "Gemini: $geminiJson\n";
+      if (gemmaJson != null) notes += "Gemma: $gemmaJson\n";
+
+      final finalBase = geminiParsed ?? gemmaParsed ?? regexResult;
+      if (finalBase == null) return null;
+
+      return ParsedSmsTransaction(
+        amount: finalBase.amount,
+        description: finalBase.description,
+        transactionType: finalBase.transactionType,
+        category: finalBase.category,
+        cardLast4: finalBase.cardLast4 ?? regexResult?.cardLast4,
+        accountLast4: finalBase.accountLast4 ?? regexResult?.accountLast4,
+        merchant: finalBase.merchant,
+        parserSource: geminiParsed != null ? 'gemini' : (gemmaParsed != null ? 'gemma' : 'regex'),
+        aiComparisonNotes: notes.trim(),
+      );
+    }
+  }
+
+  ParsedSmsTransaction? _decodeAiJson(String? jsonStr) {
+    if (jsonStr == null || jsonStr.isEmpty) return null;
+    try {
+      final jsonStart = jsonStr.indexOf('{');
+      final jsonEnd = jsonStr.lastIndexOf('}');
+      if (jsonStart == -1 || jsonEnd == -1) return null;
+      final cleanJson = jsonStr.substring(jsonStart, jsonEnd + 1);
+      final map = jsonDecode(cleanJson);
+      
+      final double amt = (map['amount'] is num) ? (map['amount'] as num).toDouble() : double.tryParse(map['amount'].toString()) ?? 0.0;
+      if (amt <= 0) return null;
+
+      final type = map['transactionType']?.toString().toLowerCase() == 'income' ? 'income' : 'expense';
+      final merchant = map['merchant']?.toString() ?? 'Unknown Merchant';
+
+      return ParsedSmsTransaction(
+        amount: amt,
+        description: type == 'income' ? 'Received from $merchant' : 'Spent at $merchant',
+        transactionType: type,
+        category: map['category']?.toString() ?? 'Other',
+        cardLast4: map['cardLast4']?.toString(),
+        accountLast4: map['accountLast4']?.toString(),
+        merchant: merchant,
+      );
+    } catch (e) {
+      print("JSON Decode Error: $e");
+      return null;
+    }
+  }
+
+  Future<String?> _parseWithGeminiRaw(String sms, String apiKey) async {
+    try {
+      final model = GenerativeModel(
+        model: 'gemini-3.1-flash-lite',
+        apiKey: apiKey,
+      );
+      final prompt = _buildParserPrompt(sms);
+      final response = await model.generateContent([Content.text(prompt)]);
+      return response.text;
+    } catch (e) {
+      print("Gemini API Error: $e");
+      return null;
+    }
+  }
+
+  Future<String?> _parseWithGemmaRaw(String sms) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final modelId = prefs.getString('selectedModelId') ?? 'gemma2_turbo_2b';
+      final meta = await ModelRepository.instance.getMeta(modelId);
+      if (meta == null) return null;
+
+      final modelPath = await ModelRepository.instance.localModelPath(meta.assetPath);
+      final file = File(modelPath);
+      if (!await file.exists()) return null;
+
+      if (!FlutterGemma.hasActiveModel()) {
+        await FlutterGemma.installModel(
+          modelType: ModelType.gemmaIt,
+        ).fromFile(modelPath).install();
+      }
+
+      final model = await FlutterGemma.getActiveModel(maxTokens: 512);
+      final session = await model.createSession();
+      final prompt = _buildParserPrompt(sms);
+      await session.addQueryChunk(Message(text: prompt, isUser: true));
+      final response = await session.getResponse();
+      await session.close();
+      return response;
+    } catch (e) {
+      print("Gemma Error: $e");
+      return null;
+    }
+  }
+
+  String _buildParserPrompt(String sms) {
+    return '''
+You are a financial SMS parser. Extract the details of the transaction and output ONLY valid JSON format.
+Do NOT include markdown formatting or backticks. Only output the raw JSON object.
+
+Fields required:
+- "amount": numeric value of the transaction
+- "transactionType": "expense" or "income"
+- "merchant": the name of the store or person
+- "category": choose from (Food, Shopping, Travel, Entertainment, Utilities, Investment, Salary, Other)
+- "cardLast4": last 4 digits of credit card if present, else null
+- "accountLast4": last 4 digits of bank account if present, else null
+
+SMS: "$sms"
+''';
+  }
+
+  ParsedSmsTransaction? _parseRegex(String smsBody) {
+    final body = smsBody.trim();
 
     double? amount;
     String transactionType = 'expense';
@@ -43,7 +226,6 @@ class SmsParserService {
     String merchant = 'Unknown Merchant';
 
     // 1. EXTRACT AMOUNT
-    // Standard patterns: Rs. 100, Rs.100, Rs 100, INR 100, RS 100.00
     final amountReg = RegExp(
       r'(?:rs\.?|inr|rs)\s*([0-9,]+(?:\.[0-9]{2})?)',
       caseSensitive: false,
@@ -55,11 +237,10 @@ class SmsParserService {
     }
 
     if (amount == null || amount <= 0) {
-      return null; // Could not extract valid amount
+      return null; 
     }
 
     // 2. DETECT TRANSACTION TYPE (Income vs Expense)
-    // Credit indicators
     final creditReg = RegExp(
       r'(credited|received|deposited|added|refunded)',
       caseSensitive: false,
@@ -69,7 +250,6 @@ class SmsParserService {
     }
 
     // 3. EXTRACT CREDIT CARD / ACCOUNT DETAILS
-    // Patterns for cards: card ending 1234, card xx1234, card no. 1234
     final cardReg = RegExp(
       r'(?:card|cc)(?:\s+ending|\s+no\.?)?\s+(?:[a-z]*\s*)?([0-9]{4})',
       caseSensitive: false,
@@ -79,7 +259,6 @@ class SmsParserService {
       cardLast4 = cardMatch.group(1);
     }
 
-    // Patterns for accounts: a/c ending 1234, acct xx1234, ac xx9876
     final acctReg = RegExp(
       r'(?:a/c|acct|ac|account|acct\s+no\.?)\s+(?:[a-z\s]*\s*)?[x\*]*([0-9]{4})',
       caseSensitive: false,
