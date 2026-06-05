@@ -1,16 +1,19 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../features/expenses/models/transaction_model.dart';
 import '../features/cards_loans/models/card_loan_models.dart';
 import '../features/investments/models/holding_model.dart';
 
+part 'database_service.g.dart';
+
 // Riverpod provider for the database service
-final databaseServiceProvider = Provider<DatabaseService>(
-  (ref) => DatabaseService(),
-);
+@Riverpod(keepAlive: true)
+DatabaseService databaseService(DatabaseServiceRef ref) {
+  return DatabaseService();
+}
 
 class DatabaseService {
   Isar? _isar;

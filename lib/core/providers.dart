@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'database_service.dart';
 import 'sync_service.dart';
 import '../features/expenses/models/transaction_model.dart';
@@ -9,272 +9,282 @@ import 'package:my_personal_tracker/features/parser/services/email_sync_service.
 import '../features/investments/services/portfolio_parser_service.dart';
 import '../features/investments/services/investment_sync_service.dart';
 
-// --- TRANSACTIONS NOTIFIER ---
-class TransactionsNotifier extends StateNotifier<AsyncValue<List<Transaction>>> {
-  final DatabaseService _dbService;
-  final Ref _ref;
+part 'providers.g.dart';
 
-  TransactionsNotifier(this._dbService, this._ref) : super(const AsyncValue.loading()) {
-    loadTransactions();
+// --- TRANSACTIONS NOTIFIER ---
+@Riverpod(keepAlive: true)
+class Transactions extends _$Transactions {
+  @override
+  FutureOr<List<Transaction>> build() async {
+    final dbService = ref.watch(databaseServiceProvider);
+    return dbService.getAllTransactions();
   }
 
   Future<void> loadTransactions() async {
-    state = const AsyncValue.loading();
-    try {
-      final txs = await _dbService.getAllTransactions();
-      state = AsyncValue.data(txs);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> addTransaction(Transaction transaction) async {
-    try {
-      await _dbService.saveTransaction(transaction);
-      await loadTransactions();
-      // Reload dependent providers to update Net Worth instantly
-      _ref.read(creditCardsProvider.notifier).loadCreditCards();
-      _ref.read(bankAccountsProvider.notifier).loadBankAccounts();
-      _ref.read(loansProvider.notifier).loadLoans();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.saveTransaction(transaction);
+    ref.invalidateSelf();
+    await future;
+    // Invalidate dependent providers to update Net Worth instantly
+    ref.invalidate(creditCardsProvider);
+    ref.invalidate(bankAccountsProvider);
+    ref.invalidate(loansProvider);
   }
 
   Future<void> removeTransaction(int id) async {
-    try {
-      await _dbService.deleteTransaction(id);
-      await loadTransactions();
-      // Reload dependent providers to update Net Worth instantly
-      _ref.read(creditCardsProvider.notifier).loadCreditCards();
-      _ref.read(bankAccountsProvider.notifier).loadBankAccounts();
-      _ref.read(loansProvider.notifier).loadLoans();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.deleteTransaction(id);
+    ref.invalidateSelf();
+    await future;
+    // Invalidate dependent providers to update Net Worth instantly
+    ref.invalidate(creditCardsProvider);
+    ref.invalidate(bankAccountsProvider);
+    ref.invalidate(loansProvider);
   }
 }
 
-final transactionsProvider = StateNotifierProvider<TransactionsNotifier, AsyncValue<List<Transaction>>>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  return TransactionsNotifier(dbService, ref);
-});
-
 // --- CREDIT CARDS NOTIFIER ---
-class CreditCardsNotifier extends StateNotifier<AsyncValue<List<CreditCard>>> {
-  final DatabaseService _dbService;
-
-  CreditCardsNotifier(this._dbService) : super(const AsyncValue.loading()) {
-    loadCreditCards();
+@Riverpod(keepAlive: true)
+class CreditCards extends _$CreditCards {
+  @override
+  FutureOr<List<CreditCard>> build() async {
+    final dbService = ref.watch(databaseServiceProvider);
+    return dbService.getAllCreditCards();
   }
 
   Future<void> loadCreditCards() async {
-    state = const AsyncValue.loading();
-    try {
-      final cards = await _dbService.getAllCreditCards();
-      state = AsyncValue.data(cards);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> addCreditCard(CreditCard card) async {
-    try {
-      await _dbService.saveCreditCard(card);
-      await loadCreditCards();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.saveCreditCard(card);
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> removeCreditCard(int id) async {
-    try {
-      await _dbService.deleteCreditCard(id);
-      await loadCreditCards();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.deleteCreditCard(id);
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> updateCreditCard(CreditCard card) async {
-    try {
-      await _dbService.saveCreditCard(card);
-      await loadCreditCards();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.saveCreditCard(card);
+    ref.invalidateSelf();
+    await future;
   }
 }
 
-final creditCardsProvider = StateNotifierProvider<CreditCardsNotifier, AsyncValue<List<CreditCard>>>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  return CreditCardsNotifier(dbService);
-});
-
 // --- BANK ACCOUNTS NOTIFIER ---
-class BankAccountsNotifier extends StateNotifier<AsyncValue<List<BankAccount>>> {
-  final DatabaseService _dbService;
-
-  BankAccountsNotifier(this._dbService) : super(const AsyncValue.loading()) {
-    loadBankAccounts();
+@Riverpod(keepAlive: true)
+class BankAccounts extends _$BankAccounts {
+  @override
+  FutureOr<List<BankAccount>> build() async {
+    final dbService = ref.watch(databaseServiceProvider);
+    return dbService.getAllBankAccounts();
   }
 
   Future<void> loadBankAccounts() async {
-    print('DEBUG: loadBankAccounts called');
-    try {
-      state = const AsyncValue.loading();
-      final accounts = await _dbService.getAllBankAccounts();
-      for (final acc in accounts) {
-        print('DEBUG: loadBankAccounts - Loaded bank account: ${acc.bankName}, balance: ${acc.balance}');
-      }
-      state = AsyncValue.data(accounts);
-    } catch (e, st) {
-      print('DEBUG: loadBankAccounts - Error: $e');
-      state = AsyncValue.error(e, st);
-    }
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> addBankAccount(BankAccount account) async {
-    try {
-      await _dbService.saveBankAccount(account);
-      await loadBankAccounts();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.saveBankAccount(account);
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> removeBankAccount(int id) async {
-    try {
-      await _dbService.deleteBankAccount(id);
-      await loadBankAccounts();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.deleteBankAccount(id);
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> updateBankAccount(BankAccount account) async {
-    try {
-      await _dbService.saveBankAccount(account);
-      await loadBankAccounts();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.saveBankAccount(account);
+    ref.invalidateSelf();
+    await future;
   }
 }
 
-final bankAccountsProvider = StateNotifierProvider<BankAccountsNotifier, AsyncValue<List<BankAccount>>>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  return BankAccountsNotifier(dbService);
-});
-
 // --- LOANS NOTIFIER ---
-class LoansNotifier extends StateNotifier<AsyncValue<List<Loan>>> {
-  final DatabaseService _dbService;
-
-  LoansNotifier(this._dbService) : super(const AsyncValue.loading()) {
-    loadLoans();
+@Riverpod(keepAlive: true)
+class Loans extends _$Loans {
+  @override
+  FutureOr<List<Loan>> build() async {
+    final dbService = ref.watch(databaseServiceProvider);
+    return dbService.getAllLoans();
   }
 
   Future<void> loadLoans() async {
-    state = const AsyncValue.loading();
-    try {
-      final loans = await _dbService.getAllLoans();
-      state = AsyncValue.data(loans);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<int> addLoan(Loan loan) async {
-    try {
-      final id = await _dbService.saveLoan(loan);
-      await loadLoans();
-      return id;
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    final id = await dbService.saveLoan(loan);
+    ref.invalidateSelf();
+    await future;
+    return id;
   }
 
   Future<void> removeLoan(int id) async {
-    try {
-      await _dbService.deleteLoan(id);
-      await loadLoans();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.deleteLoan(id);
+    ref.invalidateSelf();
+    await future;
   }
 }
 
-final loansProvider = StateNotifierProvider<LoansNotifier, AsyncValue<List<Loan>>>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  return LoansNotifier(dbService);
-});
-
 // --- HOLDINGS NOTIFIER ---
-class HoldingsNotifier extends StateNotifier<AsyncValue<List<Holding>>> {
-  final DatabaseService _dbService;
-
-  HoldingsNotifier(this._dbService) : super(const AsyncValue.loading()) {
-    loadHoldings();
+@Riverpod(keepAlive: true)
+class Holdings extends _$Holdings {
+  @override
+  FutureOr<List<Holding>> build() async {
+    final dbService = ref.watch(databaseServiceProvider);
+    return dbService.getAllHoldings();
   }
 
   Future<void> loadHoldings() async {
-    state = const AsyncValue.loading();
-    try {
-      final holdings = await _dbService.getAllHoldings();
-      state = AsyncValue.data(holdings);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> addHolding(Holding holding) async {
-    try {
-      await _dbService.saveHolding(holding);
-      await loadHoldings();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.saveHolding(holding);
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> clearAllHoldings() async {
-    try {
-      await _dbService.clearHoldings();
-      await loadHoldings();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.clearHoldings();
+    ref.invalidateSelf();
+    await future;
   }
 }
 
-final holdingsProvider = StateNotifierProvider<HoldingsNotifier, AsyncValue<List<Holding>>>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  return HoldingsNotifier(dbService);
-});
+// --- NET WORTH CALCULATIONS ---
+@riverpod
+double totalHoldingsValue(TotalHoldingsValueRef ref) {
+  final holdings = ref.watch(holdingsProvider).valueOrNull ?? [];
+  double total = 0.0;
+  for (final h in holdings) {
+    total += h.currentPrice * h.quantity;
+  }
+  return total;
+}
+
+@riverpod
+double totalCardOutstanding(TotalCardOutstandingRef ref) {
+  final cards = ref.watch(creditCardsProvider).valueOrNull ?? [];
+  double total = 0.0;
+  for (final c in cards) {
+    total += c.balance;
+  }
+  return total;
+}
+
+@riverpod
+double totalDebts(TotalDebtsRef ref) {
+  final loans = ref.watch(loansProvider).valueOrNull ?? [];
+  double total = 0.0;
+  for (final l in loans) {
+    if (!l.isLent) {
+      total += l.remainingBalance;
+    }
+  }
+  return total;
+}
+
+@riverpod
+double totalReceivables(TotalReceivablesRef ref) {
+  final loans = ref.watch(loansProvider).valueOrNull ?? [];
+  double total = 0.0;
+  for (final l in loans) {
+    if (l.isLent) {
+      total += l.remainingBalance;
+    }
+  }
+  return total;
+}
+
+@riverpod
+double cashAndBank(CashAndBankRef ref) {
+  double total = 0.0;
+  final txs = ref.watch(transactionsProvider).valueOrNull ?? [];
+  for (final tx in txs) {
+    if (tx.cardId == null &&
+        (tx.accountName == 'Cash' ||
+            tx.accountName == null ||
+            (!tx.accountName!.startsWith('bank:') &&
+                tx.accountName != 'Credit Card'))) {
+      if (tx.transactionType == 'income') {
+        total += tx.amount;
+      } else if (tx.transactionType == 'expense') {
+        total -= tx.amount;
+      }
+    }
+  }
+  final bankAccounts = ref.watch(bankAccountsProvider).valueOrNull ?? [];
+  for (final acc in bankAccounts) {
+    total += acc.balance;
+  }
+  return total;
+}
+
+@riverpod
+double netWorth(NetWorthRef ref) {
+  final holdings = ref.watch(totalHoldingsValueProvider);
+  final cashBank = ref.watch(cashAndBankProvider);
+  final receivables = ref.watch(totalReceivablesProvider);
+  final cards = ref.watch(totalCardOutstandingProvider);
+  final debts = ref.watch(totalDebtsProvider);
+  return holdings + cashBank + receivables - cards - debts;
+}
 
 // --- AUTOMATION SERVICES PROVIDERS ---
-final smsSyncServiceProvider = Provider<SmsSyncService>((ref) {
+@Riverpod(keepAlive: true)
+SmsSyncService smsSyncService(SmsSyncServiceRef ref) {
   final db = ref.watch(databaseServiceProvider);
   return SmsSyncService(db);
-});
+}
 
-final emailSyncServiceProvider = Provider<EmailSyncService>((ref) {
+@Riverpod(keepAlive: true)
+EmailSyncService emailSyncService(EmailSyncServiceRef ref) {
   final db = ref.watch(databaseServiceProvider);
   return EmailSyncService(db);
-});
+}
 
-final portfolioParserServiceProvider = Provider<PortfolioParserService>((ref) {
+@Riverpod(keepAlive: true)
+PortfolioParserService portfolioParserService(PortfolioParserServiceRef ref) {
   final db = ref.watch(databaseServiceProvider);
   return PortfolioParserService(db);
-});
+}
 
-final investmentSyncServiceProvider = Provider<InvestmentSyncService>((ref) {
+@Riverpod(keepAlive: true)
+InvestmentSyncService investmentSyncService(InvestmentSyncServiceRef ref) {
   final db = ref.watch(databaseServiceProvider);
   return InvestmentSyncService(db);
-});
+}
 
-final syncServiceProvider = Provider<SyncService>((ref) {
+@Riverpod(keepAlive: true)
+SyncService syncService(SyncServiceRef ref) {
   final db = ref.watch(databaseServiceProvider);
   return SyncService(db);
-});
+}
