@@ -370,27 +370,31 @@ class CardsLoansView extends ConsumerWidget {
                             ),
                           ),
                         )
-                      : Image.asset(
-                          'assets/credit_card_images/${card.imageUrl}',
-                          fit: BoxFit.cover,
-                          frameBuilder: (context, child, frame, wasSync) {
-                            if (wasSync) return child;
-                            return AnimatedCrossFade(
-                              firstChild: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  gradient: LinearGradient(
-                                    colors: [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.1)],
-                                  ),
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                gradient: LinearGradient(
+                                  colors: [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.1)],
                                 ),
                               ),
-                              secondChild: child,
-                              crossFadeState: frame == null
-                                  ? CrossFadeState.showFirst
-                                  : CrossFadeState.showSecond,
-                              duration: const Duration(milliseconds: 200),
-                            );
-                          },
+                            ),
+                            Image.asset(
+                              'assets/credit_card_images/${card.imageUrl}',
+                              fit: BoxFit.cover,
+                              frameBuilder: (context, child, frame, wasSync) {
+                                if (wasSync) return child;
+                                return AnimatedOpacity(
+                                  opacity: frame == null ? 0.0 : 1.0,
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeOut,
+                                  child: child,
+                                );
+                              },
+                            ),
+                          ],
                         ),
                 ),
 
