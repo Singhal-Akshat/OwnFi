@@ -18,6 +18,7 @@ class ParsedSmsTransaction {
   final String? parserSource;
   final String? aiComparisonNotes;
   final String? matchedAccountId;
+  final bool isTransaction;
 
   ParsedSmsTransaction({
     required this.amount,
@@ -30,11 +31,12 @@ class ParsedSmsTransaction {
     this.parserSource,
     this.aiComparisonNotes,
     this.matchedAccountId,
+    this.isTransaction = true,
   });
 
   @override
   String toString() {
-    return 'ParsedSmsTransaction(amount: $amount, desc: $description, type: $transactionType, cat: $category, card: $cardLast4, acct: $accountLast4, merchant: $merchant, src: $parserSource, matchedAcc: $matchedAccountId)';
+    return 'ParsedSmsTransaction(amount: $amount, desc: $description, type: $transactionType, cat: $category, card: $cardLast4, acct: $accountLast4, merchant: $merchant, src: $parserSource, matchedAcc: $matchedAccountId, isTx: $isTransaction)';
   }
 }
 
@@ -58,13 +60,13 @@ class SmsParserService {
 
   // Common keywords to identify financial transactions
   static final RegExp _financialKeywords = RegExp(
-    r'(debited|spent|charged|withdrawn|sent|paid|payment|credited|received|deposited|added|txn\s+of)',
+    r'\b(debited|spent|charged|withdrawn|sent|paid|payment|credited|received|deposited|added)\b|(?:txn\s+of)',
     caseSensitive: false,
   );
 
   // Keywords to identify OTPs, authorization codes, and bank promotions to exclude them
   static final RegExp _otpOrPromotionalKeywords = RegExp(
-    r'(otp|one-time password|one time password|verification code|verify|security code|auth code|passcode|pre-approved|pre approved|apply now|win|offer|eligible|rate of interest|subscrib|bonus)',
+    r'(otp|one-time password|one time password|verification code|verify|security code|auth code|passcode|pre-approved|pre approved|apply now|win|offer|eligible|rate of interest|subscrib|bonus|upgrade|recharge)',
     caseSensitive: false,
   );
 
@@ -108,6 +110,7 @@ class SmsParserService {
       final aiResultStr = await _parseWithGeminiRaw(body, key);
       final aiResult = _decodeAiJson(aiResultStr);
       if (aiResult != null) {
+        if (!aiResult.isTransaction) return null;
         return ParsedSmsTransaction(
           amount: aiResult.amount,
           description: aiResult.description,
@@ -117,6 +120,7 @@ class SmsParserService {
           accountLast4: aiResult.accountLast4 ?? regexResult?.accountLast4,
           merchant: aiResult.merchant,
           parserSource: 'gemini',
+          isTransaction: true,
         );
       }
       if (regexResult != null) {
@@ -129,6 +133,7 @@ class SmsParserService {
           accountLast4: regexResult.accountLast4,
           merchant: regexResult.merchant,
           parserSource: 'regex_fallback',
+          isTransaction: true,
         );
       }
       return null;
@@ -151,6 +156,9 @@ class SmsParserService {
       final geminiParsed = _decodeAiJson(geminiJson);
       final gemmaParsed = _decodeAiJson(gemmaJson);
 
+      if (geminiParsed != null && !geminiParsed.isTransaction) return null;
+      if (gemmaParsed != null && !gemmaParsed.isTransaction) return null;
+
       String notes = "";
       if (geminiJson != null) notes += "Gemini: $geminiJson\n";
       if (gemmaJson != null) notes += "Gemma: $gemmaJson\n";
@@ -168,6 +176,7 @@ class SmsParserService {
         merchant: finalBase.merchant,
         parserSource: geminiParsed != null ? 'gemini' : (gemmaParsed != null ? 'gemma' : 'regex'),
         aiComparisonNotes: notes.trim(),
+        isTransaction: finalBase.isTransaction,
       );
     }
   }
@@ -246,8 +255,9 @@ class SmsParserService {
       final cleanJson = jsonStr.substring(jsonStart, jsonEnd + 1);
       final map = jsonDecode(cleanJson);
       
+      final bool isTx = map['isTransaction'] == null ? true : (map['isTransaction'] as bool);
       final double amt = (map['amount'] is num) ? (map['amount'] as num).toDouble() : double.tryParse(map['amount'].toString()) ?? 0.0;
-      if (amt <= 0) return null;
+      final bool isRealTx = isTx && amt > 0;
 
       final rawType = map['transactionType']?.toString().toLowerCase();
       final type = (rawType == 'income') ? 'income' : (rawType == 'transfer' ? 'transfer' : 'expense');
@@ -266,6 +276,7 @@ class SmsParserService {
         accountLast4: map['accountLast4']?.toString(),
         merchant: merchant,
         matchedAccountId: map['matchedAccountId']?.toString(),
+        isTransaction: isRealTx,
       );
     } catch (e) {
       print("JSON Decode Error: $e");
@@ -331,9 +342,9 @@ class SmsParserService {
     List<BankAccount>? bankAccounts,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    final expenseCats = prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Investment', 'Health', 'Education', 'Other'];
-    final incomeCats = prefs.getStringList('categories_income') ?? ['Salary', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
-    final transferCats = prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Other'];
+    final expenseCats = prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Other'];
+    final incomeCats = prefs.getStringList('categories_income') ?? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
+    final transferCats = prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Investment', 'Other'];
 
     String cardListText = '';
     if (cards != null && cards.isNotEmpty) {
@@ -350,13 +361,15 @@ class SmsParserService {
     }
 
     return '''
-You are a financial SMS parser. Extract the details of the transaction and output ONLY valid JSON format.
-Do NOT include markdown formatting or backticks. Only output the raw JSON object.
+You are a financial SMS parser. First, evaluate if the SMS describes an actual completed financial transaction (debit, credit, or transfer of money). If it is promotional, advertisement, OTP, login alert, limit increase offer, payment option offer, upgrade offer, or spam, it is NOT a transaction.
+
+Output ONLY valid JSON format. Do NOT include markdown formatting or backticks. Only output the raw JSON object.
 
 Available Accounts/Cards to match:
 $cardListText$bankListText
 Fields required in the JSON:
-- "amount": numeric value of the transaction
+- "isTransaction": boolean. Set to true if the SMS is an actual completed financial transaction (debit, credit, or transfer), else false.
+- "amount": numeric value of the transaction. Set to 0 if not a transaction.
 - "transactionType": "expense", "income", or "transfer" (use "transfer" if the SMS indicates a transfer between own accounts/self-transfer, sending money to a contact/person, or a payment/deposit credited to a credit card to pay its bill).
 - "merchant": the name of the store, person, or beneficiary. Note: The user of this app is "Akshat Singhal" (so any transfer sent to "Akshat Singhal" is a self-transfer to himself). For self-transfers (where transactionType is "transfer" and the beneficiary is "Akshat Singhal" or yourself), the merchant MUST be the destination bank account (e.g. if sent from HDFC Bank, the merchant should be "SBI Account" or "SBI Bank", and vice versa). Do NOT return "Akshat Singhal" as the merchant for self-transfers. For any merchant name that is a UPI VPA/ID or email-style address (containing @, e.g. "anshikajain0203@okaxis" or "merchant@upi"), you MUST clean it to be just the name before the @ symbol, and strip any numbers, punctuation, or spaces (e.g. "anshikajain0203@okaxis" should be cleaned to "Anshikajain" or "Anshika Jain").
 - "category": choose from these based on transactionType:

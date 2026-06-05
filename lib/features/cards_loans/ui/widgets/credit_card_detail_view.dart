@@ -8,6 +8,7 @@ import '../../../../core/theme.dart';
 import '../../../../core/providers.dart';
 import '../../../../core/animated_gradient_background.dart';
 import '../../../cards_loans/models/card_loan_models.dart';
+import 'package:my_personal_tracker/features/expenses/ui/widgets/transaction_dialogs.dart';
 
 class CreditCardDetailView extends ConsumerStatefulWidget {
   final CreditCard card;
@@ -717,6 +718,7 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                               child: GlassBlur(
                                 borderRadius: 16,
                                 child: ListTile(
+                                  onTap: () => showTransactionDetailDialog(context, tx),
                                   leading: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(

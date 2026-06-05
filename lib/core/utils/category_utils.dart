@@ -24,6 +24,7 @@ class CategoryUtils {
     'Gifts': Icons.card_giftcard_rounded,
     'Maintenance': Icons.build_rounded,
     'Gaming': Icons.sports_esports_rounded,
+    'Payback': Icons.assignment_return_rounded,
     'Other': Icons.category_rounded,
     'Transfer': Icons.swap_horiz_rounded,
     'Credit Card': Icons.credit_card_rounded,
@@ -52,6 +53,7 @@ class CategoryUtils {
     'Gifts': Colors.purpleAccent,
     'Maintenance': Colors.blueGrey,
     'Gaming': Colors.cyanAccent,
+    'Payback': Colors.tealAccent,
     'Other': AppColors.textSecondary,
     'Transfer': AppColors.neonTeal,
     'Credit Card': Colors.blueAccent,
@@ -161,6 +163,63 @@ class CategoryUtils {
     try {
       final prefs = await SharedPreferences.getInstance();
       
+      // Initialize/migrate categories
+      List<String> expenseCats = prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Payback', 'Other'];
+      List<String> incomeCats = prefs.getStringList('categories_income') ?? ['Salary', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
+      List<String> transferCats = prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Other'];
+
+      expenseCats = List<String>.from(expenseCats);
+      incomeCats = List<String>.from(incomeCats);
+      transferCats = List<String>.from(transferCats);
+
+      // Ensure expense cats has "Payback"
+      if (!expenseCats.contains('Payback')) {
+        final otherIdx = expenseCats.indexOf('Other');
+        if (otherIdx != -1) {
+          expenseCats.insert(otherIdx, 'Payback');
+        } else {
+          expenseCats.add('Payback');
+        }
+        await prefs.setStringList('categories_expense', expenseCats);
+      }
+
+      // Clean up expense cats
+      expenseCats.removeWhere((c) => c.trim().toLowerCase() == 'investment');
+      await prefs.setStringList('categories_expense', expenseCats);
+
+      // Ensure income cats has "Investment"
+      bool hasIncomeInv = incomeCats.any((c) => c.trim().toLowerCase() == 'investment');
+      if (!hasIncomeInv) {
+        incomeCats.insert(1, 'Investment');
+        await prefs.setStringList('categories_income', incomeCats);
+      } else {
+        for (int i = 0; i < incomeCats.length; i++) {
+          if (incomeCats[i].trim().toLowerCase() == 'investment') {
+            incomeCats[i] = 'Investment';
+          }
+        }
+        await prefs.setStringList('categories_income', incomeCats);
+      }
+
+      // Ensure transfer cats has "Investment"
+      bool hasTransferInv = transferCats.any((c) => c.trim().toLowerCase() == 'investment');
+      if (!hasTransferInv) {
+        final otherIdx = transferCats.indexOf('Other');
+        if (otherIdx != -1) {
+          transferCats.insert(otherIdx, 'Investment');
+        } else {
+          transferCats.add('Investment');
+        }
+        await prefs.setStringList('categories_transfer', transferCats);
+      } else {
+        for (int i = 0; i < transferCats.length; i++) {
+          if (transferCats[i].trim().toLowerCase() == 'investment') {
+            transferCats[i] = 'Investment';
+          }
+        }
+        await prefs.setStringList('categories_transfer', transferCats);
+      }
+      
       // Load custom category icons
       final iconMap = prefs.getStringList('custom_category_icons') ?? [];
       customIcons.clear();
@@ -209,6 +268,7 @@ class CategoryUtils {
     if (lower == 'investment') return Icons.trending_up_rounded;
     if (lower == 'health') return Icons.health_and_safety_rounded;
     if (lower == 'education') return Icons.school_rounded;
+    if (lower == 'payback') return Icons.assignment_return_rounded;
     if (lower.contains('internal transfer') || lower == 'transfer') return Icons.swap_horiz_rounded;
     if (lower.contains('credit card')) return Icons.credit_card_rounded;
     if (lower.contains('family')) return Icons.family_restroom_rounded;
@@ -231,6 +291,7 @@ class CategoryUtils {
     if (lower == 'investment') return Colors.amberAccent;
     if (lower == 'health') return Colors.redAccent;
     if (lower == 'education') return Colors.indigoAccent;
+    if (lower == 'payback') return Colors.tealAccent;
     if (lower.contains('internal transfer') || lower == 'transfer') return AppColors.neonTeal;
     if (lower.contains('credit card')) return Colors.blueAccent;
     if (lower.contains('family')) return Colors.purpleAccent;

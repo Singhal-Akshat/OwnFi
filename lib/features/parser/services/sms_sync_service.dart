@@ -247,8 +247,8 @@ class SmsSyncService {
       return msg.date!.isAfter(lastSyncTime!);
     }).toList();
 
-    // Sort descending by date (newest first)
-    newMessages.sort((a, b) => (b.date ?? DateTime.now()).compareTo(a.date ?? DateTime.now()));
+    // Sort ascending by date (oldest first)
+    newMessages.sort((a, b) => (a.date ?? DateTime.now()).compareTo(b.date ?? DateTime.now()));
     await _parser.logDebug('Filtered to ${newMessages.length} new messages after date check.');
 
 

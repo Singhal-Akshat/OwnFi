@@ -32,6 +32,7 @@ import 'widgets/bank_account_card.dart';
 import 'widgets/recovery_bin_page.dart';
 import 'widgets/bank_account_detail_view.dart';
 import 'model_download_page.dart';
+import '../../features/expenses/ui/widgets/transaction_dialogs.dart';
 
 class SettingsView extends ConsumerStatefulWidget {
   const SettingsView({super.key});
@@ -1372,10 +1373,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           final prefs = snapshot.data!;
                           final key = 'categories_$currentType';
                           final defaultCats = currentType == 'expense'
-                              ? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Investment', 'Health', 'Education', 'Other']
+                              ? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Other']
                               : (currentType == 'income'
-                                  ? ['Salary', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other']
-                                  : ['Internal transfer', 'Credit card payment', 'Other']);
+                                  ? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other']
+                                  : ['Internal transfer', 'Credit card payment', 'Investment', 'Other']);
                           final cats = prefs.getStringList(key) ?? defaultCats;
 
                           return Column(
@@ -2751,18 +2752,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     ParsedSmsTransaction? lastGemini;
     ParsedSmsTransaction? lastRegex;
 
-    final amountController = TextEditingController();
-    final merchantController = TextEditingController();
-    String selectedType = 'expense';
-    String selectedCategory = 'Other';
-    String selectedAccount = 'Cash';
-
-    // State for payback and repayments
-    bool isPayback = false;
-    final paybackContactController = TextEditingController();
-    DateTime paybackDate = DateTime.now().add(const Duration(days: 30));
-    int? selectedDebtId;
-    String selectedToAccount = 'Cash';
+    final controller = TransactionFormController();
 
     showDialog(
       context: context,
@@ -2830,6 +2820,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
             final bankAccountsState = ref.watch(bankAccountsProvider);
             final loansState = ref.watch(loansProvider);
 
+
             void ensureParsed(int index) {
               if (index < 0 || index >= items.length) return;
               final bodyText = items[index]['body'] as String;
@@ -2851,27 +2842,19 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                       geminiCache[index] = geminiResult;
                       geminiLoading[index] = false;
                       if (lastInitializedIndex != currentIndex) {
-                        isPayback = false;
-                        paybackContactController.clear();
-                        paybackDate = DateTime.now().add(const Duration(days: 30));
-                        selectedDebtId = null;
-                        selectedToAccount = 'Cash';
+                        controller.reset();
                       }
                       
                       if (currentIndex == index) {
-                        amountController.text = geminiResult.amount.toStringAsFixed(0);
-                        merchantController.text = geminiResult.merchant;
-                        selectedType = geminiResult.transactionType;
-                        selectedCategory = geminiResult.category;
-                        if (selectedCategory == 'Utilities') selectedCategory = 'Bills';
-                        const allowedCategories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Salary', 'Investment', 'Health', 'Education', 'Other'];
-                        if (!allowedCategories.contains(selectedCategory)) {
-                          selectedCategory = 'Other';
-                        }
+                        controller.amountController.text = geminiResult.amount.toStringAsFixed(0);
+                        controller.descriptionController.text = geminiResult.merchant;
+                        controller.selectedType = geminiResult.transactionType;
+                        controller.selectedCategory = geminiResult.category;
+                        if (controller.selectedCategory == 'Utilities') controller.selectedCategory = 'Bills';
 
-                        selectedAccount = 'Cash';
+                        controller.selectedAccount = 'Cash';
                         if (geminiResult.matchedAccountId != null) {
-                          selectedAccount = geminiResult.matchedAccountId!;
+                          controller.selectedAccount = geminiResult.matchedAccountId!;
                         } else {
                           final bodyLower = bodyText.toLowerCase();
                           if (bodyLower.contains('hdfc')) {
@@ -2879,31 +2862,31 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             bankAccountsState.whenData((banks) {
                               final match = banks.firstWhere((b) => b.bankName.toLowerCase().contains('hdfc'), orElse: () => BankAccount());
                               if (match.id != Isar.autoIncrement) {
-                                selectedAccount = 'bank:${match.id}';
+                                controller.selectedAccount = 'bank:${match.id}';
                               }
                             });
                           } else if (bodyLower.contains('sbi')) {
                             bankAccountsState.whenData((banks) {
                               final match = banks.firstWhere((b) => b.bankName.toLowerCase().contains('sbi'), orElse: () => BankAccount());
                               if (match.id != Isar.autoIncrement) {
-                                selectedAccount = 'bank:${match.id}';
+                                controller.selectedAccount = 'bank:${match.id}';
                               }
                             });
                           }
                           
-                          if (selectedAccount == 'Cash') {
+                          if (controller.selectedAccount == 'Cash') {
                             if (geminiResult.cardLast4 != null) {
                               cardsState.whenData((cards) {
                                 final match = cards.firstWhere((c) => c.last4 == geminiResult.cardLast4, orElse: () => CreditCard());
                                 if (match.id != Isar.autoIncrement) {
-                                  selectedAccount = 'card:${match.id}';
+                                  controller.selectedAccount = 'card:${match.id}';
                                 }
                               });
                             } else if (geminiResult.accountLast4 != null) {
                               bankAccountsState.whenData((banks) {
                                 final match = banks.firstWhere((b) => b.last4 == geminiResult.accountLast4, orElse: () => BankAccount());
                                 if (match.id != Isar.autoIncrement) {
-                                  selectedAccount = 'bank:${match.id}';
+                                  controller.selectedAccount = 'bank:${match.id}';
                                 }
                               });
                             }
@@ -2934,63 +2917,55 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
             if (lastInitializedIndex != currentIndex || lastGemini != geminiResult || lastRegex != regexResult) {
               if (lastInitializedIndex != currentIndex) {
-                isPayback = false;
-                paybackContactController.clear();
-                paybackDate = DateTime.now().add(const Duration(days: 30));
-                selectedDebtId = null;
-                selectedToAccount = 'Cash';
+                controller.reset();
               }
               lastInitializedIndex = currentIndex;
               lastGemini = geminiResult;
               lastRegex = regexResult;
 
-              final initialSource = geminiResult ?? regexResult;
-              amountController.text = (initialSource?.amount ?? 0.0).toStringAsFixed(0);
-              merchantController.text = initialSource?.merchant ?? 'Unknown Merchant';
-              selectedType = initialSource?.transactionType ?? 'expense';
-              selectedCategory = initialSource?.category ?? 'Other';
-              if (selectedCategory == 'Utilities') selectedCategory = 'Bills';
-              const allowedCategories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Salary', 'Investment', 'Health', 'Education', 'Other'];
-              if (!allowedCategories.contains(selectedCategory)) {
-                selectedCategory = 'Other';
-              }
+              final initialSource = (geminiResult != null && geminiResult.isTransaction) ? geminiResult : (regexResult ?? geminiResult);
+              controller.amountController.text = (initialSource?.amount ?? 0.0).toStringAsFixed(0);
+              controller.descriptionController.text = initialSource?.merchant ?? 'Unknown Merchant';
+              controller.selectedType = initialSource?.transactionType ?? 'expense';
+              controller.selectedCategory = initialSource?.category ?? 'Other';
+              if (controller.selectedCategory == 'Utilities') controller.selectedCategory = 'Bills';
 
-              selectedAccount = 'Cash';
+              controller.selectedAccount = 'Cash';
               if (initialSource?.matchedAccountId != null) {
-                selectedAccount = initialSource!.matchedAccountId!;
+                controller.selectedAccount = initialSource!.matchedAccountId!;
               } else {
                 final bodyLower = rawBody.toLowerCase();
                 if (bodyLower.contains('hdfc')) {
                   bankAccountsState.whenData((banks) {
                     final match = banks.firstWhere((b) => b.bankName.toLowerCase().contains('hdfc'), orElse: () => BankAccount());
                     if (match.id != Isar.autoIncrement) {
-                      selectedAccount = 'bank:${match.id}';
+                      controller.selectedAccount = 'bank:${match.id}';
                     }
                   });
                 } else if (bodyLower.contains('sbi')) {
                   bankAccountsState.whenData((banks) {
                     final match = banks.firstWhere((b) => b.bankName.toLowerCase().contains('sbi'), orElse: () => BankAccount());
                     if (match.id != Isar.autoIncrement) {
-                      selectedAccount = 'bank:${match.id}';
+                      controller.selectedAccount = 'bank:${match.id}';
                     }
                   });
                 }
 
-                if (selectedAccount == 'Cash') {
+                if (controller.selectedAccount == 'Cash') {
                   final last4 = initialSource?.cardLast4 ?? initialSource?.accountLast4;
                   if (last4 != null) {
                     if (initialSource?.cardLast4 != null) {
                       cardsState.whenData((cards) {
                         final match = cards.firstWhere((c) => c.last4 == last4, orElse: () => CreditCard());
                         if (match.id != Isar.autoIncrement) {
-                          selectedAccount = 'card:${match.id}';
+                          controller.selectedAccount = 'card:${match.id}';
                         }
                       });
                     } else {
                       bankAccountsState.whenData((banks) {
                         final match = banks.firstWhere((b) => b.last4 == last4, orElse: () => BankAccount());
                         if (match.id != Isar.autoIncrement) {
-                          selectedAccount = 'bank:${match.id}';
+                          controller.selectedAccount = 'bank:${match.id}';
                         }
                       });
                     }
@@ -3006,21 +2981,21 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   return const Center(child: CircularProgressIndicator(color: AppColors.neonTeal));
                 }
                 final prefs = prefsSnapshot.data!;
-                final expenseCats = prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Investment', 'Health', 'Education', 'Other'];
-                final incomeCats = prefs.getStringList('categories_income') ?? ['Salary', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
-                final transferCats = prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Other'];
+                final expenseCats = prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Other'];
+                final incomeCats = prefs.getStringList('categories_income') ?? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
+                final transferCats = prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Investment', 'Other'];
 
-                final currentCats = selectedType == 'expense'
+                final currentCats = controller.selectedType == 'expense'
                     ? expenseCats
-                    : (selectedType == 'income' ? incomeCats : transferCats);
+                    : (controller.selectedType == 'income' ? incomeCats : transferCats);
 
-                if (!currentCats.contains(selectedCategory)) {
+                if (!currentCats.contains(controller.selectedCategory)) {
                   if (currentCats.contains('Other')) {
-                    selectedCategory = 'Other';
+                    controller.selectedCategory = 'Other';
                   } else if (currentCats.isNotEmpty) {
-                    selectedCategory = currentCats.first;
+                    controller.selectedCategory = currentCats.first;
                   } else {
-                    selectedCategory = '';
+                    controller.selectedCategory = '';
                   }
                 }
 
@@ -3188,7 +3163,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             ),
                           ),
                         ),
-                        if (!(item['approvedByRegex'] ?? false) && !(disagreed[currentIndex] ?? false)) ...[
+                        if ((!(item['approvedByRegex'] ?? false) || (geminiResult != null && !geminiResult.isTransaction)) && !(disagreed[currentIndex] ?? false)) ...[
                           const SizedBox(height: 16),
                           Container(
                             padding: const EdgeInsets.all(12),
@@ -3197,14 +3172,16 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.white10),
                             ),
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Icon(Icons.info_outline, color: Colors.orangeAccent, size: 18),
-                                SizedBox(width: 8),
+                                const Icon(Icons.info_outline, color: Colors.orangeAccent, size: 18),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'This message was classified as Non-Transactional (like an OTP, alert, or spam). Do you agree?',
-                                    style: TextStyle(fontSize: 11, color: Colors.white70),
+                                    (geminiResult != null && !geminiResult.isTransaction)
+                                        ? 'Gemini AI classified this message as Non-Transactional/Spam. Do you agree?'
+                                        : 'This message was classified as Non-Transactional (like an OTP, alert, or spam). Do you agree?',
+                                    style: const TextStyle(fontSize: 11, color: Colors.white70),
                                   ),
                                 ),
                               ],
@@ -3287,53 +3264,53 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 Expanded(
                                   child: OutlinedButton(
                                     onPressed: () {
-                                      amountController.text = regexResult.amount.toStringAsFixed(0);
-                                      merchantController.text = regexResult.merchant;
+                                      controller.amountController.text = regexResult.amount.toStringAsFixed(0);
+                                      controller.descriptionController.text = regexResult.merchant;
                                       setState(() {
-                                        selectedType = regexResult.transactionType;
-                                        selectedCategory = regexResult.category;
-                                        if (selectedCategory == 'Utilities') selectedCategory = 'Bills';
+                                        controller.selectedType = regexResult.transactionType;
+                                        controller.selectedCategory = regexResult.category;
+                                        if (controller.selectedCategory == 'Utilities') controller.selectedCategory = 'Bills';
                                         const allowedCategories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Salary', 'Investment', 'Health', 'Education', 'Other'];
-                                        if (!allowedCategories.contains(selectedCategory)) {
-                                          selectedCategory = 'Other';
+                                        if (!allowedCategories.contains(controller.selectedCategory)) {
+                                          controller.selectedCategory = 'Other';
                                         }
 
-                                        selectedAccount = 'Cash';
+                                        controller.selectedAccount = 'Cash';
                                         if (regexResult.matchedAccountId != null) {
-                                          selectedAccount = regexResult.matchedAccountId!;
+                                          controller.selectedAccount = regexResult.matchedAccountId!;
                                         } else {
                                           final bodyLower = rawBody.toLowerCase();
                                           if (bodyLower.contains('hdfc')) {
                                             bankAccountsState.whenData((banks) {
                                               final match = banks.firstWhere((b) => b.bankName.toLowerCase().contains('hdfc'), orElse: () => BankAccount());
                                               if (match.id != Isar.autoIncrement) {
-                                                selectedAccount = 'bank:${match.id}';
+                                                controller.selectedAccount = 'bank:${match.id}';
                                               }
                                             });
                                           } else if (bodyLower.contains('sbi')) {
                                             bankAccountsState.whenData((banks) {
                                               final match = banks.firstWhere((b) => b.bankName.toLowerCase().contains('sbi'), orElse: () => BankAccount());
                                               if (match.id != Isar.autoIncrement) {
-                                                selectedAccount = 'bank:${match.id}';
+                                                controller.selectedAccount = 'bank:${match.id}';
                                               }
                                             });
                                           }
 
-                                          if (selectedAccount == 'Cash') {
+                                          if (controller.selectedAccount == 'Cash') {
                                             final last4 = regexResult.cardLast4 ?? regexResult.accountLast4;
                                             if (last4 != null) {
                                               if (regexResult.cardLast4 != null) {
                                                 cardsState.whenData((cards) {
                                                   final match = cards.firstWhere((c) => c.last4 == last4, orElse: () => CreditCard());
                                                   if (match.id != Isar.autoIncrement) {
-                                                    selectedAccount = 'card:${match.id}';
+                                                    controller.selectedAccount = 'card:${match.id}';
                                                   }
                                                 });
                                               } else {
                                                 bankAccountsState.whenData((banks) {
                                                   final match = banks.firstWhere((b) => b.last4 == last4, orElse: () => BankAccount());
                                                   if (match.id != Isar.autoIncrement) {
-                                                    selectedAccount = 'bank:${match.id}';
+                                                    controller.selectedAccount = 'bank:${match.id}';
                                                   }
                                                 });
                                               }
@@ -3350,51 +3327,51 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 Expanded(
                                   child: OutlinedButton(
                                     onPressed: () {
-                                      amountController.text = geminiResult.amount.toStringAsFixed(0);
-                                      merchantController.text = geminiResult.merchant;
+                                      controller.amountController.text = geminiResult.amount.toStringAsFixed(0);
+                                      controller.descriptionController.text = geminiResult.merchant;
                                       setState(() {
-                                        selectedType = geminiResult.transactionType;
-                                        selectedCategory = geminiResult.category;
-                                        if (selectedCategory == 'Utilities') selectedCategory = 'Bills';
+                                        controller.selectedType = geminiResult.transactionType;
+                                        controller.selectedCategory = geminiResult.category;
+                                        if (controller.selectedCategory == 'Utilities') controller.selectedCategory = 'Bills';
                                         const allowedCategories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Salary', 'Investment', 'Health', 'Education', 'Other'];
-                                        if (!allowedCategories.contains(selectedCategory)) {
-                                          selectedCategory = 'Other';
+                                        if (!allowedCategories.contains(controller.selectedCategory)) {
+                                          controller.selectedCategory = 'Other';
                                         }
 
-                                        selectedAccount = 'Cash';
+                                        controller.selectedAccount = 'Cash';
                                         if (geminiResult.matchedAccountId != null) {
-                                          selectedAccount = geminiResult.matchedAccountId!;
+                                          controller.selectedAccount = geminiResult.matchedAccountId!;
                                         } else {
                                           final bodyLower = rawBody.toLowerCase();
                                           if (bodyLower.contains('hdfc')) {
                                             bankAccountsState.whenData((banks) {
                                               final match = banks.firstWhere((b) => b.bankName.toLowerCase().contains('hdfc'), orElse: () => BankAccount());
                                               if (match.id != Isar.autoIncrement) {
-                                                selectedAccount = 'bank:${match.id}';
+                                                controller.selectedAccount = 'bank:${match.id}';
                                               }
                                             });
                                           } else if (bodyLower.contains('sbi')) {
                                             bankAccountsState.whenData((banks) {
                                               final match = banks.firstWhere((b) => b.bankName.toLowerCase().contains('sbi'), orElse: () => BankAccount());
                                               if (match.id != Isar.autoIncrement) {
-                                                selectedAccount = 'bank:${match.id}';
+                                                controller.selectedAccount = 'bank:${match.id}';
                                               }
                                             });
                                           }
 
-                                          if (selectedAccount == 'Cash') {
+                                          if (controller.selectedAccount == 'Cash') {
                                             if (geminiResult.cardLast4 != null) {
                                               cardsState.whenData((cards) {
                                                 final match = cards.firstWhere((c) => c.last4 == geminiResult.cardLast4, orElse: () => CreditCard());
                                                 if (match.id != Isar.autoIncrement) {
-                                                  selectedAccount = 'card:${match.id}';
+                                                  controller.selectedAccount = 'card:${match.id}';
                                                 }
                                               });
                                             } else if (geminiResult.accountLast4 != null) {
                                               bankAccountsState.whenData((banks) {
                                                 final match = banks.firstWhere((b) => b.last4 == geminiResult.accountLast4, orElse: () => BankAccount());
                                                 if (match.id != Isar.autoIncrement) {
-                                                  selectedAccount = 'bank:${match.id}';
+                                                  controller.selectedAccount = 'bank:${match.id}';
                                                 }
                                               });
                                             }
@@ -3408,278 +3385,11 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             ],
                           ),
                         const SizedBox(height: 12),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: amountController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Amount (INR)',
-                                  prefixText: '₹ ',
-                                  border: OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: selectedType,
-                                decoration: const InputDecoration(
-                                  labelText: 'Type',
-                                  border: OutlineInputBorder(),
-                                ),
-                                dropdownColor: AppColors.obsidianSurface,
-                                items: const [
-                                  DropdownMenuItem(value: 'expense', child: Text('Expense')),
-                                  DropdownMenuItem(value: 'income', child: Text('Income')),
-                                  DropdownMenuItem(value: 'transfer', child: Text('Transfer')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setState(() => selectedType = val);
-                                },
-                              ),
-                            ),
-                          ],
+                        TransactionFormFields(
+                          controller: controller,
+                          onStateChanged: () => setState(() {}),
                         ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: merchantController,
-                          decoration: const InputDecoration(
-                            labelText: 'Merchant / Description',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField<String>(
-                          value: selectedCategory,
-                          decoration: const InputDecoration(
-                            labelText: 'Category',
-                            border: OutlineInputBorder(),
-                          ),
-                          dropdownColor: AppColors.obsidianSurface,
-                          isExpanded: true,
-                          items: currentCats.map((cat) {
-                            final icon = CategoryUtils.getCategoryIcon(cat);
-                            final color = CategoryUtils.getCategoryColor(cat, AppColors.textSecondary);
-                            return DropdownMenuItem(
-                              value: cat,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: color.withOpacity(0.15),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(icon, color: color, size: 16),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(cat),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => selectedCategory = val);
-                          },
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Account Selection (Dual for Transfer, Single for other types)
-                        if (selectedType == 'transfer') ...[
-                          DropdownButtonFormField<String>(
-                            value: selectedAccount,
-                            decoration: const InputDecoration(
-                              labelText: 'From Account (Source)',
-                              border: OutlineInputBorder(),
-                            ),
-                            dropdownColor: AppColors.obsidianSurface,
-                            isExpanded: true,
-                            items: buildDropdownItems(selectedAccount),
-                            onChanged: (val) {
-                              if (val != null) setState(() => selectedAccount = val);
-                            },
-                          ),
-                          const SizedBox(height: 10),
-                          DropdownButtonFormField<String>(
-                            value: selectedToAccount,
-                            decoration: const InputDecoration(
-                              labelText: 'To Account (Destination)',
-                              border: OutlineInputBorder(),
-                            ),
-                            dropdownColor: AppColors.obsidianSurface,
-                            isExpanded: true,
-                            items: buildDropdownItems(selectedToAccount),
-                            onChanged: (val) {
-                              if (val != null) setState(() => selectedToAccount = val);
-                            },
-                          ),
-                        ] else ...[
-                          DropdownButtonFormField<String>(
-                            value: selectedAccount,
-                            decoration: const InputDecoration(
-                              labelText: 'Account / Card',
-                              border: OutlineInputBorder(),
-                            ),
-                            dropdownColor: AppColors.obsidianSurface,
-                            isExpanded: true,
-                            items: buildDropdownItems(selectedAccount),
-                            onChanged: (val) {
-                              if (val != null) setState(() => selectedAccount = val);
-                            },
-                          ),
-                        ],
-                        const SizedBox(height: 10),
-
-                        // Payback Toggle for Income
-                        if (selectedType == 'income') ...[
-                          CheckboxListTile(
-                            title: const Text('Is this a borrowed loan to payback?'),
-                            subtitle: const Text(
-                              '(Creates a debt entry in the ledger)',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontStyle: FontStyle.italic,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            value: isPayback,
-                            activeColor: AppColors.neonEmerald,
-                            contentPadding: EdgeInsets.zero,
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() {
-                                  isPayback = val;
-                                  if (val && paybackContactController.text.isEmpty) {
-                                    paybackContactController.text = merchantController.text.trim();
-                                  }
-                                });
-                              }
-                            },
-                          ),
-                          if (isPayback) ...[
-                            const SizedBox(height: 8),
-                            Autocomplete<String>(
-                              optionsBuilder: (TextEditingValue textEditingValue) {
-                                final borrowedContacts = loansState.maybeWhen(
-                                  data: (allLoans) => allLoans
-                                      .where((l) => !l.isLent && l.remainingBalance > 0)
-                                      .map((l) => l.contactName)
-                                      .toSet()
-                                      .toList(),
-                                  orElse: () => <String>[],
-                                );
-                                if (textEditingValue.text.isEmpty) {
-                                  return borrowedContacts;
-                                }
-                                return borrowedContacts.where((String option) {
-                                  return option
-                                      .toLowerCase()
-                                      .contains(textEditingValue.text.toLowerCase());
-                                });
-                              },
-                              onSelected: (String selection) {
-                                paybackContactController.text = selection;
-                              },
-                              fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                                if (textEditingController.text != paybackContactController.text) {
-                                  textEditingController.text = paybackContactController.text;
-                                }
-                                textEditingController.addListener(() {
-                                  paybackContactController.text = textEditingController.text;
-                                });
-                                return TextField(
-                                  controller: textEditingController,
-                                  focusNode: focusNode,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Contact / Friend Name',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Payback Date', style: TextStyle(color: Colors.white70)),
-                                TextButton.icon(
-                                  onPressed: () async {
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: paybackDate,
-                                      firstDate: DateTime.now(),
-                                      lastDate: DateTime.now().add(const Duration(days: 3650)),
-                                      builder: (context, child) {
-                                        return Theme(
-                                          data: Theme.of(context).copyWith(
-                                            colorScheme: const ColorScheme.dark(
-                                              primary: AppColors.neonEmerald,
-                                              onPrimary: Colors.black,
-                                              surface: AppColors.obsidianSurface,
-                                              onSurface: Colors.white,
-                                            ),
-                                          ),
-                                          child: child!,
-                                        );
-                                      },
-                                    );
-                                    if (picked != null) {
-                                      setState(() => paybackDate = picked);
-                                    }
-                                  },
-                                  icon: const Icon(Icons.calendar_today_rounded, color: AppColors.neonEmerald, size: 16),
-                                  label: Text(
-                                    '${paybackDate.day}/${paybackDate.month}/${paybackDate.year}',
-                                    style: const TextStyle(color: AppColors.neonEmerald, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        ],
-
-                        // Repay Debt Selector for Expense / Transfer
-                        if (selectedType == 'expense' || selectedType == 'transfer') ...[
-                          loansState.maybeWhen(
-                            data: (allLoans) {
-                              final borrowedDebts = allLoans.where((l) => !l.isLent && l.remainingBalance > 0).toList();
-                              if (borrowedDebts.isEmpty) return const SizedBox.shrink();
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  DropdownButtonFormField<int?>(
-                                    value: selectedDebtId,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Link to repay active debt?',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    dropdownColor: AppColors.obsidianSurface,
-                                    items: [
-                                      const DropdownMenuItem<int?>(
-                                        value: null,
-                                        child: Text('Do not link to a debt'),
-                                      ),
-                                      ...borrowedDebts.map((loan) => DropdownMenuItem<int?>(
-                                        value: loan.id,
-                                        child: Text('${loan.contactName} (Remaining: ₹${loan.remainingBalance.toStringAsFixed(0)})'),
-                                      )),
-                                    ],
-                                    onChanged: (val) {
-                                      setState(() => selectedDebtId = val);
-                                    },
-                                  ),
-                                  const SizedBox(height: 16),
-                                ],
-                              );
-                            },
-                            orElse: () => const SizedBox.shrink(),
-                          ),
-                        ],
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 16),                        const SizedBox(height: 16),
 
                         Wrap(
                           spacing: 8,
@@ -3720,40 +3430,88 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 ),
                                 ElevatedButton(
                                   onPressed: () async {
-                                    final double amt = double.tryParse(amountController.text) ?? 0.0;
-                                    final merchant = merchantController.text.trim();
+                                    final double amt = double.tryParse(controller.amountController.text) ?? 0.0;
+                                    final merchant = controller.descriptionController.text.trim();
+                                    if (controller.selectedCategory == 'Investment') {
+                                      final name = controller.isCreatingNewInvestment ? controller.newInvestmentNameController.text.trim() : controller.selectedInvestmentName;
+                                      if (name.isNotEmpty) {
+                                        Holding? targetHolding;
+                                        final existingInvestments = ref.read(holdingsProvider).valueOrNull ?? [];
+                                        for (final h in existingInvestments) {
+                                          if (h.name.toLowerCase() == name.toLowerCase()) {
+                                            targetHolding = h;
+                                            break;
+                                          }
+                                        }
+                                        if (targetHolding == null) {
+                                          targetHolding = Holding()
+                                            ..name = name
+                                            ..symbol = name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase()
+                                            ..assetType = controller.newInvestmentAssetType
+                                            ..broker = 'manual'
+                                            ..quantity = 0.0
+                                            ..buyAvgPrice = 0.0
+                                            ..currentPrice = 0.0;
+                                        }
+
+                                        if (targetHolding.assetType == 'stable') {
+                                          if (controller.selectedType == 'expense' || controller.selectedType == 'transfer') {
+                                            targetHolding.quantity += amt;
+                                            targetHolding.buyAvgPrice = 1.0;
+                                            targetHolding.currentPrice = 1.0;
+                                          } else if (controller.selectedType == 'income') {
+                                            targetHolding.quantity = (targetHolding.quantity - amt).clamp(0.0, double.infinity);
+                                          }
+                                        } else {
+                                          if (controller.selectedType == 'expense' || controller.selectedType == 'transfer') {
+                                            final double oldCost = targetHolding.buyAvgPrice * targetHolding.quantity;
+                                            final double newCost = oldCost + amt;
+                                            targetHolding.quantity += 1.0;
+                                            targetHolding.buyAvgPrice = targetHolding.quantity > 0 ? newCost / targetHolding.quantity : 0.0;
+                                            if (targetHolding.currentPrice == 0.0) {
+                                              targetHolding.currentPrice = targetHolding.buyAvgPrice;
+                                            }
+                                          } else if (controller.selectedType == 'income') {
+                                            targetHolding.quantity = (targetHolding.quantity - 1.0).clamp(0.0, double.infinity);
+                                          }
+                                        }
+                                        targetHolding.lastUpdated = DateTime.now();
+                                        await ref.read(databaseServiceProvider).saveHolding(targetHolding);
+                                        await ref.read(holdingsProvider.notifier).loadHoldings();
+                                      }
+                                    }
 
                                     final tx = Transaction()
                                       ..amount = amt
-                                      ..description = selectedType == 'income' ? 'Received from $merchant' : 'Spent at $merchant'
-                                      ..transactionType = selectedType
-                                      ..category = selectedCategory
+                                      ..description = controller.selectedType == 'income' ? 'Received from $merchant' : 'Spent at $merchant'
+                                      ..transactionType = controller.selectedType
+                                      ..category = controller.selectedCategory
                                       ..timestamp = date
                                       ..source = item['source'] ?? 'sms'
                                       ..parserSource = geminiResult != null ? 'gemini' : 'regex'
                                       ..rawMessage = rawBody;
 
-                                    if (selectedType == 'transfer') {
-                                      tx.accountName = selectedAccount;
-                                      if (selectedToAccount.startsWith('card:')) {
-                                        tx.cardId = selectedToAccount.substring(5);
-                                      } else if (selectedToAccount.startsWith('bank:')) {
-                                        tx.cardId = selectedToAccount;
+                                    if (controller.selectedType == 'transfer') {
+                                      tx.accountName = controller.selectedAccount;
+                                      if (controller.selectedToAccount.startsWith('card:')) {
+                                        tx.cardId = controller.selectedToAccount.substring(5);
+                                      } else if (controller.selectedToAccount.startsWith('bank:')) {
+                                        tx.cardId = controller.selectedToAccount;
                                       } else {
                                         tx.cardId = null;
                                       }
                                     } else {
-                                      if (selectedAccount.startsWith('card:')) {
-                                        tx.cardId = selectedAccount.substring(5);
+                                      if (controller.selectedAccount.startsWith('card:')) {
+                                        tx.cardId = controller.selectedAccount.substring(5);
                                         tx.accountName = 'Credit Card';
                                       } else {
                                         tx.cardId = null;
-                                        tx.accountName = selectedAccount;
+                                        tx.accountName = controller.selectedAccount;
                                       }
                                     }
 
-                                    if (selectedType == 'income' && isPayback) {
-                                      final contact = paybackContactController.text.trim();
+                                    if (controller.selectedType == 'income' && controller.isPayback) {
+                                      final contact = controller.paybackContactController.text.trim();
                                       if (contact.isNotEmpty) {
                                         final allLoans = ref.read(loansProvider).valueOrNull ?? [];
                                         try {
@@ -3762,7 +3520,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                           );
                                           existing.amount += amt;
                                           existing.remainingBalance += amt;
-                                          existing.paybackDate = paybackDate;
+                                          existing.paybackDate = controller.paybackDate;
                                           final savedId = await ref.read(loansProvider.notifier).addLoan(existing);
                                           tx.linkedLoanId = savedId;
                                         } catch (_) {
@@ -3772,7 +3530,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                             ..amount = amt
                                             ..remainingBalance = amt
                                             ..startDate = DateTime.now()
-                                            ..paybackDate = paybackDate
+                                            ..paybackDate = controller.paybackDate
                                             ..interestRate = 0.0
                                             ..compoundInterval = 'none'
                                             ..emiAmount = 0.0;
@@ -3782,19 +3540,19 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                       }
                                     }
 
-                                    if ((selectedType == 'expense' || selectedType == 'transfer') && selectedDebtId != null) {
+                                    if ((controller.selectedType == 'expense' || controller.selectedType == 'transfer') && controller.selectedDebtId != null) {
                                       final allLoans = ref.read(loansProvider).valueOrNull ?? [];
                                       try {
-                                        final target = allLoans.firstWhere((l) => l.id == selectedDebtId);
+                                        final target = allLoans.firstWhere((l) => l.id == controller.selectedDebtId);
                                         target.remainingBalance = (target.remainingBalance - amt).clamp(0.0, double.infinity);
                                         await ref.read(loansProvider.notifier).addLoan(target);
                                       } catch (_) {}
-                                      tx.linkedLoanId = selectedDebtId;
+                                      tx.linkedLoanId = controller.selectedDebtId;
                                     }
 
                                     await ref.read(transactionsProvider.notifier).addTransaction(tx);
 
-                                    parser.logDebug('Approve clicked for index $currentIndex. Parsed: Amount=$amt, Merchant="$merchant", Type="$selectedType", Category="$selectedCategory", Account="$selectedAccount", Source="${geminiResult != null ? "gemini" : "regex"}". Raw body: "$rawBody"');
+                                    parser.logDebug('Approve clicked for index $currentIndex. Parsed: Amount=$amt, Merchant="$merchant", Type="${controller.selectedType}", Category="${controller.selectedCategory}", Account="${controller.selectedAccount}", Source="${geminiResult != null ? "gemini" : "regex"}". Raw body: "$rawBody"');
                                     setState(() {
                                       importedCount++;
                                       currentIndex++;

@@ -46,6 +46,17 @@ class Transactions extends _$Transactions {
     ref.invalidate(bankAccountsProvider);
     ref.invalidate(loansProvider);
   }
+
+  Future<void> updateTransaction(Transaction transaction) async {
+    final dbService = ref.read(databaseServiceProvider);
+    await dbService.saveTransaction(transaction);
+    ref.invalidateSelf();
+    await future;
+    // Invalidate dependent providers to update Net Worth instantly
+    ref.invalidate(creditCardsProvider);
+    ref.invalidate(bankAccountsProvider);
+    ref.invalidate(loansProvider);
+  }
 }
 
 // --- CREDIT CARDS NOTIFIER ---

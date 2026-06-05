@@ -4,6 +4,7 @@ import '../../../../core/theme.dart';
 import '../../../../core/providers.dart';
 import '../../../../core/animated_gradient_background.dart';
 import '../../../cards_loans/models/card_loan_models.dart';
+import 'package:my_personal_tracker/features/expenses/ui/widgets/transaction_dialogs.dart';
 
 class LoanDetailPage extends ConsumerWidget {
   final Loan loan;
@@ -258,6 +259,7 @@ class LoanDetailPage extends ConsumerWidget {
                                   child: GlassBlur(
                                     borderRadius: 14,
                                     child: ListTile(
+                                      onTap: () => showTransactionDetailDialog(context, tx),
                                       leading: Container(
                                         width: 40,
                                         height: 40,

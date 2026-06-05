@@ -23,7 +23,7 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -99,8 +99,9 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView>
               labelColor: AppColors.neonEmerald,
               unselectedLabelColor: AppColors.textSecondary,
               tabs: const [
-                Tab(text: 'Stocks (Zerodha)'),
-                Tab(text: 'Mutual Funds (Coin)'),
+                Tab(text: 'Stocks'),
+                Tab(text: 'Mutual Funds'),
+                Tab(text: 'Stable'),
               ],
             ),
           ),
@@ -117,30 +118,36 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView>
               double buyCost = 0.0;
               double stockVal = 0.0;
               double mfVal = 0.0;
-
+              double stableVal = 0.0;
+ 
               for (final h in holdings) {
                 final val = h.currentPrice * h.quantity;
                 currentVal += val;
                 buyCost += h.buyAvgPrice * h.quantity;
                 if (h.assetType == 'stock') {
                   stockVal += val;
-                } else {
+                } else if (h.assetType == 'mutual_fund') {
                   mfVal += val;
+                } else if (h.assetType == 'stable') {
+                  stableVal += val;
                 }
               }
-
+ 
               final returnsAmt = currentVal - buyCost;
               final returnsPct = buyCost > 0
                   ? (returnsAmt / buyCost) * 100
                   : 0.0;
               final isNegative = returnsAmt < 0;
-
-              final totalVal = stockVal + mfVal;
+ 
+              final totalVal = stockVal + mfVal + stableVal;
               final double stockPct = totalVal > 0
                   ? (stockVal / totalVal) * 100
                   : 0.0;
               final double mfPct = totalVal > 0
                   ? (mfVal / totalVal) * 100
+                  : 0.0;
+              final double stablePct = totalVal > 0
+                  ? (stableVal / totalVal) * 100
                   : 0.0;
 
               return Column(
@@ -211,7 +218,7 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView>
                       child: Container(
                         height: 110,
                         padding: const EdgeInsets.all(12),
-                        child: Row(
+                        child: Row(  
                           children: [
                             const SizedBox(width: 10),
                             SizedBox(
@@ -245,6 +252,18 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView>
                                           color: Colors.black,
                                         ),
                                       ),
+                                    if (stableVal > 0)
+                                      PieChartSectionData(
+                                        color: AppColors.neonPink,
+                                        value: stableVal,
+                                        title: '${stablePct.toStringAsFixed(0)}%',
+                                        radius: 28,
+                                        titleStyle: const TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                        ),
+                                      ),
                                   ],
                                   sectionsSpace: 2,
                                   centerSpaceRadius: 12,
@@ -258,15 +277,21 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _buildLegendItem(
-                                    'Stocks (Zerodha)',
+                                    'Stocks',
                                     stockVal.toIndianRupee(),
                                     AppColors.neonTeal,
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 4),
                                   _buildLegendItem(
-                                    'Mutual Funds (Coin)',
+                                    'Mutual Funds',
                                     mfVal.toIndianRupee(),
                                     AppColors.neonEmerald,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  _buildLegendItem(
+                                    'Stable',
+                                    stableVal.toIndianRupee(),
+                                    AppColors.neonPink,
                                   ),
                                 ],
                               ),
@@ -295,6 +320,9 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView>
                     .toList();
                 final mutualFunds = holdings
                     .where((h) => h.assetType == 'mutual_fund')
+                    .toList();
+                final stable = holdings
+                    .where((h) => h.assetType == 'stable')
                     .toList();
 
                 return TabBarView(
@@ -354,6 +382,35 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView>
                                 '${h.quantity.toStringAsFixed(0)} Units',
                                 'Avg NAV: ₹${h.buyAvgPrice.toStringAsFixed(1)}',
                                 'Current NAV: ₹${h.currentPrice.toStringAsFixed(1)}',
+                                '${isNegative ? "" : "+"}${pct.toStringAsFixed(1)}%',
+                              );
+                            },
+                          ),
+                    // Stable List
+                    stable.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No stable assets. Select Investment category to add holdings!',
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
+                          )
+                        : ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: stable.length,
+                            itemBuilder: (context, index) {
+                              final h = stable[index];
+                              final cost = h.buyAvgPrice * h.quantity;
+                              final curVal = h.currentPrice * h.quantity;
+                              final ret = curVal - cost;
+                              final pct = cost > 0 ? (ret / cost) * 100 : 0.0;
+                              final isNegative = ret < 0;
+
+                              return _buildHoldingItem(
+                                h.symbol,
+                                h.name,
+                                '₹${h.quantity.toStringAsFixed(0)} Amount',
+                                'Avg Price: ₹${h.buyAvgPrice.toStringAsFixed(1)}',
+                                'Current Value: ₹${h.currentPrice.toStringAsFixed(1)}',
                                 '${isNegative ? "" : "+"}${pct.toStringAsFixed(1)}%',
                               );
                             },

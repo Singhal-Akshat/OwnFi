@@ -8,6 +8,7 @@ import 'package:my_personal_tracker/core/theme.dart';
 import 'package:my_personal_tracker/core/animated_gradient_background.dart';
 import 'package:my_personal_tracker/core/providers.dart';
 import 'package:my_personal_tracker/features/cards_loans/models/card_loan_models.dart';
+import 'package:my_personal_tracker/features/expenses/ui/widgets/transaction_dialogs.dart';
 
 class BankAccountDetailView extends ConsumerStatefulWidget {
   final BankAccount account;
@@ -622,6 +623,7 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                               child: GlassBlur(
                                 borderRadius: 16,
                                 child: ListTile(
+                                  onTap: () => showTransactionDetailDialog(context, tx),
                                   leading: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
