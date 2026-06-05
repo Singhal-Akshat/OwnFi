@@ -1505,7 +1505,14 @@ class DashboardView extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref, {
     Transaction? existingTransaction,
-  }) {
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!context.mounted) return;
+
+    final expenseCats = prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Investment', 'Health', 'Education', 'Other'];
+    final incomeCats = prefs.getStringList('categories_income') ?? ['Salary', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
+    final transferCats = prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Other'];
+
     final amountController = TextEditingController(
       text: existingTransaction != null
           ? existingTransaction.amount.toStringAsFixed(0)
@@ -1627,22 +1634,13 @@ class DashboardView extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            final cardsState = ref.watch(creditCardsProvider);
-            final bankAccountsState = ref.watch(bankAccountsProvider);
-            final loansState = ref.watch(loansProvider);
-
-            return FutureBuilder<SharedPreferences>(
-              future: SharedPreferences.getInstance(),
-              builder: (context, prefsSnapshot) {
-                if (!prefsSnapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator(color: AppColors.neonTeal));
-                }
-                final prefs = prefsSnapshot.data!;
-                final expenseCats = prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Investment', 'Health', 'Education', 'Other'];
-                final incomeCats = prefs.getStringList('categories_income') ?? ['Salary', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
-                final transferCats = prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Other'];
+        return Consumer(
+          builder: (context, ref, child) {
+            return StatefulBuilder(
+              builder: (context, setState) {
+                final cardsState = ref.watch(creditCardsProvider);
+                final bankAccountsState = ref.watch(bankAccountsProvider);
+                final loansState = ref.watch(loansProvider);
 
                 final currentCats = selectedType == 'expense'
                     ? expenseCats
@@ -7348,6 +7346,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                         ref
                                             .read(creditCardsProvider.notifier)
                                             .loadCreditCards();
+                                        ref
+                                            .read(bankAccountsProvider.notifier)
+                                            .loadBankAccounts();
                                       } else if (type == 'loans') {
                                         await ref
                                             .read(databaseServiceProvider)
@@ -7371,6 +7372,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                         ref
                                             .read(creditCardsProvider.notifier)
                                             .loadCreditCards();
+                                        ref
+                                            .read(bankAccountsProvider.notifier)
+                                            .loadBankAccounts();
                                         ref
                                             .read(loansProvider.notifier)
                                             .loadLoans();
@@ -11533,6 +11537,8 @@ class _RecoveryBinPageState extends ConsumerState<RecoveryBinPage> {
     await ref.read(databaseServiceProvider).restoreTransaction(tx.id);
     ref.read(transactionsProvider.notifier).loadTransactions();
     ref.read(creditCardsProvider.notifier).loadCreditCards();
+    ref.read(bankAccountsProvider.notifier).loadBankAccounts();
+    ref.read(loansProvider.notifier).loadLoans();
     _loadDeletedTransactions();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

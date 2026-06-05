@@ -206,6 +206,55 @@ class DatabaseService {
 
   Future<void> saveTransaction(Transaction transaction) async {
     await isar.writeTxn(() async {
+      // Revert old transaction balances if we are updating an existing transaction
+      if (transaction.id != null && transaction.id != Isar.autoIncrement) {
+        final oldTx = await isar.transactions.get(transaction.id);
+        if (oldTx != null && !oldTx.isDeleted) {
+          if (oldTx.cardId != null) {
+            if (oldTx.cardId!.startsWith('bank:')) {
+              final toBankIdInt = int.tryParse(oldTx.cardId!.substring(5));
+              if (toBankIdInt != null) {
+                final toBank = await isar.bankAccounts.get(toBankIdInt);
+                if (toBank != null) {
+                  if (oldTx.transactionType == 'transfer') {
+                    toBank.balance -= oldTx.amount;
+                  }
+                  await isar.bankAccounts.put(toBank);
+                }
+              }
+            } else {
+              final cardIdInt = int.tryParse(oldTx.cardId!);
+              if (cardIdInt != null) {
+                final card = await isar.creditCards.get(cardIdInt);
+                if (card != null) {
+                  if (oldTx.transactionType == 'expense') {
+                    card.balance -= oldTx.amount;
+                  } else if (oldTx.transactionType == 'transfer') {
+                    card.balance += oldTx.amount;
+                  }
+                  await isar.creditCards.put(card);
+                }
+              }
+            }
+          }
+
+          if (oldTx.accountName != null && oldTx.accountName!.startsWith('bank:')) {
+            final bankIdInt = int.tryParse(oldTx.accountName!.substring(5));
+            if (bankIdInt != null) {
+              final bank = await isar.bankAccounts.get(bankIdInt);
+              if (bank != null) {
+                if (oldTx.transactionType == 'expense' || oldTx.transactionType == 'transfer') {
+                  bank.balance += oldTx.amount;
+                } else if (oldTx.transactionType == 'income') {
+                  bank.balance -= oldTx.amount;
+                }
+                await isar.bankAccounts.put(bank);
+              }
+            }
+          }
+        }
+      }
+
       await isar.transactions.put(transaction);
 
       // Adjust credit card balance if transaction is linked to a card
@@ -257,12 +306,14 @@ class DatabaseService {
   }
 
   Future<void> softDeleteTransaction(int id) async {
+    print('DEBUG: softDeleteTransaction called for id: $id');
     await isar.writeTxn(() async {
       final transaction = await isar.transactions.get(id);
       if (transaction != null) {
         transaction.isDeleted = true;
         transaction.deletedAt = DateTime.now();
         await isar.transactions.put(transaction);
+        print('DEBUG: softDeleteTransaction - marked transaction ${transaction.id} as deleted. type: ${transaction.transactionType}, amount: ${transaction.amount}, accountName: ${transaction.accountName}, cardId: ${transaction.cardId}');
 
         if (transaction.cardId != null) {
           if (transaction.cardId!.startsWith('bank:')) {
@@ -270,10 +321,12 @@ class DatabaseService {
             if (toBankIdInt != null) {
               final toBank = await isar.bankAccounts.get(toBankIdInt);
               if (toBank != null) {
+                final oldBalance = toBank.balance;
                 if (transaction.transactionType == 'transfer') {
                   toBank.balance -= transaction.amount;
                 }
                 await isar.bankAccounts.put(toBank);
+                print('DEBUG: softDeleteTransaction - reverted cardId bank (toBank) balance from $oldBalance to ${toBank.balance}');
               }
             }
           } else {
@@ -282,12 +335,14 @@ class DatabaseService {
             if (cardIdInt != null) {
               final card = await isar.creditCards.get(cardIdInt);
               if (card != null) {
+                final oldBalance = card.balance;
                 if (transaction.transactionType == 'expense') {
                   card.balance -= transaction.amount;
                 } else if (transaction.transactionType == 'transfer') {
                   card.balance += transaction.amount;
                 }
                 await isar.creditCards.put(card);
+                print('DEBUG: softDeleteTransaction - reverted creditCard balance from $oldBalance to ${card.balance}');
               }
             }
           }
@@ -299,15 +354,21 @@ class DatabaseService {
           if (bankIdInt != null) {
             final bank = await isar.bankAccounts.get(bankIdInt);
             if (bank != null) {
+              final oldBalance = bank.balance;
               if (transaction.transactionType == 'expense' || transaction.transactionType == 'transfer') {
                 bank.balance += transaction.amount;
               } else if (transaction.transactionType == 'income') {
                 bank.balance -= transaction.amount;
               }
               await isar.bankAccounts.put(bank);
+              print('DEBUG: softDeleteTransaction - reverted accountName bank balance from $oldBalance to ${bank.balance}');
+            } else {
+              print('DEBUG: softDeleteTransaction - bank account with id $bankIdInt not found in DB');
             }
           }
         }
+      } else {
+        print('DEBUG: softDeleteTransaction - transaction with id $id was null');
       }
     });
     onChanged?.call();

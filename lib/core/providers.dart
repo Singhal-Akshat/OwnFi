@@ -120,11 +120,16 @@ class BankAccountsNotifier extends StateNotifier<AsyncValue<List<BankAccount>>> 
   }
 
   Future<void> loadBankAccounts() async {
+    print('DEBUG: loadBankAccounts called');
     try {
       state = const AsyncValue.loading();
       final accounts = await _dbService.getAllBankAccounts();
+      for (final acc in accounts) {
+        print('DEBUG: loadBankAccounts - Loaded bank account: ${acc.bankName}, balance: ${acc.balance}');
+      }
       state = AsyncValue.data(accounts);
     } catch (e, st) {
+      print('DEBUG: loadBankAccounts - Error: $e');
       state = AsyncValue.error(e, st);
     }
   }
