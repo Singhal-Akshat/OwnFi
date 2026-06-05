@@ -49,7 +49,7 @@ class _ModelOnboardingScreenState extends State<ModelOnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Welcome to Money Tracker')),
+      appBar: AppBar(title: const Text('Welcome to OwnFi')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

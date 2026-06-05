@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_sms_inbox/flutter_sms_inbox.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -247,7 +248,7 @@ class SmsSyncService {
     return importedCount;
   }
 
-  Future<List<Map<String, dynamic>>> fetchNewSmsForReview() async {
+  Future<List<Map<String, dynamic>>> fetchNewSmsForReview({DateTime? since}) async {
     var permission = await Permission.sms.status;
     if (permission.isDenied) {
       permission = await Permission.sms.request();
@@ -269,7 +270,9 @@ class SmsSyncService {
     final bool allowDuplicates = allowDuplicatesStr == 'true';
 
     DateTime? lastSyncTime;
-    if (customStart == null || customEnd == null) {
+    if (since != null) {
+      lastSyncTime = since;
+    } else if (customStart == null || customEnd == null) {
       final lastSyncStr = await _storage.read(key: 'last_sms_sync_time');
       if (lastSyncStr != null && !allowDuplicates) {
         lastSyncTime = DateTime.parse(lastSyncStr);
@@ -322,6 +325,22 @@ class SmsSyncService {
       }
 
       final isTx = await _parser.isTransactionalSms(msg.body!);
+
+      if (!isTx) {
+        final regexSkippedList = prefs.getStringList('regex_skipped_messages') ?? [];
+        final msgJson = jsonEncode({
+          'body': msg.body,
+          'date': (msg.date ?? DateTime.now()).toIso8601String(),
+          'sender': msg.sender ?? 'Unknown',
+        });
+        if (!regexSkippedList.any((item) => jsonDecode(item)['body'] == msg.body)) {
+          regexSkippedList.insert(0, msgJson);
+          if (regexSkippedList.length > 200) {
+            regexSkippedList.removeLast();
+          }
+          await prefs.setStringList('regex_skipped_messages', regexSkippedList);
+        }
+      }
 
       results.add({
         'body': msg.body,

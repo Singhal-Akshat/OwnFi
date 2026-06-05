@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:isar/isar.dart';
 import 'core/theme.dart';
 import 'core/lock_screen.dart';
 import 'core/animated_gradient_background.dart';
@@ -14,6 +17,8 @@ import 'features/cards_loans/ui/cards_loans_view.dart';
 import 'features/investments/ui/investments_view.dart';
 import 'features/advisor/ui/advisor_view.dart';
 import 'ui/settings/settings_view.dart';
+import 'ui/settings/widgets/sync_review_helper.dart';
+import 'features/expenses/models/transaction_model.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -21,7 +26,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MypersonalTracker',
+      title: 'OwnFi',
       theme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
       debugShowCheckedModeBanner: false,
@@ -70,11 +75,114 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _checkOnboarding();
       AssetPrecacher.precache(context);
-      _performBackgroundSync();
+      await _performBackgroundSync();
+      if (mounted) {
+        _requestPermissionsAndCheckSyncReview();
+      }
     });
+  }
+
+  Future<void> _requestPermissionsAndCheckSyncReview() async {
+    try {
+      await Permission.notification.request();
+    } catch (_) {}
+
+    const storage = FlutterSecureStorage();
+    final review = await storage.read(key: 'settings_interactive_review') ?? 'false';
+    if (review != 'true') return;
+
+    final showOnlyValidStr = await storage.read(key: 'settings_show_only_valid_sms_email') ?? 'true';
+    final showOnlyValid = showOnlyValidStr == 'true';
+
+    try {
+      final dbService = ref.read(databaseServiceProvider);
+      final lastTx = await dbService.isar.transactions.where().sortByTimestampDesc().findFirst();
+      final DateTime? since = lastTx?.timestamp;
+      if (since == null) return;
+
+      final smsSync = ref.read(smsSyncServiceProvider);
+      final itemsForReview = await smsSync.fetchNewSmsForReview(since: since);
+      if (itemsForReview.isEmpty) return;
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: GlassBlur(
+              borderRadius: 24,
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: AppColors.neonTeal,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Unreviewed Transactions',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'You have ${itemsForReview.length} new SMS messages since your last logged transaction. Would you like to review and add them now?',
+                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(dialogContext);
+                          },
+                          child: const Text(
+                            'Bypass',
+                            style: TextStyle(color: Colors.white54),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(dialogContext);
+                            showSyncReviewDialog(
+                              context,
+                              ref,
+                              itemsForReview,
+                              showOnlyValidSmsEmail: showOnlyValid,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.neonTeal,
+                            foregroundColor: Colors.black,
+                          ),
+                          child: const Text('Review Now'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint('Startup sync review check failed: $e');
+    }
   }
 
   Future<void> _performBackgroundSync() async {

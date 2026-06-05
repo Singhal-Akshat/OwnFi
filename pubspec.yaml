@@ -88,11 +88,20 @@ dev_dependencies:
   build_runner: ^2.4.8
   isar_generator: 3.1.0+1
   riverpod_generator: ^2.3.9
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
 
   assets:
+    - assets/App_icon.png
     - assets/models/
     - assets/credit_card_images/
     - assets/bank_logos/
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/App_icon.png"
+  adaptive_icon_background: "#121212"
+  adaptive_icon_foreground: "assets/App_icon.png"

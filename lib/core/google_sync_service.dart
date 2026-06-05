@@ -13,6 +13,8 @@ import 'package:path_provider/path_provider.dart';
 import 'database_service.dart';
 import '../features/expenses/models/transaction_model.dart';
 import 'package:googleapis_auth/auth_io.dart' as auth;
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 final googleSyncServiceProvider = Provider<GoogleSyncService>(
   (ref) => GoogleSyncService(),
@@ -332,14 +334,31 @@ class GoogleSyncService {
         await driveApi.files.create(driveFile, uploadMedia: media);
       }
       
-      // Backup API keys securely to appDataFolder
+      // Backup API keys and UI/AI preferences securely to appDataFolder
       final geminiKey = await _storage.read(key: 'ai_gemini_key') ?? '';
       final openaiKey = await _storage.read(key: 'ai_openai_key') ?? '';
       final ollamaHost = await _storage.read(key: 'ai_ollama_host') ?? '';
+
+      final prefs = await SharedPreferences.getInstance();
+      final categoriesExpense = prefs.getStringList('categories_expense');
+      final categoriesIncome = prefs.getStringList('categories_income');
+      final categoriesTransfer = prefs.getStringList('categories_transfer');
+      final customCategoryIcons = prefs.getStringList('custom_category_icons');
+      final customCategoryColors = prefs.getStringList('custom_category_colors');
+      final selectedModelId = prefs.getString('selectedModelId');
+      final hasSeenModelOnboarding = prefs.getBool('hasSeenModelOnboarding');
+
       final keysMap = {
         'ai_gemini_key': geminiKey,
         'ai_openai_key': openaiKey,
         'ai_ollama_host': ollamaHost,
+        if (categoriesExpense != null) 'categories_expense': categoriesExpense,
+        if (categoriesIncome != null) 'categories_income': categoriesIncome,
+        if (categoriesTransfer != null) 'categories_transfer': categoriesTransfer,
+        if (customCategoryIcons != null) 'custom_category_icons': customCategoryIcons,
+        if (customCategoryColors != null) 'custom_category_colors': customCategoryColors,
+        if (selectedModelId != null) 'selectedModelId': selectedModelId,
+        if (hasSeenModelOnboarding != null) 'hasSeenModelOnboarding': hasSeenModelOnboarding,
       };
       final keysBytes = utf8.encode(jsonEncode(keysMap));
       final keysMedia = drive.Media(Stream.value(keysBytes), keysBytes.length);
@@ -427,6 +446,29 @@ class GoogleSyncService {
             if (keysMap['ai_gemini_key'] != null) await _storage.write(key: 'ai_gemini_key', value: keysMap['ai_gemini_key']);
             if (keysMap['ai_openai_key'] != null) await _storage.write(key: 'ai_openai_key', value: keysMap['ai_openai_key']);
             if (keysMap['ai_ollama_host'] != null) await _storage.write(key: 'ai_ollama_host', value: keysMap['ai_ollama_host']);
+
+            final prefs = await SharedPreferences.getInstance();
+            if (keysMap['categories_expense'] != null) {
+              await prefs.setStringList('categories_expense', List<String>.from(keysMap['categories_expense'] as List));
+            }
+            if (keysMap['categories_income'] != null) {
+              await prefs.setStringList('categories_income', List<String>.from(keysMap['categories_income'] as List));
+            }
+            if (keysMap['categories_transfer'] != null) {
+              await prefs.setStringList('categories_transfer', List<String>.from(keysMap['categories_transfer'] as List));
+            }
+            if (keysMap['custom_category_icons'] != null) {
+              await prefs.setStringList('custom_category_icons', List<String>.from(keysMap['custom_category_icons'] as List));
+            }
+            if (keysMap['custom_category_colors'] != null) {
+              await prefs.setStringList('custom_category_colors', List<String>.from(keysMap['custom_category_colors'] as List));
+            }
+            if (keysMap['selectedModelId'] != null) {
+              await prefs.setString('selectedModelId', keysMap['selectedModelId'] as String);
+            }
+            if (keysMap['hasSeenModelOnboarding'] != null) {
+              await prefs.setBool('hasSeenModelOnboarding', keysMap['hasSeenModelOnboarding'] as bool);
+            }
           } catch (e) {
             debugPrint('Failed to decode restored keys: $e');
           }

@@ -45,7 +45,7 @@ class _LockScreenState extends State<LockScreen> {
   Future<void> _authenticateBiometrics() async {
     try {
       final didAuth = await _auth.authenticate(
-        localizedReason: 'Authenticate to unlock MypersonalTracker',
+        localizedReason: 'Authenticate to unlock OwnFi',
         options: const AuthenticationOptions(
           biometricOnly: false,
           stickyAuth: true,
@@ -111,23 +111,27 @@ class _LockScreenState extends State<LockScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Glow lock icon
+                      // App logo
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: AppColors.neonPurple.withOpacity(0.08),
                           border: Border.all(color: AppColors.neonPurple.withOpacity(0.25)),
                         ),
-                        child: const Icon(
-                          Icons.lock_outline_rounded,
-                          size: 54,
-                          color: AppColors.neonPurple,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(40),
+                          child: Image.asset(
+                            'assets/App_icon.png',
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
                       const Text(
-                        'MypersonalTracker',
+                        'OwnFi',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
