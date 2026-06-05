@@ -4,6 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/theme.dart';
 import 'core/lock_screen.dart';
 import 'core/animated_gradient_background.dart';
+import 'core/utils/asset_precacher.dart';
+import 'core/google_sync_service.dart';
+import 'core/database_service.dart';
+import 'core/providers.dart';
 import 'ui/onboarding/model_onboarding.dart';
 import 'features/expenses/ui/dashboard_view.dart';
 import 'features/cards_loans/ui/cards_loans_view.dart';
@@ -51,14 +55,14 @@ class _AppStartupLockGateState extends ConsumerState<AppStartupLockGate> {
   }
 }
 
-class MainNavigationShell extends StatefulWidget {
+class MainNavigationShell extends ConsumerStatefulWidget {
   const MainNavigationShell({super.key});
 
   @override
-  State<MainNavigationShell> createState() => _MainNavigationShellState();
+  ConsumerState<MainNavigationShell> createState() => _MainNavigationShellState();
 }
 
-class _MainNavigationShellState extends State<MainNavigationShell>
+class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     with WidgetsBindingObserver {
   int _currentIndex = 0;
 
@@ -68,7 +72,27 @@ class _MainNavigationShellState extends State<MainNavigationShell>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOnboarding();
+      AssetPrecacher.precache(context);
+      _performBackgroundSync();
     });
+  }
+
+  Future<void> _performBackgroundSync() async {
+    try {
+      final dbService = ref.read(databaseServiceProvider);
+      final syncService = ref.read(googleSyncServiceProvider);
+      final restored = await syncService.syncOnStartup(dbService);
+      if (restored && mounted) {
+        // Reload all providers since database was restored
+        ref.read(transactionsProvider.notifier).loadTransactions();
+        ref.read(creditCardsProvider.notifier).loadCreditCards();
+        ref.read(bankAccountsProvider.notifier).loadBankAccounts();
+        ref.read(loansProvider.notifier).loadLoans();
+        ref.read(holdingsProvider.notifier).loadHoldings();
+      }
+    } catch (e) {
+      debugPrint('Background startup sync failed: $e');
+    }
   }
 
   @override
@@ -94,6 +118,8 @@ class _MainNavigationShellState extends State<MainNavigationShell>
     }
   }
 
+  final List<bool> _loadedScreens = [true, false, false, false, false];
+
   final List<Widget> _screens = const [
     DashboardView(),
     CardsLoansView(),
@@ -104,6 +130,10 @@ class _MainNavigationShellState extends State<MainNavigationShell>
 
   @override
   Widget build(BuildContext context) {
+    if (!_loadedScreens[_currentIndex]) {
+      _loadedScreens[_currentIndex] = true;
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBody: true,
@@ -112,7 +142,12 @@ class _MainNavigationShellState extends State<MainNavigationShell>
           const AnimatedGradientBackground(),
           SafeArea(
             bottom: false,
-            child: IndexedStack(index: _currentIndex, children: _screens),
+            child: IndexedStack(
+              index: _currentIndex,
+              children: List.generate(_screens.length, (index) {
+                return _loadedScreens[index] ? _screens[index] : const SizedBox.shrink();
+              }),
+            ),
           ),
         ],
       ),

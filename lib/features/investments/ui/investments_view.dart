@@ -381,6 +381,7 @@ class _InvestmentsViewState extends ConsumerState<InvestmentsView>
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassBlur(
         borderRadius: 16,
+        useBlur: false,
         child: ListTile(
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

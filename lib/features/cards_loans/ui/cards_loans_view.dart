@@ -361,10 +361,36 @@ class CardsLoansView extends ConsumerWidget {
                       ? SvgPicture.asset(
                           'assets/credit_card_images/${card.imageUrl}',
                           fit: BoxFit.fill,
+                          placeholderBuilder: (context) => Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: LinearGradient(
+                                colors: [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.1)],
+                              ),
+                            ),
+                          ),
                         )
                       : Image.asset(
                           'assets/credit_card_images/${card.imageUrl}',
                           fit: BoxFit.cover,
+                          frameBuilder: (context, child, frame, wasSync) {
+                            if (wasSync) return child;
+                            return AnimatedCrossFade(
+                              firstChild: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  gradient: LinearGradient(
+                                    colors: [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.1)],
+                                  ),
+                                ),
+                              ),
+                              secondChild: child,
+                              crossFadeState: frame == null
+                                  ? CrossFadeState.showFirst
+                                  : CrossFadeState.showSecond,
+                              duration: const Duration(milliseconds: 200),
+                            );
+                          },
                         ),
                 ),
 
@@ -573,10 +599,36 @@ class CardsLoansView extends ConsumerWidget {
                       ? SvgPicture.asset(
                           'assets/credit_card_images/${card.imageUrl}',
                           fit: BoxFit.fill,
+                          placeholderBuilder: (context) => Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: LinearGradient(
+                                colors: [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.1)],
+                              ),
+                            ),
+                          ),
                         )
                       : Image.asset(
                           'assets/credit_card_images/${card.imageUrl}',
                           fit: BoxFit.cover,
+                          frameBuilder: (context, child, frame, wasSync) {
+                            if (wasSync) return child;
+                            return AnimatedCrossFade(
+                              firstChild: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  gradient: LinearGradient(
+                                    colors: [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.1)],
+                                  ),
+                                ),
+                              ),
+                              secondChild: child,
+                              crossFadeState: frame == null
+                                  ? CrossFadeState.showFirst
+                                  : CrossFadeState.showSecond,
+                              duration: const Duration(milliseconds: 200),
+                            );
+                          },
                         ),
                 ),
               GlassBlur(
@@ -736,6 +788,7 @@ class CardsLoansView extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassBlur(
         borderRadius: 16,
+        useBlur: false,
         child: ListTile(
           title: Text(
             title,
@@ -822,16 +875,16 @@ class CardsLoansView extends ConsumerWidget {
 
     final imageOptions = [
       '',
-      'HDFC_MoneyBack_Vertical_HQ.avif',
-      'IDFC_Millennia_HQ.avif',
+      'HDFC_MoneyBack_Vertical_HQ.webp',
+      'IDFC_Millennia_HQ.webp',
       'LIC_Axis_Cropped_Vector.svg',
-      'RBL_Bank_Fitted.avif',
-      'SBI_SimplySave_Mobile.avif',
-      'Scapia_Rupay.avif',
-      'Scapia_Visa.avif',
-      'Tata_NeuCard_FullFrame.avif',
-      'UNI_YesBank_Vertical.avif',
-      'hsbc_vertical_card_final.avif',
+      'RBL_Bank_Fitted.webp',
+      'SBI_SimplySave_Mobile.webp',
+      'Scapia_Rupay.webp',
+      'Scapia_Visa.webp',
+      'Tata_NeuCard_FullFrame.webp',
+      'UNI_YesBank_Vertical.webp',
+      'hsbc_vertical_card_final.webp',
     ];
 
     showDialog(

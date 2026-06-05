@@ -162,6 +162,10 @@ class DashboardView extends ConsumerWidget {
                       cashAndBank,
                       totalCardOutstanding + totalDebts,
                       totalReceivables,
+                      isLoading: txsState.isLoading ||
+                          cardsState.isLoading ||
+                          loansState.isLoading ||
+                          holdingsState.isLoading,
                     ),
 
                     // Card 2+: Bank Accounts
@@ -260,6 +264,7 @@ class DashboardView extends ConsumerWidget {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: GlassBlur(
                           borderRadius: 16,
+                          useBlur: false,
                           child: ListTile(
                             onTap: () => _showAddExpenseDialog(
                               context,
@@ -318,10 +323,19 @@ class DashboardView extends ConsumerWidget {
                                                 ? SvgPicture.asset(
                                                     'assets/credit_card_images/${card.imageUrl}',
                                                     fit: BoxFit.fill,
+                                                    placeholderBuilder: (context) => Container(
+                                                      color: Colors.white10,
+                                                    ),
                                                   )
                                                 : Image.asset(
                                                     'assets/credit_card_images/${card.imageUrl}',
                                                     fit: BoxFit.cover,
+                                                    frameBuilder: (context, child, frame, wasSync) {
+                                                      if (wasSync) return child;
+                                                      return frame == null
+                                                          ? Container(color: Colors.white10)
+                                                          : child;
+                                                    },
                                                   ),
                                           ),
                                         );
@@ -354,6 +368,14 @@ class DashboardView extends ConsumerWidget {
                                           'assets/bank_logos/${bank.logoAsset}',
                                           width: 18,
                                           height: 18,
+                                          placeholderBuilder: (context) => const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 1.0,
+                                              color: AppColors.neonTeal,
+                                            ),
+                                          ),
                                         );
                                       } else {
                                         accountIcon = const Icon(
@@ -437,8 +459,8 @@ class DashboardView extends ConsumerWidget {
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
                                 color: tx.transactionType == 'income'
-                                    ? AppColors.neonEmerald
-                                    : Colors.white,
+                                      ? AppColors.neonEmerald
+                                      : Colors.white,
                               ),
                             ),
                           ),
@@ -500,8 +522,9 @@ class DashboardView extends ConsumerWidget {
     double totalHoldingsVal,
     double cashAndBank,
     double liabilities,
-    double receivables,
-  ) {
+    double receivables, {
+    required bool isLoading,
+  }) {
     return Container(
       width: 290,
       margin: const EdgeInsets.only(right: 16),
@@ -512,27 +535,55 @@ class DashboardView extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'NET WORTH',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                  letterSpacing: 1.2,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'NET WORTH',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  if (isLoading)
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: AppColors.neonTeal,
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 6),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  netWorth.toIndianRupee(),
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
+                child: isLoading
+                    ? const SizedBox(
+                        height: 38,
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.0,
+                              color: AppColors.neonTeal,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        netWorth.toIndianRupee(),
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
               ),
               const Spacer(),
               Row(

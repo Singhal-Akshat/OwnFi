@@ -34,9 +34,10 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _animation,
+        builder: (context, child) {
         final val = _animation.value;
         return Container(
           decoration: const BoxDecoration(
@@ -102,6 +103,7 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
           ),
         );
       },
-    );
+    ),
+   );
   }
 }

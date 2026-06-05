@@ -47,15 +47,8 @@ void main() async {
   final dbService = DatabaseService();
   await dbService.init();
 
-  // Perform startup cloud sync pull check
-  final syncService = GoogleSyncService();
-  try {
-    await syncService.syncOnStartup(dbService);
-  } catch (e) {
-    debugPrint('Cloud sync on startup failed: $e');
-  }
-
   // Hook up automatic backups on database changes
+  final syncService = GoogleSyncService();
   dbService.onChanged = () {
     syncService.triggerAutoBackup(dbService);
   };

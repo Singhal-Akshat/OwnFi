@@ -195,6 +195,14 @@ class DatabaseService {
   }
 
   // ----------------- TRANSACTIONS CRUD -----------------
+  List<Transaction> getActiveTransactionsSync() {
+    return isar.transactions.filter().isDeletedEqualTo(false).sortByTimestampDesc().findAllSync();
+  }
+
+  List<Transaction> getAllTransactionsSync() {
+    return getActiveTransactionsSync();
+  }
+
   Future<List<Transaction>> getActiveTransactions() async {
     return isar.transactions.filter().isDeletedEqualTo(false).sortByTimestampDesc().findAll();
   }
@@ -474,6 +482,10 @@ class DatabaseService {
   }
 
   // ----------------- CREDIT CARDS CRUD -----------------
+  List<CreditCard> getAllCreditCardsSync() {
+    return isar.creditCards.where().findAllSync();
+  }
+
   Future<List<CreditCard>> getAllCreditCards() async {
     return isar.creditCards.where().findAll();
   }
@@ -493,6 +505,10 @@ class DatabaseService {
   }
 
   // ----------------- LOANS CRUD -----------------
+  List<Loan> getAllLoansSync() {
+    return isar.loans.where().findAllSync();
+  }
+
   Future<List<Loan>> getAllLoans() async {
     return isar.loans.where().findAll();
   }
@@ -513,6 +529,10 @@ class DatabaseService {
   }
 
   // ----------------- HOLDINGS CRUD -----------------
+  List<Holding> getAllHoldingsSync() {
+    return isar.holdings.where().findAllSync();
+  }
+
   Future<List<Holding>> getAllHoldings() async {
     return isar.holdings.where().findAll();
   }
@@ -532,6 +552,10 @@ class DatabaseService {
   }
 
   // ----------------- BANK ACCOUNTS CRUD -----------------
+  List<BankAccount> getAllBankAccountsSync() {
+    return isar.bankAccounts.where().findAllSync();
+  }
+
   Future<List<BankAccount>> getAllBankAccounts() async {
     return isar.bankAccounts.where().findAll();
   }

@@ -218,6 +218,7 @@ class _LockScreenState extends State<LockScreen> {
                                     borderRadius: BorderRadius.circular(30),
                                     child: GlassBlur(
                                       borderRadius: 30,
+                                      useBlur: false,
                                       child: Center(
                                         child: icon ??
                                             Text(

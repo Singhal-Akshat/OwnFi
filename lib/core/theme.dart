@@ -107,6 +107,7 @@ class GlassBlur extends StatelessWidget {
   final double borderRadius;
   final Color cardColor;
   final Color borderColor;
+  final bool useBlur;
 
   const GlassBlur({
     super.key,
@@ -116,22 +117,32 @@ class GlassBlur extends StatelessWidget {
     this.borderRadius = 16.0,
     this.cardColor = AppColors.glassCard,
     this.borderColor = AppColors.glassBorder,
+    this.useBlur = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    final container = Container(
+      decoration: AppTheme.glassDecoration(
+        borderRadius: borderRadius,
+        color: cardColor,
+        borderColor: borderColor,
+      ),
+      child: child,
+    );
+
+    if (!useBlur || (blurX == 0.0 && blurY == 0.0)) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: container,
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blurX, sigmaY: blurY),
-        child: Container(
-          decoration: AppTheme.glassDecoration(
-            borderRadius: borderRadius,
-            color: cardColor,
-            borderColor: borderColor,
-          ),
-          child: child,
-        ),
+        child: container,
       ),
     );
   }

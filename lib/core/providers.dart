@@ -15,9 +15,9 @@ part 'providers.g.dart';
 @Riverpod(keepAlive: true)
 class Transactions extends _$Transactions {
   @override
-  FutureOr<List<Transaction>> build() async {
+  FutureOr<List<Transaction>> build() {
     final dbService = ref.watch(databaseServiceProvider);
-    return dbService.getAllTransactions();
+    return dbService.getAllTransactionsSync();
   }
 
   Future<void> loadTransactions() async {
@@ -52,9 +52,9 @@ class Transactions extends _$Transactions {
 @Riverpod(keepAlive: true)
 class CreditCards extends _$CreditCards {
   @override
-  FutureOr<List<CreditCard>> build() async {
+  FutureOr<List<CreditCard>> build() {
     final dbService = ref.watch(databaseServiceProvider);
-    return dbService.getAllCreditCards();
+    return dbService.getAllCreditCardsSync();
   }
 
   Future<void> loadCreditCards() async {
@@ -88,9 +88,9 @@ class CreditCards extends _$CreditCards {
 @Riverpod(keepAlive: true)
 class BankAccounts extends _$BankAccounts {
   @override
-  FutureOr<List<BankAccount>> build() async {
+  FutureOr<List<BankAccount>> build() {
     final dbService = ref.watch(databaseServiceProvider);
-    return dbService.getAllBankAccounts();
+    return dbService.getAllBankAccountsSync();
   }
 
   Future<void> loadBankAccounts() async {
@@ -124,9 +124,9 @@ class BankAccounts extends _$BankAccounts {
 @Riverpod(keepAlive: true)
 class Loans extends _$Loans {
   @override
-  FutureOr<List<Loan>> build() async {
+  FutureOr<List<Loan>> build() {
     final dbService = ref.watch(databaseServiceProvider);
-    return dbService.getAllLoans();
+    return dbService.getAllLoansSync();
   }
 
   Future<void> loadLoans() async {
@@ -154,9 +154,9 @@ class Loans extends _$Loans {
 @Riverpod(keepAlive: true)
 class Holdings extends _$Holdings {
   @override
-  FutureOr<List<Holding>> build() async {
+  FutureOr<List<Holding>> build() {
     final dbService = ref.watch(databaseServiceProvider);
-    return dbService.getAllHoldings();
+    return dbService.getAllHoldingsSync();
   }
 
   Future<void> loadHoldings() async {
