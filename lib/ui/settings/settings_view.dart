@@ -47,6 +47,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
   bool _checkingLocalLLM = false;
   bool _interactiveReviewEnabled = false;
   bool _allowSyncDuplicates = false;
+  bool _showOnlyValidSmsEmail = true;
   int _smsLookbackValue = 180;
   String _smsLookbackUnit = 'days';
   DateTime? _syncStartDate;
@@ -69,6 +70,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     final localLLM = await _storage.read(key: 'ai_use_local') ?? 'false';
     final review = await _storage.read(key: 'settings_interactive_review') ?? 'false';
     final allowDuplicates = await _storage.read(key: 'settings_sms_sync_allow_duplicates') ?? 'false';
+    final showOnlyValid = await _storage.read(key: 'settings_show_only_valid_sms_email') ?? 'true';
 
     String? lookbackValStr = await _storage.read(
       key: 'settings_sms_lookback_value',
@@ -95,6 +97,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       _localLLMEnabled = localLLM == 'true';
       _interactiveReviewEnabled = review == 'true';
       _allowSyncDuplicates = allowDuplicates == 'true';
+      _showOnlyValidSmsEmail = showOnlyValid == 'true';
       if (lookbackValStr != null) {
         _smsLookbackValue = int.tryParse(lookbackValStr) ?? 180;
       }
@@ -264,6 +267,29 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     );
                   },
                  ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                SwitchListTile(
+                  title: const Text(
+                    'Show Only Valid SMS/Email',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Only review regex-approved messages first during sync',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  value: _showOnlyValidSmsEmail,
+                  activeColor: AppColors.neonTeal,
+                  onChanged: (val) async {
+                    setState(() => _showOnlyValidSmsEmail = val);
+                    await _storage.write(
+                      key: 'settings_show_only_valid_sms_email',
+                      value: val.toString(),
+                    );
+                  },
+                ),
                 const Divider(height: 1, color: AppColors.glassBorder),
                 SwitchListTile(
                   title: const Text(
@@ -2737,6 +2763,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     BuildContext context,
     List<Map<String, dynamic>> items,
   ) {
+    final validItems = items.where((item) => item['approvedByRegex'] == true).toList();
+    final rejectedItems = items.where((item) => item['approvedByRegex'] == false).toList();
+
+    List<Map<String, dynamic>> currentReviewItems = _showOnlyValidSmsEmail ? validItems : items;
+    bool reviewingRejected = false;
+
     int currentIndex = 0;
     int importedCount = 0;
     int skippedCount = 0;
@@ -2760,7 +2792,100 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (stateContext, setState) {
-            if (currentIndex >= items.length) {
+            if (currentIndex >= currentReviewItems.length) {
+              if (_showOnlyValidSmsEmail && !reviewingRejected && rejectedItems.isNotEmpty) {
+                return Dialog(
+                  backgroundColor: Colors.transparent,
+                  child: GlassBlur(
+                    borderRadius: 24,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_outline_rounded,
+                            color: AppColors.neonEmerald,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Valid Messages Reviewed!',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Imported: $importedCount\nSkipped: $skippedCount',
+                            style: const TextStyle(color: Colors.white70),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: Text(
+                              'There are ${rejectedItems.length} messages that were rejected/filtered out by the regex parser.',
+                              style: const TextStyle(fontSize: 12, color: Colors.white70),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              TextButton(
+                                onPressed: () async {
+                                  const storage = FlutterSecureStorage();
+                                  await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
+                                  ref.read(transactionsProvider.notifier).loadTransactions();
+                                  ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                  ref.read(loansProvider.notifier).loadLoans();
+                                  Navigator.pop(dialogContext);
+                                },
+                                child: const Text('Finish Sync', style: TextStyle(color: Colors.white70)),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    currentReviewItems = rejectedItems;
+                                    currentIndex = 0;
+                                    reviewingRejected = true;
+                                    regexCache.clear();
+                                    geminiCache.clear();
+                                    geminiLoading.clear();
+                                    forceGemini.clear();
+                                    disagreed.clear();
+                                    lastInitializedIndex = null;
+                                    lastGemini = null;
+                                    lastRegex = null;
+                                    controller.reset();
+                                  });
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.neonTeal,
+                                ),
+                                child: Text(
+                                  'Review Rejected (${rejectedItems.length})',
+                                  style: const TextStyle(color: Colors.black),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+
               return Dialog(
                 backgroundColor: Colors.transparent,
                 child: GlassBlur(
@@ -2776,9 +2901,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           size: 48,
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          'Sync Review Finished!',
-                          style: TextStyle(
+                        Text(
+                          reviewingRejected ? 'Rejected Review Finished!' : 'Sync Review Finished!',
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -2812,7 +2937,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               );
             }
 
-            final item = items[currentIndex];
+            final item = currentReviewItems[currentIndex];
             final String rawBody = item['body'] ?? '';
             final DateTime date = item['date'] ?? DateTime.now();
 
@@ -2822,9 +2947,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
 
             void ensureParsed(int index) {
-              if (index < 0 || index >= items.length) return;
-              final bodyText = items[index]['body'] as String;
-              final isApproved = items[index]['approvedByRegex'] ?? false;
+              if (index < 0 || index >= currentReviewItems.length) return;
+              final bodyText = currentReviewItems[index]['body'] as String;
+              final isApproved = currentReviewItems[index]['approvedByRegex'] ?? false;
 
               if (!regexCache.containsKey(index)) {
                 regexCache[index] = parser.parseRegexOnly(bodyText);
@@ -3057,7 +3182,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Review Sync (${currentIndex + 1}/${items.length})',
+                              reviewingRejected
+                                  ? 'Review Rejected (${currentIndex + 1}/${currentReviewItems.length})'
+                                  : 'Review Sync (${currentIndex + 1}/${currentReviewItems.length})',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -3455,24 +3582,16 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                         }
 
                                         if (targetHolding.assetType == 'stable') {
-                                          if (controller.selectedType == 'expense' || controller.selectedType == 'transfer') {
-                                            targetHolding.quantity += amt;
-                                            targetHolding.buyAvgPrice = 1.0;
-                                            targetHolding.currentPrice = 1.0;
-                                          } else if (controller.selectedType == 'income') {
-                                            targetHolding.quantity = (targetHolding.quantity - amt).clamp(0.0, double.infinity);
-                                          }
+                                          targetHolding.quantity += amt;
+                                          targetHolding.buyAvgPrice = 1.0;
+                                          targetHolding.currentPrice = 1.0;
                                         } else {
-                                          if (controller.selectedType == 'expense' || controller.selectedType == 'transfer') {
-                                            final double oldCost = targetHolding.buyAvgPrice * targetHolding.quantity;
-                                            final double newCost = oldCost + amt;
-                                            targetHolding.quantity += 1.0;
-                                            targetHolding.buyAvgPrice = targetHolding.quantity > 0 ? newCost / targetHolding.quantity : 0.0;
-                                            if (targetHolding.currentPrice == 0.0) {
-                                              targetHolding.currentPrice = targetHolding.buyAvgPrice;
-                                            }
-                                          } else if (controller.selectedType == 'income') {
-                                            targetHolding.quantity = (targetHolding.quantity - 1.0).clamp(0.0, double.infinity);
+                                          final double oldCost = targetHolding.buyAvgPrice * targetHolding.quantity;
+                                          final double newCost = oldCost + amt;
+                                          targetHolding.quantity += 1.0;
+                                          targetHolding.buyAvgPrice = targetHolding.quantity > 0 ? newCost / targetHolding.quantity : 0.0;
+                                          if (targetHolding.currentPrice == 0.0) {
+                                            targetHolding.currentPrice = targetHolding.buyAvgPrice;
                                           }
                                         }
                                         targetHolding.lastUpdated = DateTime.now();

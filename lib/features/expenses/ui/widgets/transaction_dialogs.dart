@@ -873,24 +873,16 @@ void showTransactionEntryDialog(
                                   }
 
                                   if (targetHolding.assetType == 'stable') {
-                                    if (controller.selectedType == 'expense' || controller.selectedType == 'transfer') {
-                                      targetHolding.quantity += amount;
-                                      targetHolding.buyAvgPrice = 1.0;
-                                      targetHolding.currentPrice = 1.0;
-                                    } else if (controller.selectedType == 'income') {
-                                      targetHolding.quantity = (targetHolding.quantity - amount).clamp(0.0, double.infinity);
-                                    }
+                                    targetHolding.quantity += amount;
+                                    targetHolding.buyAvgPrice = 1.0;
+                                    targetHolding.currentPrice = 1.0;
                                   } else {
-                                    if (controller.selectedType == 'expense' || controller.selectedType == 'transfer') {
-                                      final double oldCost = targetHolding.buyAvgPrice * targetHolding.quantity;
-                                      final double newCost = oldCost + amount;
-                                      targetHolding.quantity += 1.0;
-                                      targetHolding.buyAvgPrice = targetHolding.quantity > 0 ? newCost / targetHolding.quantity : 0.0;
-                                      if (targetHolding.currentPrice == 0.0) {
-                                        targetHolding.currentPrice = targetHolding.buyAvgPrice;
-                                      }
-                                    } else if (controller.selectedType == 'income') {
-                                      targetHolding.quantity = (targetHolding.quantity - 1.0).clamp(0.0, double.infinity);
+                                    final double oldCost = targetHolding.buyAvgPrice * targetHolding.quantity;
+                                    final double newCost = oldCost + amount;
+                                    targetHolding.quantity += 1.0;
+                                    targetHolding.buyAvgPrice = targetHolding.quantity > 0 ? newCost / targetHolding.quantity : 0.0;
+                                    if (targetHolding.currentPrice == 0.0) {
+                                      targetHolding.currentPrice = targetHolding.buyAvgPrice;
                                     }
                                   }
                                   targetHolding.lastUpdated = DateTime.now();
