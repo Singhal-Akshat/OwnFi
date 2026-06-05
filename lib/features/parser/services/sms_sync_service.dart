@@ -109,8 +109,9 @@ class SmsSyncService {
     int importedCount = 0;
     final isar = _dbService.isar;
 
-    // Load credit cards to match last4 digits
+    // Load credit cards and bank accounts for matching
     final cards = await _dbService.getAllCreditCards();
+    final bankAccounts = await _dbService.getAllBankAccounts();
 
     // Pre-validate Gemini key for bulk
     final apiKey = await _storage.read(key: 'ai_gemini_key');
@@ -126,7 +127,12 @@ class SmsSyncService {
     for (final msg in newMessages) {
       if (msg.body == null) continue;
       if (skippedList.contains(msg.body)) continue;
-      final parsed = await _parser.parseAsync(msg.body!, isBulk: true);
+      final parsed = await _parser.parseAsync(
+        msg.body!,
+        isBulk: true,
+        cards: cards,
+        bankAccounts: bankAccounts,
+      );
       if (parsed != null) {
         parsedMessages.add(MapEntry(msg, parsed));
       }
@@ -149,11 +155,12 @@ class SmsSyncService {
 
         if (existing != null) continue; // Duplicate
 
-        // Match card last4 if present
+        // --- Resolve Account ---
         String? matchedCardId;
-        String? accountName = parsed.cardLast4 != null ? 'Credit Card' : (parsed.accountLast4 != null ? 'Bank' : 'Cash');
+        String? accountName;
 
         if (parsed.cardLast4 != null) {
+          // Try to match a credit card
           final matchedCard = cards.firstWhere(
             (c) => c.last4 == parsed.cardLast4,
             orElse: () => CreditCard(),
@@ -161,15 +168,58 @@ class SmsSyncService {
           if (matchedCard.id != Isar.autoIncrement) {
             matchedCardId = matchedCard.id.toString();
             accountName = '${matchedCard.cardName} (..${matchedCard.last4})';
-            
-            // Adjust card balance in database!
+
+            // Adjust card balance
             if (parsed.transactionType == 'expense') {
               matchedCard.balance += parsed.amount;
             } else if (parsed.transactionType == 'income') {
-              // Cash back or refunds
               matchedCard.balance -= parsed.amount;
             }
             await isar.creditCards.put(matchedCard);
+          } else {
+            // Card not found in DB — fall back to Cash
+            accountName = 'Cash';
+          }
+        } else {
+          // Try to match a bank account via matchedAccountId from Gemini
+          BankAccount? matchedBank;
+
+          if (parsed.matchedAccountId != null &&
+              parsed.matchedAccountId!.startsWith('bank:')) {
+            final bankIdInt =
+                int.tryParse(parsed.matchedAccountId!.substring(5));
+            if (bankIdInt != null) {
+              try {
+                matchedBank = bankAccounts.firstWhere(
+                  (b) => b.id == bankIdInt,
+                );
+              } catch (_) {}
+            }
+          }
+
+          // Fall back: match by last4 digits
+          if (matchedBank == null && parsed.accountLast4 != null) {
+            try {
+              matchedBank = bankAccounts.firstWhere(
+                (b) => b.last4 == parsed.accountLast4,
+              );
+            } catch (_) {}
+          }
+
+          if (matchedBank != null) {
+            accountName = 'bank:${matchedBank.id}';
+
+            // Adjust bank account balance
+            if (parsed.transactionType == 'expense' ||
+                parsed.transactionType == 'transfer') {
+              matchedBank.balance -= parsed.amount;
+            } else if (parsed.transactionType == 'income') {
+              matchedBank.balance += parsed.amount;
+            }
+            await isar.bankAccounts.put(matchedBank);
+          } else {
+            // No bank account matched — fall back to Cash
+            accountName = 'Cash';
           }
         }
 

@@ -18,6 +18,8 @@ class CardsLoansView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cardsState = ref.watch(creditCardsProvider);
     final loansState = ref.watch(loansProvider);
+    final txsState = ref.watch(transactionsProvider);
+    final allTxs = txsState.valueOrNull ?? [];
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -46,7 +48,7 @@ class CardsLoansView extends ConsumerWidget {
                     physics: const BouncingScrollPhysics(),
                     children: [
                       ...cards.map((card) {
-                        return _buildCreditCardItem(context, ref, card);
+                        return _buildCreditCardItem(context, ref, card, allTxs);
                       }),
                       _buildAddCardButton(context, ref),
                     ],
@@ -369,10 +371,52 @@ class CardsLoansView extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     CreditCard card,
+    List<dynamic> allTxs,
   ) {
     bool showSpent = true; // State for toggle
     bool isLongPressed = false; // State for edit/delete
     bool isFlipped = false; // State for flip
+
+    // Compute dynamic spent (current cycle) and statement (last cycle) from transactions
+    final now = DateTime.now();
+    final DateTime mostRecentStatementDate;
+    final DateTime previousStatementDate;
+    if (now.day >= card.statementDay) {
+      mostRecentStatementDate = DateTime(now.year, now.month, card.statementDay);
+      previousStatementDate = DateTime(
+        now.month == 1 ? now.year - 1 : now.year,
+        now.month == 1 ? 12 : now.month - 1,
+        card.statementDay,
+      );
+    } else {
+      mostRecentStatementDate = DateTime(
+        now.month == 1 ? now.year - 1 : now.year,
+        now.month == 1 ? 12 : now.month - 1,
+        card.statementDay,
+      );
+      final prevMonth = mostRecentStatementDate.month;
+      final prevYear = mostRecentStatementDate.year;
+      previousStatementDate = DateTime(
+        prevMonth == 1 ? prevYear - 1 : prevYear,
+        prevMonth == 1 ? 12 : prevMonth - 1,
+        card.statementDay,
+      );
+    }
+    final cardId = card.id.toString();
+    final computedSpent = allTxs
+        .where((t) =>
+            t.cardId == cardId &&
+            t.transactionType == 'expense' &&
+            t.timestamp.isAfter(mostRecentStatementDate))
+        .fold<double>(0.0, (sum, t) => sum + t.amount);
+    final computedStatement = allTxs
+        .where((t) =>
+            t.cardId == cardId &&
+            t.transactionType == 'expense' &&
+            t.timestamp.isAfter(previousStatementDate) &&
+            t.timestamp.isBefore(
+                mostRecentStatementDate.add(const Duration(seconds: 1))))
+        .fold<double>(0.0, (sum, t) => sum + t.amount);
 
     return StatefulBuilder(
       builder: (context, setState) {
@@ -616,8 +660,8 @@ class CardsLoansView extends ConsumerWidget {
                                 const SizedBox(height: 8),
                                 Text(
                                   showSpent
-                                      ? '₹${card.balance.toStringAsFixed(0)}'
-                                      : '₹${card.statementAmount.toStringAsFixed(0)}',
+                                      ? '₹${computedSpent.toStringAsFixed(0)}'
+                                      : '₹${computedStatement.toStringAsFixed(0)}',
                                   style: GoogleFonts.spaceGrotesk(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w700,

@@ -103,17 +103,13 @@ class TransactionFormFields extends ConsumerWidget {
       future: SharedPreferences.getInstance(),
       builder: (context, snapshot) {
         final prefs = snapshot.data;
-        final List<String> expenseCats = List<String>.from(prefs?.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Investment', 'Payback', 'Other']);
+        final List<String> expenseCats = List<String>.from(prefs?.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Payback', 'Other']);
         final List<String> incomeCats = List<String>.from(prefs?.getStringList('categories_income') ?? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other']);
         final List<String> transferCats = List<String>.from(prefs?.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Investment', 'Other']);
 
         final List<String> currentCats = List<String>.from(controller.selectedType == 'expense'
             ? expenseCats
             : (controller.selectedType == 'income' ? incomeCats : transferCats));
-
-        if (!currentCats.contains('Investment')) {
-          currentCats.add('Investment');
-        }
 
         if (!currentCats.contains(controller.selectedCategory)) {
           if (currentCats.contains('Other')) {
@@ -427,7 +423,7 @@ class TransactionFormFields extends ConsumerWidget {
                   },
                 ),
               ],
-            ] else ...[
+            ] else if (controller.selectedCategory != 'Investment') ...[
               DropdownButtonFormField<String>(
                 value: controller.selectedAccount,
                 decoration: const InputDecoration(

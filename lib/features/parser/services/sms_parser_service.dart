@@ -70,7 +70,12 @@ class SmsParserService {
     caseSensitive: false,
   );
 
-  Future<ParsedSmsTransaction?> parseAsync(String smsBody, {bool isBulk = false}) async {
+  Future<ParsedSmsTransaction?> parseAsync(
+    String smsBody, {
+    bool isBulk = false,
+    List<CreditCard>? cards,
+    List<BankAccount>? bankAccounts,
+  }) async {
     final body = smsBody.trim();
     await logDebug('Parsing SMS Body: "$body"');
 
@@ -107,7 +112,12 @@ class SmsParserService {
       if (key == null || key.isEmpty) {
         throw Exception("Gemini API Key missing for Bulk Sync.");
       }
-      final aiResultStr = await _parseWithGeminiRaw(body, key);
+      final aiResultStr = await _parseWithGeminiRaw(
+        body,
+        key,
+        cards: cards,
+        bankAccounts: bankAccounts,
+      );
       final aiResult = _decodeAiJson(aiResultStr);
       if (aiResult != null) {
         if (!aiResult.isTransaction) return null;
@@ -119,6 +129,7 @@ class SmsParserService {
           cardLast4: aiResult.cardLast4 ?? regexResult?.cardLast4,
           accountLast4: aiResult.accountLast4 ?? regexResult?.accountLast4,
           merchant: aiResult.merchant,
+          matchedAccountId: aiResult.matchedAccountId,
           parserSource: 'gemini',
           isTransaction: true,
         );

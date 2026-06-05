@@ -244,6 +244,13 @@ double cashAndBank(CashAndBankRef ref) {
   double total = 0.0;
   final txs = ref.watch(transactionsProvider).valueOrNull ?? [];
   for (final tx in txs) {
+    // Skip investment-income transactions: they are tracked in Holdings
+    // (totalHoldingsValue), not in Cash/Bank. Counting them here causes
+    // double-counting in Net Worth when the user categorises a credited SMS
+    // as 'Investment' and a Holding is also created.
+    if (tx.transactionType == 'income' && tx.category == 'Investment') {
+      continue;
+    }
     if (tx.cardId == null &&
         (tx.accountName == 'Cash' ||
             tx.accountName == null ||

@@ -396,8 +396,10 @@ class DashboardView extends ConsumerWidget {
                               ),
                             ),
                             subtitle: () {
-                              String accountDisplayName = 'Cash';
-                              if (tx.cardId != null) {
+                              String accountDisplayName;
+                              if (tx.category == 'Investment') {
+                                accountDisplayName = tx.description;
+                              } else if (tx.cardId != null) {
                                 accountDisplayName = 'Credit Card';
                               } else if (tx.accountName != null) {
                                 if (tx.accountName!.startsWith('bank:')) {
@@ -416,6 +418,8 @@ class DashboardView extends ConsumerWidget {
                                 } else {
                                   accountDisplayName = tx.accountName!;
                                 }
+                              } else {
+                                accountDisplayName = 'Cash';
                               }
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -87,6 +87,7 @@ class EmailSyncService {
     int count = 0;
     final isar = _dbService.isar;
     final cards = await _dbService.getAllCreditCards();
+    final bankAccounts = await _dbService.getAllBankAccounts();
 
     for (final message in fetchResult.messages) {
       final subject = message.decodeSubject() ?? '';
@@ -95,7 +96,12 @@ class EmailSyncService {
 
       // Case 1: Detect transaction alert emails
       if (_isTransactionSubject(subject) || _isTransactionBody(bodyText)) {
-        final parsed = await _parser.parseAsync(bodyText, isBulk: true);
+        final parsed = await _parser.parseAsync(
+          bodyText,
+          isBulk: true,
+          cards: cards,
+          bankAccounts: bankAccounts,
+        );
         if (parsed != null) {
           await isar.writeTxn(() async {
             // Deduplicate
@@ -107,11 +113,15 @@ class EmailSyncService {
                 .findFirst();
 
             if (existing == null) {
+              // --- Resolve Account ---
               String? cardId;
-              String? accountName = parsed.cardLast4 != null ? 'Credit Card' : (parsed.accountLast4 != null ? 'Bank' : 'Cash');
+              String? accountName;
 
               if (parsed.cardLast4 != null) {
-                final card = cards.firstWhere((c) => c.last4 == parsed.cardLast4, orElse: () => CreditCard());
+                final card = cards.firstWhere(
+                  (c) => c.last4 == parsed.cardLast4,
+                  orElse: () => CreditCard(),
+                );
                 if (card.id != Isar.autoIncrement) {
                   cardId = card.id.toString();
                   accountName = '${card.cardName} (..${card.last4})';
@@ -121,6 +131,47 @@ class EmailSyncService {
                     card.balance -= parsed.amount;
                   }
                   await isar.creditCards.put(card);
+                } else {
+                  accountName = 'Cash';
+                }
+              } else {
+                // Try to match a bank account via matchedAccountId from Gemini
+                BankAccount? matchedBank;
+
+                if (parsed.matchedAccountId != null &&
+                    parsed.matchedAccountId!.startsWith('bank:')) {
+                  final bankIdInt =
+                      int.tryParse(parsed.matchedAccountId!.substring(5));
+                  if (bankIdInt != null) {
+                    try {
+                      matchedBank = bankAccounts.firstWhere(
+                        (b) => b.id == bankIdInt,
+                      );
+                    } catch (_) {}
+                  }
+                }
+
+                // Fall back: match by last4 digits
+                if (matchedBank == null && parsed.accountLast4 != null) {
+                  try {
+                    matchedBank = bankAccounts.firstWhere(
+                      (b) => b.last4 == parsed.accountLast4,
+                    );
+                  } catch (_) {}
+                }
+
+                if (matchedBank != null) {
+                  accountName = 'bank:${matchedBank.id}';
+                  if (parsed.transactionType == 'expense' ||
+                      parsed.transactionType == 'transfer') {
+                    matchedBank.balance -= parsed.amount;
+                  } else if (parsed.transactionType == 'income') {
+                    matchedBank.balance += parsed.amount;
+                  }
+                  await isar.bankAccounts.put(matchedBank);
+                } else {
+                  // No bank account matched — fall back to Cash
+                  accountName = 'Cash';
                 }
               }
 

@@ -7,6 +7,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:my_personal_tracker/core/theme.dart';
 import 'package:my_personal_tracker/core/animated_gradient_background.dart';
 import 'package:my_personal_tracker/core/providers.dart';
+import 'package:my_personal_tracker/core/utils/category_utils.dart';
 import 'package:my_personal_tracker/features/cards_loans/models/card_loan_models.dart';
 import 'package:my_personal_tracker/features/expenses/ui/widgets/transaction_dialogs.dart';
 
@@ -627,20 +628,18 @@ class _BankAccountDetailViewState extends ConsumerState<BankAccountDetailView> {
                                   leading: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color:
-                                          (isIncome
-                                                  ? AppColors.neonEmerald
-                                                  : AppColors.neonTeal)
-                                              .withOpacity(0.1),
+                                      color: CategoryUtils.getCategoryColor(
+                                        tx.category,
+                                        isIncome ? AppColors.neonEmerald : AppColors.neonTeal,
+                                      ).withOpacity(0.12),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
-                                      isIncome
-                                          ? Icons.arrow_downward
-                                          : Icons.arrow_upward,
-                                      color: isIncome
-                                          ? AppColors.neonEmerald
-                                          : AppColors.neonTeal,
+                                      CategoryUtils.getCategoryIcon(tx.category),
+                                      color: CategoryUtils.getCategoryColor(
+                                        tx.category,
+                                        isIncome ? AppColors.neonEmerald : AppColors.neonTeal,
+                                      ),
                                       size: 20,
                                     ),
                                   ),

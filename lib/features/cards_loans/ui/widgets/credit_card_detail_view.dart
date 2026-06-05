@@ -7,6 +7,7 @@ import 'package:local_auth/local_auth.dart';
 import '../../../../core/theme.dart';
 import '../../../../core/providers.dart';
 import '../../../../core/animated_gradient_background.dart';
+import '../../../../core/utils/category_utils.dart';
 import '../../../cards_loans/models/card_loan_models.dart';
 import 'package:my_personal_tracker/features/expenses/ui/widgets/transaction_dialogs.dart';
 
@@ -27,6 +28,7 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
   bool _isFlipped = false;
   String _selectedFilter = 'spent'; // 'spent' or 'statement'
 
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +46,56 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
     _statementController.dispose();
     super.dispose();
   }
+
+  /// Compute statement-cycle bounds and return (spent, statement) totals from [allTxs].
+  (double, double) _computeTotals(List<dynamic> allTxs) {
+    final cardTxs = allTxs
+        .where((t) => t.cardId == widget.card.id.toString())
+        .toList();
+
+    final now = DateTime.now();
+    DateTime mostRecentStatementDate;
+    DateTime previousStatementDate;
+
+    if (now.day >= widget.card.statementDay) {
+      mostRecentStatementDate =
+          DateTime(now.year, now.month, widget.card.statementDay);
+      previousStatementDate = DateTime(
+        now.month == 1 ? now.year - 1 : now.year,
+        now.month == 1 ? 12 : now.month - 1,
+        widget.card.statementDay,
+      );
+    } else {
+      mostRecentStatementDate = DateTime(
+        now.month == 1 ? now.year - 1 : now.year,
+        now.month == 1 ? 12 : now.month - 1,
+        widget.card.statementDay,
+      );
+      final prevMonth = mostRecentStatementDate.month;
+      final prevYear = mostRecentStatementDate.year;
+      previousStatementDate = DateTime(
+        prevMonth == 1 ? prevYear - 1 : prevYear,
+        prevMonth == 1 ? 12 : prevMonth - 1,
+        widget.card.statementDay,
+      );
+    }
+
+    final spent = cardTxs
+        .where((t) =>
+            t.timestamp.isAfter(mostRecentStatementDate) &&
+            t.transactionType == 'expense')
+        .fold<double>(0.0, (sum, t) => sum + t.amount);
+    final stmt = cardTxs
+        .where((t) =>
+            t.timestamp.isAfter(previousStatementDate) &&
+            t.timestamp.isBefore(
+                mostRecentStatementDate.add(const Duration(seconds: 1))) &&
+            t.transactionType == 'expense')
+        .fold<double>(0.0, (sum, t) => sum + t.amount);
+
+    return (spent, stmt);
+  }
+
 
   void _saveDetails() async {
     final newSpend = double.tryParse(_spendController.text) ?? 0.0;
@@ -124,7 +176,7 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
     );
   }
 
-  Widget _buildFrontCardContent() {
+  Widget _buildFrontCardContent(double computedSpent, double computedStatement) {
     return GlassBlur(
       key: const ValueKey('front'),
       borderRadius: 20,
@@ -255,7 +307,7 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                               ),
                             ),
                             Text(
-                              '₹${widget.card.currentSpendings.toStringAsFixed(2)}',
+                              '₹${computedSpent.toStringAsFixed(0)}',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -297,7 +349,7 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                               ),
                             ),
                             Text(
-                              '₹${widget.card.statementAmount.toStringAsFixed(2)}',
+                              '₹${computedStatement.toStringAsFixed(0)}',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -458,6 +510,10 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
   @override
   Widget build(BuildContext context) {
     final txsState = ref.watch(transactionsProvider);
+    // Compute spent/statement eagerly from already-loaded data so the
+    // card header shows correct numbers immediately (no setState deferral).
+    final allTxs = txsState.valueOrNull ?? [];
+    final (computedSpent, computedStatement) = _computeTotals(allTxs);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -564,7 +620,7 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                                 },
                             child: _isFlipped
                                 ? _buildBackCardContent()
-                                : _buildFrontCardContent(),
+                                : _buildFrontCardContent(computedSpent, computedStatement),
                           ),
                         ],
                       ),
@@ -722,14 +778,18 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                                   leading: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: AppColors.neonTeal.withOpacity(
-                                        0.1,
-                                      ),
+                                      color: CategoryUtils.getCategoryColor(
+                                        tx.category,
+                                        AppColors.neonTeal,
+                                      ).withOpacity(0.12),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(
-                                      Icons.arrow_upward,
-                                      color: AppColors.neonTeal,
+                                    child: Icon(
+                                      CategoryUtils.getCategoryIcon(tx.category),
+                                      color: CategoryUtils.getCategoryColor(
+                                        tx.category,
+                                        AppColors.neonTeal,
+                                      ),
                                       size: 20,
                                     ),
                                   ),
