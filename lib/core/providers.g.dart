@@ -172,7 +172,7 @@ final syncServiceProvider = Provider<SyncService>.internal(
 );
 
 typedef SyncServiceRef = ProviderRef<SyncService>;
-String _$transactionsHash() => r'c81e6c8227dc4393ee8e1014de5366eb0e966cd6';
+String _$transactionsHash() => r'023c37488d702c441714612e529b1c12653c55ec';
 
 /// See also [Transactions].
 @ProviderFor(Transactions)
@@ -187,7 +187,7 @@ final transactionsProvider =
 );
 
 typedef _$Transactions = AsyncNotifier<List<Transaction>>;
-String _$creditCardsHash() => r'264153aae1c3aabc08ba0f315dabe0aaeb63de8a';
+String _$creditCardsHash() => r'2bc2d61a2f3fd914c2cd0de02835d22812e1cfcb';
 
 /// See also [CreditCards].
 @ProviderFor(CreditCards)
@@ -202,7 +202,7 @@ final creditCardsProvider =
 );
 
 typedef _$CreditCards = AsyncNotifier<List<CreditCard>>;
-String _$bankAccountsHash() => r'66e03dacf8f5ff2c534dd24fae2c191b2a8b5e58';
+String _$bankAccountsHash() => r'2d31d99aeb24b3036473383aa595ebc8d07ebaf0';
 
 /// See also [BankAccounts].
 @ProviderFor(BankAccounts)
@@ -217,7 +217,7 @@ final bankAccountsProvider =
 );
 
 typedef _$BankAccounts = AsyncNotifier<List<BankAccount>>;
-String _$loansHash() => r'ddbdb0ca7c342936e62e4c8e6934fd695fc38f85';
+String _$loansHash() => r'ba91bf26667ae2a8f9869420508e5a0346e409f9';
 
 /// See also [Loans].
 @ProviderFor(Loans)
@@ -231,7 +231,7 @@ final loansProvider = AsyncNotifierProvider<Loans, List<Loan>>.internal(
 );
 
 typedef _$Loans = AsyncNotifier<List<Loan>>;
-String _$holdingsHash() => r'02f76317830f148392bc647438e3be437eba7f8b';
+String _$holdingsHash() => r'3750fdef7855b27665e2f92e79a077ee9c3bc96e';
 
 /// See also [Holdings].
 @ProviderFor(Holdings)

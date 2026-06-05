@@ -3511,44 +3511,79 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     }
 
                                     if (controller.selectedType == 'income' && controller.isPayback) {
-                                      final contact = controller.paybackContactController.text.trim();
-                                      if (contact.isNotEmpty) {
-                                        final allLoans = ref.read(loansProvider).valueOrNull ?? [];
-                                        try {
-                                          final existing = allLoans.firstWhere(
-                                            (l) => !l.isLent && l.remainingBalance > 0 && l.contactName.trim().toLowerCase() == contact.toLowerCase(),
-                                          );
-                                          existing.amount += amt;
-                                          existing.remainingBalance += amt;
-                                          existing.paybackDate = controller.paybackDate;
-                                          final savedId = await ref.read(loansProvider.notifier).addLoan(existing);
-                                          tx.linkedLoanId = savedId;
-                                        } catch (_) {
-                                          final loan = Loan()
-                                            ..contactName = contact
-                                            ..isLent = false // borrowed debt
-                                            ..amount = amt
-                                            ..remainingBalance = amt
-                                            ..startDate = DateTime.now()
-                                            ..paybackDate = controller.paybackDate
-                                            ..interestRate = 0.0
-                                            ..compoundInterval = 'none'
-                                            ..emiAmount = 0.0;
-                                          final savedId = await ref.read(loansProvider.notifier).addLoan(loan);
-                                          tx.linkedLoanId = savedId;
-                                        }
-                                      }
-                                    }
+                                       final contact = controller.paybackContactController.text.trim();
+                                       if (contact.isNotEmpty) {
+                                         final allLoans = ref.read(loansProvider).valueOrNull ?? [];
+                                         try {
+                                           final existing = allLoans.firstWhere(
+                                             (l) => !l.isCompleted && l.contactName.trim().toLowerCase() == contact.toLowerCase(),
+                                           );
+                                           if (existing.isLent) {
+                                             if (amt >= existing.remainingBalance) {
+                                               final excess = amt - existing.remainingBalance;
+                                               if (excess > 0) {
+                                                 existing.isLent = false;
+                                                 existing.remainingBalance = excess;
+                                                 existing.amount = excess;
+                                                 existing.isCompleted = false;
+                                               } else {
+                                                 existing.remainingBalance = 0.0;
+                                                 existing.isCompleted = true;
+                                               }
+                                             } else {
+                                               existing.remainingBalance -= amt;
+                                             }
+                                           } else {
+                                             existing.amount += amt;
+                                             existing.remainingBalance += amt;
+                                             existing.isCompleted = false;
+                                           }
+                                           existing.paybackDate = controller.paybackDate;
+                                           final savedId = await ref.read(loansProvider.notifier).addLoan(existing);
+                                           tx.linkedLoanId = savedId;
+                                         } catch (_) {
+                                           final loan = Loan()
+                                             ..contactName = contact
+                                             ..isLent = false // borrowed debt
+                                             ..amount = amt
+                                             ..remainingBalance = amt
+                                             ..startDate = DateTime.now()
+                                             ..paybackDate = controller.paybackDate
+                                             ..interestRate = 0.0
+                                             ..compoundInterval = 'none'
+                                             ..emiAmount = 0.0
+                                             ..isCompleted = false;
+                                           final savedId = await ref.read(loansProvider.notifier).addLoan(loan);
+                                           tx.linkedLoanId = savedId;
+                                         }
+                                       }
+                                     }
 
                                     if ((controller.selectedType == 'expense' || controller.selectedType == 'transfer') && controller.selectedDebtId != null) {
-                                      final allLoans = ref.read(loansProvider).valueOrNull ?? [];
-                                      try {
-                                        final target = allLoans.firstWhere((l) => l.id == controller.selectedDebtId);
-                                        target.remainingBalance = (target.remainingBalance - amt).clamp(0.0, double.infinity);
-                                        await ref.read(loansProvider.notifier).addLoan(target);
-                                      } catch (_) {}
-                                      tx.linkedLoanId = controller.selectedDebtId;
-                                    }
+                                       final allLoans = ref.read(loansProvider).valueOrNull ?? [];
+                                       try {
+                                         final target = allLoans.firstWhere((l) => l.id == controller.selectedDebtId);
+                                         if (amt >= target.remainingBalance) {
+                                           final overpaid = amt - target.remainingBalance;
+                                           if (overpaid > 0) {
+                                             // Flip to Lent loan (receivable)
+                                             target.isLent = true;
+                                             target.remainingBalance = overpaid;
+                                             target.amount = overpaid;
+                                             target.isCompleted = false;
+                                           } else {
+                                             // Fully paid
+                                             target.remainingBalance = 0.0;
+                                             target.isCompleted = true;
+                                           }
+                                         } else {
+                                           // Partially paid
+                                           target.remainingBalance -= amt;
+                                         }
+                                         await ref.read(loansProvider.notifier).addLoan(target);
+                                       } catch (_) {}
+                                       tx.linkedLoanId = controller.selectedDebtId;
+                                     }
 
                                     await ref.read(transactionsProvider.notifier).addTransaction(tx);
 

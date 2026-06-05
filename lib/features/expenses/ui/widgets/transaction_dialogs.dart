@@ -27,6 +27,12 @@ class TransactionFormController {
   DateTime paybackDate = DateTime.now().add(const Duration(days: 30));
   int? selectedDebtId;
 
+  // Split details
+  bool isSplit = false;
+  int? selectedSplitLoanId;
+  final splitFriendController = TextEditingController();
+  final splitAmountController = TextEditingController();
+
   // Investment details
   bool isCreatingNewInvestment = false;
   String selectedInvestmentName = '';
@@ -38,6 +44,8 @@ class TransactionFormController {
     descriptionController.dispose();
     paybackContactController.dispose();
     newInvestmentNameController.dispose();
+    splitFriendController.dispose();
+    splitAmountController.dispose();
   }
 
   void reset({
@@ -58,6 +66,10 @@ class TransactionFormController {
     paybackContactController.clear();
     paybackDate = DateTime.now().add(const Duration(days: 30));
     selectedDebtId = null;
+    isSplit = false;
+    selectedSplitLoanId = null;
+    splitFriendController.clear();
+    splitAmountController.clear();
     isCreatingNewInvestment = false;
     selectedInvestmentName = '';
     newInvestmentNameController.clear();
@@ -91,7 +103,7 @@ class TransactionFormFields extends ConsumerWidget {
       future: SharedPreferences.getInstance(),
       builder: (context, snapshot) {
         final prefs = snapshot.data;
-        final List<String> expenseCats = prefs?.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Payback', 'Other'];
+        final List<String> expenseCats = prefs?.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Investment', 'Payback', 'Other'];
         final List<String> incomeCats = prefs?.getStringList('categories_income') ?? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
         final List<String> transferCats = prefs?.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Investment', 'Other'];
 
@@ -460,14 +472,64 @@ class TransactionFormFields extends ConsumerWidget {
               ),
               if (controller.isPayback) ...[
                 const SizedBox(height: 10),
-                TextField(
-                  controller: controller.paybackContactController,
+                DropdownButtonFormField<int?>(
+                  value: controller.selectedDebtId,
                   decoration: const InputDecoration(
-                    labelText: 'Contact / Lender Name',
-                    hintText: 'e.g. Papa',
+                    labelText: 'Link to existing friend ledger?',
                     border: OutlineInputBorder(),
                   ),
+                  dropdownColor: AppColors.obsidianSurface,
+                  isExpanded: true,
+                  items: () {
+                    final items = [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Create New Ledger Entry...'),
+                      ),
+                      ...activeLoans
+                          .where((l) => !l.isCompleted)
+                          .map((l) => DropdownMenuItem<int?>(
+                                value: l.id,
+                                child: Text(l.isLent
+                                    ? '${l.contactName} (Debt: -₹${l.remainingBalance.toStringAsFixed(0)})'
+                                    : '${l.contactName} (Debt: ₹${l.remainingBalance.toStringAsFixed(0)})'),
+                              )),
+                    ];
+                    if (controller.selectedDebtId != null && !items.any((item) => item.value == controller.selectedDebtId)) {
+                      try {
+                        final l = activeLoans.firstWhere((loan) => loan.id == controller.selectedDebtId);
+                        items.add(DropdownMenuItem<int?>(
+                          value: l.id,
+                          child: Text(l.isLent
+                              ? '${l.contactName} (Debt: -₹${l.remainingBalance.toStringAsFixed(0)})'
+                              : '${l.contactName} (Debt: ₹${l.remainingBalance.toStringAsFixed(0)})'),
+                        ));
+                      } catch (_) {}
+                    }
+                    return items;
+                  }(),
+                  onChanged: (val) {
+                    controller.selectedDebtId = val;
+                    if (val != null) {
+                      final chosen = activeLoans.firstWhere((l) => l.id == val);
+                      controller.paybackContactController.text = chosen.contactName;
+                    } else {
+                      controller.paybackContactController.clear();
+                    }
+                    onStateChanged();
+                  },
                 ),
+                if (controller.selectedDebtId == null) ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: controller.paybackContactController,
+                    decoration: const InputDecoration(
+                      labelText: 'Contact / Lender Name',
+                      hintText: 'e.g. Papa',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 InkWell(
                   onTap: () async {
@@ -496,7 +558,7 @@ class TransactionFormFields extends ConsumerWidget {
             // Repayment fields for Expense or Transfer
             if (controller.selectedType == 'expense' || controller.selectedType == 'transfer') ...[
               if (activeLoans.isNotEmpty) ...[
-                DropdownButtonFormField<int>(
+                DropdownButtonFormField<int?>(
                   value: controller.selectedDebtId,
                   decoration: const InputDecoration(
                     labelText: 'Is this repaying a borrowed debt?',
@@ -505,22 +567,131 @@ class TransactionFormFields extends ConsumerWidget {
                   dropdownColor: AppColors.obsidianSurface,
                   isExpanded: true,
                   hint: const Text('None / Select Debt'),
-                  items: [
-                    const DropdownMenuItem<int>(
-                      value: null,
-                      child: Text('No, regular transaction'),
-                    ),
-                    ...activeLoans
-                        .where((l) => !l.isLent && l.remainingBalance > 0)
-                        .map((l) => DropdownMenuItem<int>(
-                              value: l.id,
-                              child: Text('${l.contactName} (Rem: ₹${l.remainingBalance.toStringAsFixed(0)})'),
-                            )),
-                  ],
+                  items: () {
+                    final items = [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('No, regular transaction'),
+                      ),
+                      ...activeLoans
+                          .where((l) => !l.isLent && l.remainingBalance > 0 && !l.isCompleted)
+                          .map((l) => DropdownMenuItem<int?>(
+                                value: l.id,
+                                child: Text('${l.contactName} (Rem: ₹${l.remainingBalance.toStringAsFixed(0)})'),
+                              )),
+                    ];
+                    if (controller.selectedDebtId != null && !items.any((item) => item.value == controller.selectedDebtId)) {
+                      try {
+                        final l = activeLoans.firstWhere((loan) => loan.id == controller.selectedDebtId);
+                        items.add(DropdownMenuItem<int?>(
+                          value: l.id,
+                          child: Text('${l.contactName} (Rem: ₹${l.remainingBalance.toStringAsFixed(0)})'),
+                        ));
+                      } catch (_) {}
+                    }
+                    return items.cast<DropdownMenuItem<int?>>();
+                  }(),
                   onChanged: (val) {
                     controller.selectedDebtId = val;
                     onStateChanged();
                   },
+                ),
+              ],
+            ],
+
+            // Split toggle and fields (only for expense type)
+            if (controller.selectedType == 'expense') ...[
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                title: const Text(
+                  'Split Expense?',
+                  style: TextStyle(fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Split bills with friends/contacts',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                value: controller.isSplit,
+                activeColor: AppColors.neonTeal,
+                contentPadding: EdgeInsets.zero,
+                onChanged: (val) {
+                  if (val != null) {
+                    controller.isSplit = val;
+                    onStateChanged();
+                  }
+                },
+              ),
+              if (controller.isSplit) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int?>(
+                  value: controller.selectedSplitLoanId,
+                  decoration: const InputDecoration(
+                    labelText: 'Link to existing friend ledger?',
+                    border: OutlineInputBorder(),
+                  ),
+                  dropdownColor: AppColors.obsidianSurface,
+                  isExpanded: true,
+                  items: () {
+                    final items = [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Create New Ledger Entry...'),
+                      ),
+                      ...activeLoans
+                          .where((l) => !l.isCompleted)
+                          .map((l) => DropdownMenuItem<int?>(
+                                value: l.id,
+                                child: Text(l.isLent
+                                    ? '${l.contactName} (Owed: ₹${l.remainingBalance.toStringAsFixed(0)})'
+                                    : '${l.contactName} (Owed: -₹${l.remainingBalance.toStringAsFixed(0)})'),
+                              )),
+                    ];
+                    if (controller.selectedSplitLoanId != null && !items.any((item) => item.value == controller.selectedSplitLoanId)) {
+                      try {
+                        final l = activeLoans.firstWhere((loan) => loan.id == controller.selectedSplitLoanId);
+                        items.add(DropdownMenuItem<int?>(
+                          value: l.id,
+                          child: Text(l.isLent
+                              ? '${l.contactName} (Owed: ₹${l.remainingBalance.toStringAsFixed(0)})'
+                              : '${l.contactName} (Owed: -₹${l.remainingBalance.toStringAsFixed(0)})'),
+                        ));
+                      } catch (_) {}
+                    }
+                    return items;
+                  }(),
+                  onChanged: (val) {
+                    controller.selectedSplitLoanId = val;
+                    if (val != null) {
+                      final chosen = activeLoans.firstWhere((l) => l.id == val);
+                      controller.splitFriendController.text = chosen.contactName;
+                    } else {
+                      controller.splitFriendController.clear();
+                    }
+                    onStateChanged();
+                  },
+                ),
+                if (controller.selectedSplitLoanId == null) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: controller.splitFriendController,
+                    decoration: const InputDecoration(
+                      labelText: 'Friend Name',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: controller.splitAmountController,
+                  decoration: const InputDecoration(
+                    labelText: 'Owed Amount',
+                    prefixText: '₹ ',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 ),
               ],
             ],
@@ -572,10 +743,18 @@ void showTransactionEntryDialog(
       final allLoans = ref.read(loansProvider).valueOrNull ?? [];
       try {
         final linkedLoan = allLoans.firstWhere((l) => l.id == existingTransaction.linkedLoanId);
-        if (existingTransaction.transactionType == 'income' && !linkedLoan.isLent) {
+        if (existingTransaction.transactionType == 'income') {
           controller.isPayback = true;
           controller.paybackContactController.text = linkedLoan.contactName;
           controller.paybackDate = linkedLoan.paybackDate ?? DateTime.now().add(const Duration(days: 30));
+          controller.selectedDebtId = linkedLoan.id;
+        } else if (existingTransaction.isSplit) {
+          controller.isSplit = true;
+          controller.selectedSplitLoanId = linkedLoan.id;
+          controller.splitFriendController.text = linkedLoan.contactName;
+          controller.splitAmountController.text = existingTransaction.splitDetails.isNotEmpty
+              ? existingTransaction.splitDetails.first.amount.toStringAsFixed(0)
+              : '';
         } else {
           controller.selectedDebtId = linkedLoan.id;
         }
@@ -754,37 +933,195 @@ void showTransactionEntryDialog(
                                 final contact = controller.paybackContactController.text.trim();
                                 if (contact.isNotEmpty) {
                                   final allLoans = ref.read(loansProvider).valueOrNull ?? [];
-                                  try {
-                                    final existing = allLoans.firstWhere(
-                                      (l) => !l.isLent && l.remainingBalance > 0 && l.contactName.trim().toLowerCase() == contact.toLowerCase(),
-                                    );
-                                    existing.amount += amount;
-                                    existing.remainingBalance += amount;
-                                    existing.paybackDate = controller.paybackDate;
-                                    final savedId = await ref.read(loansProvider.notifier).addLoan(existing);
-                                    tx.linkedLoanId = savedId;
-                                  } catch (_) {
-                                    final loan = Loan()
-                                      ..contactName = contact
-                                      ..isLent = false
-                                      ..amount = amount
-                                      ..remainingBalance = amount
-                                      ..startDate = DateTime.now()
-                                      ..paybackDate = controller.paybackDate
-                                      ..interestRate = 0.0
-                                      ..compoundInterval = 'none'
-                                      ..emiAmount = 0.0;
-                                    final savedId = await ref.read(loansProvider.notifier).addLoan(loan);
-                                    tx.linkedLoanId = savedId;
+                                  if (controller.selectedDebtId != null) {
+                                    try {
+                                      final target = allLoans.firstWhere((l) => l.id == controller.selectedDebtId);
+                                      if (target.isLent) {
+                                        // It was a receivable, borrowing money reduces the receivable
+                                        if (amount >= target.remainingBalance) {
+                                          final excess = amount - target.remainingBalance;
+                                          if (excess > 0) {
+                                            target.isLent = false; // Flips to borrowed (debt)
+                                            target.remainingBalance = excess;
+                                            target.amount = excess;
+                                            target.isCompleted = false;
+                                          } else {
+                                            // Fully paid
+                                            target.remainingBalance = 0.0;
+                                            target.isCompleted = true;
+                                          }
+                                        } else {
+                                          target.remainingBalance -= amount;
+                                        }
+                                      } else {
+                                        // Already borrowed (debt), borrowing more increases the debt
+                                        target.amount += amount;
+                                        target.remainingBalance += amount;
+                                        target.isCompleted = false;
+                                      }
+                                      target.paybackDate = controller.paybackDate;
+                                      final savedId = await ref.read(loansProvider.notifier).addLoan(target);
+                                      tx.linkedLoanId = savedId;
+                                    } catch (_) {}
+                                  } else {
+                                    try {
+                                      // Search active loan with this name case-insensitively to combine
+                                      final existing = allLoans.firstWhere(
+                                        (l) => !l.isCompleted && l.contactName.trim().toLowerCase() == contact.toLowerCase(),
+                                      );
+                                      if (existing.isLent) {
+                                        if (amount >= existing.remainingBalance) {
+                                          final excess = amount - existing.remainingBalance;
+                                          if (excess > 0) {
+                                            existing.isLent = false;
+                                            existing.remainingBalance = excess;
+                                            existing.amount = excess;
+                                            existing.isCompleted = false;
+                                          } else {
+                                            existing.remainingBalance = 0.0;
+                                            existing.isCompleted = true;
+                                          }
+                                        } else {
+                                          existing.remainingBalance -= amount;
+                                        }
+                                      } else {
+                                        existing.amount += amount;
+                                        existing.remainingBalance += amount;
+                                        existing.isCompleted = false;
+                                      }
+                                      existing.paybackDate = controller.paybackDate;
+                                      final savedId = await ref.read(loansProvider.notifier).addLoan(existing);
+                                      tx.linkedLoanId = savedId;
+                                    } catch (_) {
+                                      final loan = Loan()
+                                        ..contactName = contact
+                                        ..isLent = false
+                                        ..amount = amount
+                                        ..remainingBalance = amount
+                                        ..startDate = DateTime.now()
+                                        ..paybackDate = controller.paybackDate
+                                        ..interestRate = 0.0
+                                        ..compoundInterval = 'none'
+                                        ..emiAmount = 0.0
+                                        ..isCompleted = false;
+                                      final savedId = await ref.read(loansProvider.notifier).addLoan(loan);
+                                      tx.linkedLoanId = savedId;
+                                    }
                                   }
                                 }
                               }
 
-                              if ((controller.selectedType == 'expense' || controller.selectedType == 'transfer') && controller.selectedDebtId != null) {
+                              // Handle Split Expenses
+                              if ((controller.selectedType == 'expense' || controller.selectedType == 'transfer') && controller.isSplit) {
+                                final friend = controller.splitFriendController.text.trim();
+                                final splitAmount = double.tryParse(controller.splitAmountController.text) ?? 0.0;
+                                if (splitAmount > 0) {
+                                  tx.isSplit = true;
+                                  tx.splitDetails = [
+                                    TransactionSplitDetail()
+                                      ..friendName = friend.isNotEmpty ? friend : 'Friend'
+                                      ..amount = splitAmount
+                                      ..category = category
+                                      ..description = desc
+                                  ];
+
+                                  final allLoans = ref.read(loansProvider).valueOrNull ?? [];
+                                  if (controller.selectedSplitLoanId != null) {
+                                    try {
+                                      final target = allLoans.firstWhere((l) => l.id == controller.selectedSplitLoanId);
+                                      if (!target.isLent) {
+                                        // We owed them, lending money reduces our debt
+                                        if (splitAmount >= target.remainingBalance) {
+                                          final excess = splitAmount - target.remainingBalance;
+                                          if (excess > 0) {
+                                            target.isLent = true; // Flips to receivable (lent)
+                                            target.remainingBalance = excess;
+                                            target.amount = excess;
+                                            target.isCompleted = false;
+                                          } else {
+                                            // Fully paid
+                                            target.remainingBalance = 0.0;
+                                            target.isCompleted = true;
+                                          }
+                                        } else {
+                                          target.remainingBalance -= splitAmount;
+                                        }
+                                      } else {
+                                        // Already lent, lending more increases receivable
+                                        target.amount += splitAmount;
+                                        target.remainingBalance += splitAmount;
+                                        target.isCompleted = false;
+                                      }
+                                      final savedId = await ref.read(loansProvider.notifier).addLoan(target);
+                                      tx.linkedLoanId = savedId;
+                                    } catch (_) {}
+                                  } else if (friend.isNotEmpty) {
+                                    try {
+                                      final existing = allLoans.firstWhere(
+                                        (l) => !l.isCompleted && l.contactName.trim().toLowerCase() == friend.toLowerCase(),
+                                      );
+                                      if (!existing.isLent) {
+                                        if (splitAmount >= existing.remainingBalance) {
+                                          final excess = splitAmount - existing.remainingBalance;
+                                          if (excess > 0) {
+                                            existing.isLent = true;
+                                            existing.remainingBalance = excess;
+                                            existing.amount = excess;
+                                            existing.isCompleted = false;
+                                          } else {
+                                            existing.remainingBalance = 0.0;
+                                            existing.isCompleted = true;
+                                          }
+                                        } else {
+                                          existing.remainingBalance -= splitAmount;
+                                        }
+                                      } else {
+                                        existing.amount += splitAmount;
+                                        existing.remainingBalance += splitAmount;
+                                        existing.isCompleted = false;
+                                      }
+                                      final savedId = await ref.read(loansProvider.notifier).addLoan(existing);
+                                      tx.linkedLoanId = savedId;
+                                    } catch (_) {
+                                      final loan = Loan()
+                                        ..contactName = friend
+                                        ..isLent = true
+                                        ..amount = splitAmount
+                                        ..remainingBalance = splitAmount
+                                        ..startDate = selectedDateTime
+                                        ..interestRate = 0.0
+                                        ..compoundInterval = 'none'
+                                        ..emiAmount = 0.0
+                                        ..isCompleted = false;
+                                      final savedId = await ref.read(loansProvider.notifier).addLoan(loan);
+                                      tx.linkedLoanId = savedId;
+                                    }
+                                  }
+                                }
+                              }
+
+                              // Handle Loan repayments
+                              if ((controller.selectedType == 'expense' || controller.selectedType == 'transfer') && controller.selectedDebtId != null && !controller.isSplit) {
                                 final allLoans = ref.read(loansProvider).valueOrNull ?? [];
                                 try {
                                   final target = allLoans.firstWhere((l) => l.id == controller.selectedDebtId);
-                                  target.remainingBalance = (target.remainingBalance - amount).clamp(0.0, double.infinity);
+                                  if (amount >= target.remainingBalance) {
+                                    final overpaid = amount - target.remainingBalance;
+                                    if (overpaid > 0) {
+                                      // Flip to Lent loan (receivable)
+                                      target.isLent = true;
+                                      target.remainingBalance = overpaid;
+                                      target.amount = overpaid;
+                                      target.isCompleted = false;
+                                    } else {
+                                      // Fully paid
+                                      target.remainingBalance = 0.0;
+                                      target.isCompleted = true;
+                                    }
+                                  } else {
+                                    // Partially paid
+                                    target.remainingBalance -= amount;
+                                  }
                                   await ref.read(loansProvider.notifier).addLoan(target);
                                 } catch (_) {}
                                 tx.linkedLoanId = controller.selectedDebtId;
@@ -843,6 +1180,14 @@ void showTransactionDetailDialog(BuildContext context, Transaction tx) {
               final bankId = int.tryParse(tx.accountName!.substring(5));
               final b = bankList.firstWhere((acc) => acc.id == bankId);
               displayAccount = '${b.bankName} (..${b.last4})';
+            } catch (_) {}
+          }
+
+          final loansList = ref.read(loansProvider).valueOrNull ?? [];
+          Loan? linkedLoan;
+          if (tx.linkedLoanId != null) {
+            try {
+              linkedLoan = loansList.firstWhere((l) => l.id == tx.linkedLoanId);
             } catch (_) {}
           }
 
@@ -945,6 +1290,13 @@ void showTransactionDetailDialog(BuildContext context, Transaction tx) {
                     _buildDetailRow('Date & Time', DateFormat('dd MMMM yyyy, hh:mm a').format(tx.timestamp)),
                     const SizedBox(height: 10),
                     _buildDetailRow('Entry Mode', tx.source?.toUpperCase() ?? 'MANUAL'),
+                    if (linkedLoan != null) ...[
+                      const SizedBox(height: 10),
+                      _buildDetailRow(
+                        linkedLoan.isCompleted ? 'Loan Completed' : 'Linked Loan',
+                        linkedLoan.contactName,
+                      ),
+                    ],
                     const SizedBox(height: 24),
 
                     // Actions

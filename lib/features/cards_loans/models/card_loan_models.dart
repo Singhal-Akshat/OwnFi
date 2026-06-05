@@ -54,6 +54,7 @@ class Loan {
   double remainingBalance = 0.0;
 
   int? linkedTransactionId; // reference to the transaction id in database
+  bool isCompleted = false;
 }
 
 @collection

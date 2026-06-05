@@ -87,81 +87,159 @@ class CardsLoansView extends ConsumerWidget {
               ),
               error: (err, _) => Center(child: Text('Error: $err')),
               data: (allLoans) {
-                final loans = allLoans.where((l) => l.remainingBalance > 0).toList();
-                if (loans.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        'No active loans. Click Add Loan to track!',
-                        style: TextStyle(color: AppColors.textMuted),
-                      ),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: loans.length,
-                  itemBuilder: (context, index) {
-                    final loan = loans[index];
-                    final String typeStr = loan.isLent
-                        ? 'Lent (Receivable)'
-                        : 'Borrowed (Debt)';
-                    final Color typeColor = loan.isLent
-                        ? AppColors.neonEmerald
-                        : Colors.redAccent;
-                    final String emiInfo = loan.emiAmount > 0
-                        ? 'EMI: ₹${loan.emiAmount.toStringAsFixed(0)} (${loan.interestRate}%)'
-                        : 'Friendly Loan (${loan.interestRate}%)';
+                final loans = allLoans.where((l) => l.remainingBalance > 0 && !l.isCompleted).toList();
+                final completedLoans = allLoans.where((l) => l.isCompleted || l.remainingBalance == 0).toList();
 
-                    return Dismissible(
-                      key: ValueKey(loan.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.delete_sweep_rounded,
-                          color: Colors.redAccent,
-                          size: 28,
-                        ),
-                      ),
-                      onDismissed: (_) {
-                        ref.read(loansProvider.notifier).removeLoan(loan.id);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${loan.contactName}\'s loan deleted',
-                            ),
-                            backgroundColor: AppColors.obsidianSurface,
-                          ),
-                        );
-                      },
-                      child: GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => LoanDetailPage(
-                              loan: loan,
-                              onEdit: () => _showAddLoanDialog(context, ref, existingLoan: loan),
-                            ),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (loans.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Text(
+                            'No active loans. Click Add Loan to track!',
+                            style: TextStyle(color: AppColors.textMuted),
                           ),
                         ),
-                        child: _buildLoanItem(
-                          loan.contactName,
-                          typeStr,
-                          '₹${loan.remainingBalance.toStringAsFixed(0)}',
-                          emiInfo,
-                          typeColor,
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: loans.length,
+                        itemBuilder: (context, index) {
+                          final loan = loans[index];
+                          final String typeStr = loan.isLent
+                              ? 'Lent (Receivable)'
+                              : 'Borrowed (Debt)';
+                          final Color typeColor = loan.isLent
+                              ? AppColors.neonEmerald
+                              : Colors.redAccent;
+                          final String emiInfo = loan.emiAmount > 0
+                              ? 'EMI: ₹${loan.emiAmount.toStringAsFixed(0)} (${loan.interestRate}%)'
+                              : 'Friendly Loan (${loan.interestRate}%)';
+
+                          return Dismissible(
+                            key: ValueKey(loan.id),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                Icons.delete_sweep_rounded,
+                                color: Colors.redAccent,
+                                size: 28,
+                              ),
+                            ),
+                            onDismissed: (_) {
+                              ref.read(loansProvider.notifier).removeLoan(loan.id);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${loan.contactName}\'s loan deleted',
+                                  ),
+                                  backgroundColor: AppColors.obsidianSurface,
+                                ),
+                              );
+                            },
+                            child: GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => LoanDetailPage(
+                                    loan: loan,
+                                    onEdit: () => _showAddLoanDialog(context, ref, existingLoan: loan),
+                                  ),
+                                ),
+                              ),
+                              child: _buildLoanItem(
+                                loan.contactName,
+                                typeStr,
+                                '₹${loan.remainingBalance.toStringAsFixed(0)}',
+                                emiInfo,
+                                typeColor,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
+                    if (completedLoans.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      Text(
+                        'Archived & Completed Loans',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                    );
-                  },
+                      const SizedBox(height: 10),
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: completedLoans.length,
+                        itemBuilder: (context, index) {
+                          final loan = completedLoans[index];
+                          final String typeStr = loan.isLent
+                              ? 'Lent (Completed)'
+                              : 'Borrowed (Paid Off)';
+                          final Color typeColor = AppColors.neonTeal;
+                          final String emiInfo = 'Completed • Original: ₹${loan.amount.toStringAsFixed(0)}';
+
+                          return Dismissible(
+                            key: ValueKey(loan.id),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                Icons.delete_sweep_rounded,
+                                color: Colors.redAccent,
+                                size: 28,
+                              ),
+                            ),
+                            onDismissed: (_) {
+                              ref.read(loansProvider.notifier).removeLoan(loan.id);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${loan.contactName}\'s archived loan deleted',
+                                  ),
+                                  backgroundColor: AppColors.obsidianSurface,
+                                ),
+                              );
+                            },
+                            child: GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => LoanDetailPage(
+                                    loan: loan,
+                                    onEdit: () => _showAddLoanDialog(context, ref, existingLoan: loan),
+                                  ),
+                                ),
+                              ),
+                              child: _buildLoanItem(
+                                loan.contactName,
+                                typeStr,
+                                'Completed',
+                                emiInfo,
+                                typeColor,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
                 );
               },
             ),

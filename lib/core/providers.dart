@@ -34,6 +34,7 @@ class Transactions extends _$Transactions {
     ref.invalidate(creditCardsProvider);
     ref.invalidate(bankAccountsProvider);
     ref.invalidate(loansProvider);
+    ref.invalidate(holdingsProvider);
   }
 
   Future<void> removeTransaction(int id) async {
@@ -45,6 +46,7 @@ class Transactions extends _$Transactions {
     ref.invalidate(creditCardsProvider);
     ref.invalidate(bankAccountsProvider);
     ref.invalidate(loansProvider);
+    ref.invalidate(holdingsProvider);
   }
 
   Future<void> updateTransaction(Transaction transaction) async {
@@ -56,6 +58,7 @@ class Transactions extends _$Transactions {
     ref.invalidate(creditCardsProvider);
     ref.invalidate(bankAccountsProvider);
     ref.invalidate(loansProvider);
+    ref.invalidate(holdingsProvider);
   }
 }
 

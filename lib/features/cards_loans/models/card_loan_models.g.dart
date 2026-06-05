@@ -2336,28 +2336,33 @@ const LoanSchema = CollectionSchema(
       name: r'interestRate',
       type: IsarType.double,
     ),
-    r'isLent': PropertySchema(
+    r'isCompleted': PropertySchema(
       id: 5,
+      name: r'isCompleted',
+      type: IsarType.bool,
+    ),
+    r'isLent': PropertySchema(
+      id: 6,
       name: r'isLent',
       type: IsarType.bool,
     ),
     r'linkedTransactionId': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'linkedTransactionId',
       type: IsarType.long,
     ),
     r'paybackDate': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'paybackDate',
       type: IsarType.dateTime,
     ),
     r'remainingBalance': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'remainingBalance',
       type: IsarType.double,
     ),
     r'startDate': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'startDate',
       type: IsarType.dateTime,
     )
@@ -2398,11 +2403,12 @@ void _loanSerialize(
   writer.writeString(offsets[2], object.contactName);
   writer.writeDouble(offsets[3], object.emiAmount);
   writer.writeDouble(offsets[4], object.interestRate);
-  writer.writeBool(offsets[5], object.isLent);
-  writer.writeLong(offsets[6], object.linkedTransactionId);
-  writer.writeDateTime(offsets[7], object.paybackDate);
-  writer.writeDouble(offsets[8], object.remainingBalance);
-  writer.writeDateTime(offsets[9], object.startDate);
+  writer.writeBool(offsets[5], object.isCompleted);
+  writer.writeBool(offsets[6], object.isLent);
+  writer.writeLong(offsets[7], object.linkedTransactionId);
+  writer.writeDateTime(offsets[8], object.paybackDate);
+  writer.writeDouble(offsets[9], object.remainingBalance);
+  writer.writeDateTime(offsets[10], object.startDate);
 }
 
 Loan _loanDeserialize(
@@ -2418,11 +2424,12 @@ Loan _loanDeserialize(
   object.emiAmount = reader.readDouble(offsets[3]);
   object.id = id;
   object.interestRate = reader.readDouble(offsets[4]);
-  object.isLent = reader.readBool(offsets[5]);
-  object.linkedTransactionId = reader.readLongOrNull(offsets[6]);
-  object.paybackDate = reader.readDateTimeOrNull(offsets[7]);
-  object.remainingBalance = reader.readDouble(offsets[8]);
-  object.startDate = reader.readDateTime(offsets[9]);
+  object.isCompleted = reader.readBool(offsets[5]);
+  object.isLent = reader.readBool(offsets[6]);
+  object.linkedTransactionId = reader.readLongOrNull(offsets[7]);
+  object.paybackDate = reader.readDateTimeOrNull(offsets[8]);
+  object.remainingBalance = reader.readDouble(offsets[9]);
+  object.startDate = reader.readDateTime(offsets[10]);
   return object;
 }
 
@@ -2446,12 +2453,14 @@ P _loanDeserializeProp<P>(
     case 5:
       return (reader.readBool(offset)) as P;
     case 6:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 7:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 8:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 9:
+      return (reader.readDouble(offset)) as P;
+    case 10:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -3044,6 +3053,16 @@ extension LoanQueryFilter on QueryBuilder<Loan, Loan, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Loan, Loan, QAfterFilterCondition> isCompletedEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isCompleted',
+        value: value,
+      ));
+    });
+  }
+
   QueryBuilder<Loan, Loan, QAfterFilterCondition> isLentEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -3374,6 +3393,18 @@ extension LoanQuerySortBy on QueryBuilder<Loan, Loan, QSortBy> {
     });
   }
 
+  QueryBuilder<Loan, Loan, QAfterSortBy> sortByIsCompleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isCompleted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Loan, Loan, QAfterSortBy> sortByIsCompletedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isCompleted', Sort.desc);
+    });
+  }
+
   QueryBuilder<Loan, Loan, QAfterSortBy> sortByIsLent() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isLent', Sort.asc);
@@ -3508,6 +3539,18 @@ extension LoanQuerySortThenBy on QueryBuilder<Loan, Loan, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Loan, Loan, QAfterSortBy> thenByIsCompleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isCompleted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Loan, Loan, QAfterSortBy> thenByIsCompletedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isCompleted', Sort.desc);
+    });
+  }
+
   QueryBuilder<Loan, Loan, QAfterSortBy> thenByIsLent() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isLent', Sort.asc);
@@ -3603,6 +3646,12 @@ extension LoanQueryWhereDistinct on QueryBuilder<Loan, Loan, QDistinct> {
     });
   }
 
+  QueryBuilder<Loan, Loan, QDistinct> distinctByIsCompleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isCompleted');
+    });
+  }
+
   QueryBuilder<Loan, Loan, QDistinct> distinctByIsLent() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isLent');
@@ -3668,6 +3717,12 @@ extension LoanQueryProperty on QueryBuilder<Loan, Loan, QQueryProperty> {
   QueryBuilder<Loan, double, QQueryOperations> interestRateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'interestRate');
+    });
+  }
+
+  QueryBuilder<Loan, bool, QQueryOperations> isCompletedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isCompleted');
     });
   }
 
