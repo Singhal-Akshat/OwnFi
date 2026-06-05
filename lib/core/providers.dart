@@ -147,6 +147,7 @@ class Loans extends _$Loans {
     await dbService.deleteLoan(id);
     ref.invalidateSelf();
     await future;
+    ref.invalidate(transactionsProvider);
   }
 }
 

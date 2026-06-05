@@ -1539,7 +1539,14 @@ class DashboardView extends ConsumerWidget {
                         if (selectedType == 'income') ...[
                           CheckboxListTile(
                             title: const Text('Is this a borrowed loan to payback?'),
-                            subtitle: const Text('Creates a debt entry in the ledger'),
+                            subtitle: const Text(
+                              '(Creates a debt entry in the ledger)',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontStyle: FontStyle.italic,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                             value: isPayback,
                             activeColor: AppColors.neonEmerald,
                             contentPadding: EdgeInsets.zero,
@@ -1675,70 +1682,6 @@ class DashboardView extends ConsumerWidget {
                           ),
                         ],
 
-                        // Link to any Loan (all loans dropdown)
-                        if (!isPayback && selectedDebtId == null)
-                        loansState.maybeWhen(
-                          data: (allLoans) {
-                            final activeLoansList = allLoans.where((l) => l.remainingBalance > 0).toList();
-                            if (activeLoansList.isEmpty) return const SizedBox.shrink();
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                DropdownButtonFormField<int?>(
-                                  value: selectedLinkedLoanId,
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                    labelText: 'Link to Loan / Debt',
-                                    hintText: 'Optionally associate with a loan',
-                                    border: const OutlineInputBorder(),
-                                    prefixIcon: Icon(
-                                      Icons.link_rounded,
-                                      color: selectedLinkedLoanId != null
-                                          ? AppColors.neonPurple
-                                          : AppColors.textMuted,
-                                      size: 18,
-                                    ),
-                                  ),
-                                  dropdownColor: AppColors.obsidianSurface,
-                                  items: [
-                                    const DropdownMenuItem<int?>(
-                                      value: null,
-                                      child: Text('No linked loan'),
-                                    ),
-                                    ...activeLoansList.map((loan) => DropdownMenuItem<int?>(
-                                      value: loan.id,
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            loan.isLent
-                                                ? Icons.call_made_rounded
-                                                : Icons.call_received_rounded,
-                                            color: loan.isLent
-                                                ? AppColors.neonEmerald
-                                                : Colors.redAccent,
-                                            size: 14,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Flexible(
-                                            child: Text(
-                                              '${loan.contactName} (₹${loan.remainingBalance.toStringAsFixed(0)})',
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )),
-                                  ],
-                                  onChanged: (val) {
-                                    setState(() => selectedLinkedLoanId = val);
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-                            );
-                          },
-                          orElse: () => const SizedBox.shrink(),
-                        ),
 
                         // Date & Time Picker
                         Row(

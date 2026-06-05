@@ -13,6 +13,8 @@ import 'package:isar/isar.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:my_personal_tracker/core/theme.dart';
+import 'package:my_personal_tracker/core/utils/category_utils.dart';
+import 'package:my_personal_tracker/core/utils/icon_list.dart';
 import 'package:my_personal_tracker/core/database_service.dart';
 import 'package:my_personal_tracker/core/providers.dart';
 import 'package:my_personal_tracker/core/google_sync_service.dart';
@@ -532,7 +534,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
           // Version Footer
           const Center(
             child: Text(
-              'MypersonalTracker v1.0.0 â€¢ 100% Local Encryption',
+              'MypersonalTracker v1.0.0 • 100% Local Encryption',
               style: TextStyle(fontSize: 11, color: AppColors.textMuted),
             ),
           ),
@@ -947,7 +949,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                               const SizedBox(height: 10),
                               Text(
                                 tempStart != null && tempEnd != null
-                                    ? '${_formatDate(tempStart!)}  âž”  ${_formatDate(tempEnd!)}'
+                                    ? '${_formatDate(tempStart!)}  ➔  ${_formatDate(tempEnd!)}'
                                     : 'No range selected',
                                 style: const TextStyle(
                                   color: Colors.white,
@@ -1283,6 +1285,8 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
   void _showManageCategoriesDialog(BuildContext context) {
     String currentType = 'expense';
+    IconData selectedIconData = Icons.category_rounded;
+    Color selectedColor = AppColors.neonTeal;
     final newCategoryController = TextEditingController();
 
     showDialog(
@@ -1376,16 +1380,27 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
                           return Column(
                             mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                constraints: const BoxConstraints(maxHeight: 200),
+                                constraints: const BoxConstraints(maxHeight: 180),
                                 child: ListView.builder(
                                   shrinkWrap: true,
                                   itemCount: cats.length,
                                   itemBuilder: (context, index) {
                                     final cat = cats[index];
+                                    final icon = CategoryUtils.getCategoryIcon(cat);
+                                    final color = CategoryUtils.getCategoryColor(cat, Colors.white70);
                                     return ListTile(
                                       contentPadding: EdgeInsets.zero,
+                                      leading: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: color.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(icon, color: color, size: 18),
+                                      ),
                                       title: Text(cat, style: const TextStyle(fontSize: 14)),
                                       trailing: cat.toLowerCase() == 'other' || cat.toLowerCase() == 'others'
                                           ? null
@@ -1394,6 +1409,19 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                               onPressed: () async {
                                                 final updated = List<String>.from(cats)..removeAt(index);
                                                 await prefs.setStringList(key, updated);
+                                                
+                                                // Clean up custom icon and color mappings
+                                                final iconMap = prefs.getStringList('custom_category_icons') ?? [];
+                                                iconMap.removeWhere((item) => item.startsWith('$cat:'));
+                                                await prefs.setStringList('custom_category_icons', iconMap);
+
+                                                final colorMap = prefs.getStringList('custom_category_colors') ?? [];
+                                                colorMap.removeWhere((item) => item.startsWith('$cat:'));
+                                                await prefs.setStringList('custom_category_colors', colorMap);
+
+                                                // Reload memory cache
+                                                await CategoryUtils.loadCustomCategories();
+                                                
                                                 setState(() {});
                                               },
                                             ),
@@ -1427,12 +1455,106 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                           updated.add('Other');
                                         }
                                         await prefs.setStringList(key, updated);
+                                        
+                                        // Save custom icon mapping (we store codePoint as string)
+                                        final iconMap = prefs.getStringList('custom_category_icons') ?? [];
+                                        iconMap.add('$newCat:${selectedIconData.codePoint}');
+                                        await prefs.setStringList('custom_category_icons', iconMap);
+                                        
+                                        // Save custom color mapping
+                                        final colorMap = prefs.getStringList('custom_category_colors') ?? [];
+                                        final colorHex = '#${selectedColor.value.toRadixString(16).substring(2)}';
+                                        colorMap.add('$newCat:$colorHex');
+                                        await prefs.setStringList('custom_category_colors', colorMap);
+
+                                        // Reload memory cache
+                                        await CategoryUtils.loadCustomCategories();
+
                                         newCategoryController.clear();
+                                        selectedIconData = Icons.category_rounded;
+                                        selectedColor = AppColors.neonTeal;
                                         setState(() {});
                                       }
                                     },
                                   ),
                                 ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Select Icon & Color:', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                                  GestureDetector(
+                                    onTap: () {
+                                      _showIconPickerDialog(context, (icon, color) {
+                                        setState(() {
+                                          selectedIconData = icon;
+                                          selectedColor = color;
+                                        });
+                                      });
+                                    },
+                                    child: const Text(
+                                      'More Icons ➔',
+                                      style: TextStyle(fontSize: 12, color: AppColors.neonTeal, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              SizedBox(
+                                height: 44,
+                                child: ListView(
+                                  scrollDirection: Axis.horizontal,
+                                  physics: const BouncingScrollPhysics(),
+                                  children: [
+                                    // Current selection preview
+                                    GestureDetector(
+                                      onTap: () {
+                                        _showIconPickerDialog(context, (icon, color) {
+                                          setState(() {
+                                            selectedIconData = icon;
+                                            selectedColor = color;
+                                          });
+                                        });
+                                      },
+                                      child: Container(
+                                        margin: const EdgeInsets.only(right: 8),
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: selectedColor.withOpacity(0.25),
+                                          border: Border.all(color: selectedColor, width: 2),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(selectedIconData, color: selectedColor, size: 18),
+                                      ),
+                                    ),
+                                    ...CategoryUtils.availableCategoryIcons.entries.map((e) {
+                                      final isSelected = selectedIconData == e.value;
+                                      final iconColor = CategoryUtils.availableCategoryColors[e.key] ?? Colors.white;
+                                      return GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            selectedIconData = e.value;
+                                            selectedColor = iconColor;
+                                          });
+                                        },
+                                        child: Container(
+                                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: isSelected ? iconColor.withOpacity(0.15) : Colors.transparent,
+                                            border: Border.all(
+                                              color: isSelected ? iconColor : Colors.white10,
+                                              width: 1.5,
+                                            ),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(e.value, color: isSelected ? iconColor : Colors.white70, size: 18),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ],
+                                ),
                               ),
                             ],
                           );
@@ -1447,6 +1569,159 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             child: const Text('Close', style: TextStyle(color: AppColors.textSecondary)),
                           ),
                         ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showIconPickerDialog(BuildContext context, void Function(IconData, Color) onSelected) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String selectedCategory = CategoryUtils.iconLibrary.keys.first;
+        String searchQuery = '';
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final filteredIcons = <IconData>[];
+            if (searchQuery.isNotEmpty) {
+              IconList.allIcons.forEach((name, icon) {
+                if (name.contains(searchQuery)) {
+                  filteredIcons.add(icon);
+                }
+              });
+            } else {
+              filteredIcons.addAll(CategoryUtils.iconLibrary[selectedCategory] ?? []);
+            }
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: GlassBlur(
+                borderRadius: 24,
+                blurX: 30,
+                blurY: 30,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Icon Library',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Search field
+                      TextField(
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: 'Search icons (e.g. food, bill, bank)...',
+                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54, size: 18),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.white24),
+                          ),
+                        ),
+                        onChanged: (val) {
+                          setState(() {
+                            searchQuery = val.toLowerCase().trim();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Category Tabs selector (only show when not searching)
+                      if (searchQuery.isEmpty) ...[
+                        SizedBox(
+                          height: 38,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            children: CategoryUtils.iconLibrary.keys.map((catName) {
+                              final isSelected = selectedCategory == catName;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: ChoiceChip(
+                                  label: Text(catName, style: const TextStyle(fontSize: 11)),
+                                  selected: isSelected,
+                                  selectedColor: AppColors.neonPurple.withOpacity(0.2),
+                                  checkmarkColor: AppColors.neonPurple,
+                                  labelStyle: TextStyle(
+                                    color: isSelected ? AppColors.neonPurple : Colors.white70,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                  onSelected: (val) {
+                                    if (val) {
+                                      setState(() {
+                                        selectedCategory = catName;
+                                      });
+                                    }
+                                  },
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      
+                      // Icons Grid
+                      Container(
+                        width: double.maxFinite,
+                        height: 200,
+                        child: filteredIcons.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No matching icons found',
+                                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                                ),
+                              )
+                            : GridView.builder(
+                                physics: const BouncingScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 5,
+                                  crossAxisSpacing: 10,
+                                  mainAxisSpacing: 10,
+                                ),
+                                itemCount: filteredIcons.length,
+                                itemBuilder: (context, index) {
+                                  final icon = filteredIcons[index];
+                                  return InkWell(
+                                    onTap: () {
+                                      final color = Colors.primaries[icon.codePoint % Colors.primaries.length];
+                                      onSelected(icon, color);
+                                      Navigator.pop(context);
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.05),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: Colors.white10),
+                                      ),
+                                      child: Icon(icon, color: Colors.white, size: 22),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                        ),
                       ),
                     ],
                   ),
@@ -2821,7 +3096,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                item['source'] == 'sms' ? 'ðŸ“± SMS' : 'ðŸ“§ Email',
+                                item['source'] == 'sms' ? '📱 SMS' : '📧 Email',
                                 style: const TextStyle(fontSize: 10, color: Colors.blueAccent),
                               ),
                             ),
@@ -3141,7 +3416,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 controller: amountController,
                                 decoration: const InputDecoration(
                                   labelText: 'Amount (INR)',
-                                  prefixText: 'â‚¹ ',
+                                  prefixText: '₹ ',
                                   border: OutlineInputBorder(),
                                 ),
                                 keyboardType: TextInputType.number,
@@ -3186,7 +3461,25 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           dropdownColor: AppColors.obsidianSurface,
                           isExpanded: true,
                           items: currentCats.map((cat) {
-                            return DropdownMenuItem(value: cat, child: Text(cat));
+                            final icon = CategoryUtils.getCategoryIcon(cat);
+                            final color = CategoryUtils.getCategoryColor(cat, AppColors.textSecondary);
+                            return DropdownMenuItem(
+                              value: cat,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: color.withOpacity(0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(icon, color: color, size: 16),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(cat),
+                                ],
+                              ),
+                            );
                           }).toList(),
                           onChanged: (val) {
                             if (val != null) setState(() => selectedCategory = val);
@@ -3244,7 +3537,14 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         if (selectedType == 'income') ...[
                           CheckboxListTile(
                             title: const Text('Is this a borrowed loan to payback?'),
-                            subtitle: const Text('Creates a debt entry in the ledger'),
+                            subtitle: const Text(
+                              '(Creates a debt entry in the ledger)',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontStyle: FontStyle.italic,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                             value: isPayback,
                             activeColor: AppColors.neonEmerald,
                             contentPadding: EdgeInsets.zero,
@@ -3365,7 +3665,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                       ),
                                       ...borrowedDebts.map((loan) => DropdownMenuItem<int?>(
                                         value: loan.id,
-                                        child: Text('${loan.contactName} (Remaining: â‚¹${loan.remainingBalance.toStringAsFixed(0)})'),
+                                        child: Text('${loan.contactName} (Remaining: ₹${loan.remainingBalance.toStringAsFixed(0)})'),
                                       )),
                                     ],
                                     onChanged: (val) {
@@ -4153,91 +4453,6 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     );
   }
 
-  void _showGeminiNanoInfoDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: GlassBlur(
-            borderRadius: 24,
-            blurX: 30,
-            blurY: 30,
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.info_outline_rounded,
-                        color: AppColors.neonPurple,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'On-Device LLM Preparing',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Your Samsung S24 Ultra supports running Gemini Nano locally on-device. Google AI Core is now preparing the model in the background.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textPrimary,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'â€¢ AI Core will automatically download model files (~1GB) in the background.\n'
-                    'â€¢ Please keep your device connected to Wi-Fi and power.\n'
-                    'â€¢ The local AI advisor will automatically activate as soon as the system finishes downloading the model.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.neonPurple,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text(
-                        'Got it',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+
 }
 

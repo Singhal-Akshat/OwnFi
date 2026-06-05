@@ -7,6 +7,7 @@ import 'core/database_service.dart';
 import 'core/providers.dart';
 import 'core/google_sync_service.dart';
 import 'app.dart';
+import 'core/utils/category_utils.dart';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -24,6 +25,7 @@ void callbackDispatcher() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await CategoryUtils.loadCustomCategories();
   try {
     await FlutterGemma.initialize();
   } catch (e) {

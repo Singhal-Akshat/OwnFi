@@ -323,6 +323,21 @@ class DatabaseService {
       if (transaction != null) {
         transaction.isDeleted = true;
         transaction.deletedAt = DateTime.now();
+
+        // Delete associated loan if linked
+        if (transaction.linkedLoanId != null) {
+          await isar.loans.delete(transaction.linkedLoanId!);
+          print('DEBUG: softDeleteTransaction - deleted linked loan ID: ${transaction.linkedLoanId}');
+          transaction.linkedLoanId = null;
+        }
+
+        // Also find and delete any loans where linkedTransactionId == transaction.id
+        final linkedLoans = await isar.loans.filter().linkedTransactionIdEqualTo(id).findAll();
+        for (final loan in linkedLoans) {
+          await isar.loans.delete(loan.id);
+          print('DEBUG: softDeleteTransaction - deleted loan ID ${loan.id} linked via transaction ID $id');
+        }
+
         await isar.transactions.put(transaction);
         print('DEBUG: softDeleteTransaction - marked transaction ${transaction.id} as deleted. type: ${transaction.transactionType}, amount: ${transaction.amount}, accountName: ${transaction.accountName}, cardId: ${transaction.cardId}');
 
@@ -448,6 +463,16 @@ class DatabaseService {
 
   Future<void> permanentlyDeleteTransaction(int id) async {
     await isar.writeTxn(() async {
+      final transaction = await isar.transactions.get(id);
+      if (transaction != null) {
+        if (transaction.linkedLoanId != null) {
+          await isar.loans.delete(transaction.linkedLoanId!);
+        }
+        final linkedLoans = await isar.loans.filter().linkedTransactionIdEqualTo(id).findAll();
+        for (final loan in linkedLoans) {
+          await isar.loans.delete(loan.id);
+        }
+      }
       await isar.transactions.delete(id);
     });
     onChanged?.call();
@@ -523,6 +548,11 @@ class DatabaseService {
 
   Future<void> deleteLoan(int id) async {
     await isar.writeTxn(() async {
+      final linkedTxs = await isar.transactions.filter().linkedLoanIdEqualTo(id).findAll();
+      for (final tx in linkedTxs) {
+        tx.linkedLoanId = null;
+        await isar.transactions.put(tx);
+      }
       await isar.loans.delete(id);
     });
     onChanged?.call();
