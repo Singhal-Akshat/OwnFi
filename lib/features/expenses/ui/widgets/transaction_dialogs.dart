@@ -103,13 +103,17 @@ class TransactionFormFields extends ConsumerWidget {
       future: SharedPreferences.getInstance(),
       builder: (context, snapshot) {
         final prefs = snapshot.data;
-        final List<String> expenseCats = prefs?.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Investment', 'Payback', 'Other'];
-        final List<String> incomeCats = prefs?.getStringList('categories_income') ?? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
-        final List<String> transferCats = prefs?.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Investment', 'Other'];
+        final List<String> expenseCats = List<String>.from(prefs?.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Investment', 'Payback', 'Other']);
+        final List<String> incomeCats = List<String>.from(prefs?.getStringList('categories_income') ?? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other']);
+        final List<String> transferCats = List<String>.from(prefs?.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Investment', 'Other']);
 
-        final currentCats = controller.selectedType == 'expense'
+        final List<String> currentCats = List<String>.from(controller.selectedType == 'expense'
             ? expenseCats
-            : (controller.selectedType == 'income' ? incomeCats : transferCats);
+            : (controller.selectedType == 'income' ? incomeCats : transferCats));
+
+        if (!currentCats.contains('Investment')) {
+          currentCats.add('Investment');
+        }
 
         if (!currentCats.contains(controller.selectedCategory)) {
           if (currentCats.contains('Other')) {
@@ -424,14 +428,13 @@ class TransactionFormFields extends ConsumerWidget {
                 ),
               ],
             ] else ...[
-              if (!(controller.selectedType == 'income' && controller.selectedCategory == 'Investment')) ...[
-                DropdownButtonFormField<String>(
-                  value: controller.selectedAccount,
-                  decoration: const InputDecoration(
-                    labelText: 'Account / Card',
-                    border: OutlineInputBorder(),
-                  ),
-                  dropdownColor: AppColors.obsidianSurface,
+              DropdownButtonFormField<String>(
+                value: controller.selectedAccount,
+                decoration: const InputDecoration(
+                  labelText: 'Account / Card',
+                  border: OutlineInputBorder(),
+                ),
+                dropdownColor: AppColors.obsidianSurface,
                   isExpanded: true,
                   items: buildDropdownItems(controller.selectedAccount),
                   onChanged: (val) {
@@ -442,7 +445,6 @@ class TransactionFormFields extends ConsumerWidget {
                   },
                 ),
               ],
-            ],
             const SizedBox(height: 12),
 
             // Payback Toggle for Income
@@ -1287,6 +1289,36 @@ void showTransactionDetailDialog(BuildContext context, Transaction tx) {
                       _buildDetailRow(
                         linkedLoan.isCompleted ? 'Loan Completed' : 'Linked Loan',
                         linkedLoan.contactName,
+                      ),
+                    ],
+                    if (tx.rawMessage != null && tx.rawMessage!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Divider(color: Colors.white10),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Original Message Context:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        constraints: const BoxConstraints(maxHeight: 120),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: SingleChildScrollView(
+                          child: Text(
+                            tx.rawMessage!,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontFamily: 'monospace',
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),

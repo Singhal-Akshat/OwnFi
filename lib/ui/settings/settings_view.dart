@@ -2756,8 +2756,8 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
           backgroundColor: Colors.redAccent,
         ),
       );
-    }
   }
+}
 
   void _showSyncReviewDialog(
     BuildContext context,
@@ -2772,6 +2772,9 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     int currentIndex = 0;
     int importedCount = 0;
     int skippedCount = 0;
+
+    int? editingRejectedIndex;
+    final Set<int> processedIndices = {};
 
     final parser = SmsParserService();
     final Map<int, ParsedSmsTransaction?> regexCache = {};
@@ -2792,6 +2795,265 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (stateContext, setState) {
+            // If we are reviewing rejected messages, and not editing any specific message, show the scrollable list view
+            if (reviewingRejected && editingRejectedIndex == null) {
+              final unprocessedRejectedIndices = List.generate(rejectedItems.length, (i) => i)
+                  .where((i) => !processedIndices.contains(i))
+                  .toList();
+
+              if (unprocessedRejectedIndices.isEmpty) {
+                return Dialog(
+                  backgroundColor: Colors.transparent,
+                  child: GlassBlur(
+                    borderRadius: 24,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_outline_rounded,
+                            color: AppColors.neonEmerald,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'All Rejected Messages Reviewed!',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Imported: $importedCount\nSkipped: $skippedCount',
+                            style: const TextStyle(color: Colors.white70),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: () async {
+                              const storage = FlutterSecureStorage();
+                              await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
+                              ref.read(transactionsProvider.notifier).loadTransactions();
+                              ref.read(creditCardsProvider.notifier).loadCreditCards();
+                              ref.read(loansProvider.notifier).loadLoans();
+                              Navigator.pop(dialogContext);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.neonTeal,
+                            ),
+                            child: const Text('Finish Sync', style: TextStyle(color: Colors.black)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return Dialog(
+                backgroundColor: Colors.transparent,
+                child: GlassBlur(
+                  borderRadius: 24,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Rejected Messages (${unprocessedRejectedIndices.length})',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.neonTeal,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () async {
+                                const storage = FlutterSecureStorage();
+                                await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
+                                ref.read(transactionsProvider.notifier).loadTransactions();
+                                ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                ref.read(loansProvider.notifier).loadLoans();
+                                Navigator.pop(dialogContext);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'These messages were filtered out by rules. Tap any message to manually approve it as a transaction.',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.5,
+                          ),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: unprocessedRejectedIndices.length,
+                            itemBuilder: (context, index) {
+                              final rejectedIndex = unprocessedRejectedIndices[index];
+                              final rejectedItem = rejectedItems[rejectedIndex];
+                              final String body = rejectedItem['body'] ?? '';
+                              final DateTime date = rejectedItem['date'] ?? DateTime.now();
+                              final String source = rejectedItem['source'] ?? 'sms';
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.glassBorder),
+                                ),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () {
+                                    setState(() {
+                                      editingRejectedIndex = rejectedIndex;
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  source == 'sms' ? Icons.sms_rounded : Icons.email_rounded,
+                                                  size: 14,
+                                                  color: Colors.blueAccent,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  source.toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.blueAccent,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              DateFormat('dd MMM yyyy, hh:mm a').format(date),
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.white38,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          body,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontFamily: 'monospace',
+                                            color: Colors.white70,
+                                          ),
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          children: [
+                                            const Text(
+                                              'Process Message',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.neonTeal,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            const Icon(
+                                              Icons.arrow_forward_ios_rounded,
+                                              size: 10,
+                                              color: AppColors.neonTeal,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () async {
+                                final prefs = await SharedPreferences.getInstance();
+                                final skippedList = prefs.getStringList('skipped_sms_messages') ?? [];
+                                int newlySkipped = 0;
+                                for (final idx in unprocessedRejectedIndices) {
+                                  final rItem = rejectedItems[idx];
+                                  final rBody = rItem['body'] ?? '';
+                                  if (!skippedList.contains(rBody)) {
+                                    skippedList.add(rBody);
+                                    newlySkipped++;
+                                  }
+                                  processedIndices.add(idx);
+                                }
+                                if (newlySkipped > 0) {
+                                  await prefs.setStringList('skipped_sms_messages', skippedList);
+                                }
+                                setState(() {
+                                  skippedCount += newlySkipped;
+                                });
+                              },
+                              child: const Text(
+                                'Skip All Remaining',
+                                style: TextStyle(color: Colors.white54),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.neonTeal,
+                              ),
+                              onPressed: () async {
+                                const storage = FlutterSecureStorage();
+                                await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
+                                ref.read(transactionsProvider.notifier).loadTransactions();
+                                ref.read(creditCardsProvider.notifier).loadCreditCards();
+                                ref.read(loansProvider.notifier).loadLoans();
+                                Navigator.pop(dialogContext);
+                              },
+                              child: const Text(
+                                'Finish Sync',
+                                style: TextStyle(color: Colors.black),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
             if (currentIndex >= currentReviewItems.length) {
               if (_showOnlyValidSmsEmail && !reviewingRejected && rejectedItems.isNotEmpty) {
                 return Dialog(
@@ -2937,14 +3199,14 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               );
             }
 
-            final item = currentReviewItems[currentIndex];
+            final activeIndex = reviewingRejected && editingRejectedIndex != null ? editingRejectedIndex! : currentIndex;
+            final item = currentReviewItems[activeIndex];
             final String rawBody = item['body'] ?? '';
             final DateTime date = item['date'] ?? DateTime.now();
 
             final cardsState = ref.watch(creditCardsProvider);
             final bankAccountsState = ref.watch(bankAccountsProvider);
             final loansState = ref.watch(loansProvider);
-
 
             void ensureParsed(int index) {
               if (index < 0 || index >= currentReviewItems.length) return;
@@ -2957,7 +3219,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
               final shouldCallGemini = isApproved || (forceGemini[index] ?? false);
 
-              if (index == currentIndex && shouldCallGemini && !geminiCache.containsKey(index) && !(geminiLoading[index] ?? false)) {
+              if (index == activeIndex && shouldCallGemini && !geminiCache.containsKey(index) && !(geminiLoading[index] ?? false)) {
                 geminiLoading[index] = true;
                 final activeCards = cardsState.valueOrNull;
                 final activeBanks = bankAccountsState.valueOrNull;
@@ -2966,11 +3228,11 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     setState(() {
                       geminiCache[index] = geminiResult;
                       geminiLoading[index] = false;
-                      if (lastInitializedIndex != currentIndex) {
+                      if (lastInitializedIndex != activeIndex) {
                         controller.reset();
                       }
                       
-                      if (currentIndex == index) {
+                      if (activeIndex == index) {
                         controller.amountController.text = geminiResult.amount.toStringAsFixed(0);
                         controller.descriptionController.text = geminiResult.merchant;
                         controller.selectedType = geminiResult.transactionType;
@@ -3033,18 +3295,20 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               }
             }
 
-            ensureParsed(currentIndex);
-            ensureParsed(currentIndex + 1);
-            ensureParsed(currentIndex + 2);
+            ensureParsed(activeIndex);
+            if (!reviewingRejected) {
+              ensureParsed(activeIndex + 1);
+              ensureParsed(activeIndex + 2);
+            }
 
-            final regexResult = regexCache[currentIndex];
-            final geminiResult = geminiCache[currentIndex];
+            final regexResult = regexCache[activeIndex];
+            final geminiResult = geminiCache[activeIndex];
 
-            if (lastInitializedIndex != currentIndex || lastGemini != geminiResult || lastRegex != regexResult) {
-              if (lastInitializedIndex != currentIndex) {
+            if (lastInitializedIndex != activeIndex || lastGemini != geminiResult || lastRegex != regexResult) {
+              if (lastInitializedIndex != activeIndex) {
                 controller.reset();
               }
-              lastInitializedIndex = currentIndex;
+              lastInitializedIndex = activeIndex;
               lastGemini = geminiResult;
               lastRegex = regexResult;
 
@@ -3106,13 +3370,17 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   return const Center(child: CircularProgressIndicator(color: AppColors.neonTeal));
                 }
                 final prefs = prefsSnapshot.data!;
-                final expenseCats = prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Other'];
-                final incomeCats = prefs.getStringList('categories_income') ?? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other'];
-                final transferCats = prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Investment', 'Other'];
+                final expenseCats = List<String>.from(prefs.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Investment', 'Other']);
+                final incomeCats = List<String>.from(prefs.getStringList('categories_income') ?? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other']);
+                final transferCats = List<String>.from(prefs.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Investment', 'Other']);
 
-                final currentCats = controller.selectedType == 'expense'
+                final currentCats = List<String>.from(controller.selectedType == 'expense'
                     ? expenseCats
-                    : (controller.selectedType == 'income' ? incomeCats : transferCats);
+                    : (controller.selectedType == 'income' ? incomeCats : transferCats));
+
+                if (!currentCats.contains('Investment')) {
+                  currentCats.add('Investment');
+                }
 
                 if (!currentCats.contains(controller.selectedCategory)) {
                   if (currentCats.contains('Other')) {
@@ -3179,16 +3447,30 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              reviewingRejected
-                                  ? 'Review Rejected (${currentIndex + 1}/${currentReviewItems.length})'
-                                  : 'Review Sync (${currentIndex + 1}/${currentReviewItems.length})',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.neonTeal,
+                            if (reviewingRejected && editingRejectedIndex != null) ...[
+                              IconButton(
+                                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 20),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () {
+                                  setState(() {
+                                    editingRejectedIndex = null;
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Expanded(
+                              child: Text(
+                                reviewingRejected
+                                    ? 'Review Rejected'
+                                    : 'Review Sync (${currentIndex + 1}/${currentReviewItems.length})',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.neonTeal,
+                                ),
                               ),
                             ),
                             Container(
@@ -3234,13 +3516,13 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                 ),
                               ),
                             ),
-                            if (!(item['approvedByRegex'] ?? false) && !(forceGemini[currentIndex] ?? false) && geminiCache[currentIndex] == null) ...[
+                            if (!(item['approvedByRegex'] ?? false) && !(forceGemini[activeIndex] ?? false) && geminiCache[activeIndex] == null) ...[
                               InkWell(
                                 onTap: () {
                                   setState(() {
-                                    forceGemini[currentIndex] = true;
+                                    forceGemini[activeIndex] = true;
                                   });
-                                  parser.logDebug('Manual Gemini request triggered for index $currentIndex: "$rawBody"');
+                                  parser.logDebug('Manual Gemini request triggered for index $activeIndex: "$rawBody"');
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -3290,7 +3572,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             ),
                           ),
                         ),
-                        if ((!(item['approvedByRegex'] ?? false) || (geminiResult != null && !geminiResult.isTransaction)) && !(disagreed[currentIndex] ?? false)) ...[
+                        if ((!(item['approvedByRegex'] ?? false) || (geminiResult != null && !geminiResult.isTransaction)) && !(disagreed[activeIndex] ?? false)) ...[
                           const SizedBox(height: 16),
                           Container(
                             padding: const EdgeInsets.all(12),
@@ -3322,7 +3604,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             children: [
                               OutlinedButton.icon(
                                 onPressed: () async {
-                                  parser.logDebug('Agreed with rejection (Spam/Non-Tx) for index $currentIndex: "$rawBody"');
+                                  parser.logDebug('Agreed with rejection (Spam/Non-Tx) for index $activeIndex: "$rawBody"');
                                   final prefs = await SharedPreferences.getInstance();
                                   final skippedList = prefs.getStringList('skipped_sms_messages') ?? [];
                                   if (!skippedList.contains(rawBody)) {
@@ -3331,7 +3613,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                   }
                                   setState(() {
                                     skippedCount++;
-                                    currentIndex++;
+                                    if (reviewingRejected) {
+                                      processedIndices.add(activeIndex);
+                                      editingRejectedIndex = null;
+                                    } else {
+                                      currentIndex++;
+                                    }
                                   });
                                 },
                                 icon: const Icon(Icons.check_circle_outline, color: AppColors.neonEmerald, size: 14),
@@ -3342,10 +3629,10 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                               ),
                               ElevatedButton.icon(
                                 onPressed: () {
-                                  parser.logDebug('Disagreed with rejection (Message is transaction) for index $currentIndex: "$rawBody"');
+                                  parser.logDebug('Disagreed with rejection (Message is transaction) for index $activeIndex: "$rawBody"');
                                   setState(() {
-                                    disagreed[currentIndex] = true;
-                                    forceGemini[currentIndex] = true;
+                                    disagreed[activeIndex] = true;
+                                    forceGemini[activeIndex] = true;
                                   });
                                 },
                                 icon: const Icon(Icons.close_rounded, color: Colors.black, size: 14),
@@ -3357,7 +3644,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                             ],
                           ),
                         ] else ...[
-                        if (geminiLoading[currentIndex] ?? false)
+                        if (geminiLoading[activeIndex] ?? false)
                           const Padding(
                             padding: EdgeInsets.only(top: 8.0),
                             child: Row(
@@ -3397,7 +3684,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                         controller.selectedType = regexResult.transactionType;
                                         controller.selectedCategory = regexResult.category;
                                         if (controller.selectedCategory == 'Utilities') controller.selectedCategory = 'Bills';
-                                        const allowedCategories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Salary', 'Investment', 'Health', 'Education', 'Other'];
+                                        const allowedCategories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Other'];
                                         if (!allowedCategories.contains(controller.selectedCategory)) {
                                           controller.selectedCategory = 'Other';
                                         }
@@ -3460,7 +3747,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                         controller.selectedType = geminiResult.transactionType;
                                         controller.selectedCategory = geminiResult.category;
                                         if (controller.selectedCategory == 'Utilities') controller.selectedCategory = 'Bills';
-                                        const allowedCategories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Salary', 'Investment', 'Health', 'Education', 'Other'];
+                                        const allowedCategories = ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Other'];
                                         if (!allowedCategories.contains(controller.selectedCategory)) {
                                           controller.selectedCategory = 'Other';
                                         }
@@ -3516,7 +3803,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                           controller: controller,
                           onStateChanged: () => setState(() {}),
                         ),
-                        const SizedBox(height: 16),                        const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         Wrap(
                           spacing: 8,
@@ -3541,7 +3828,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                               children: [
                                 TextButton(
                                   onPressed: () async {
-                                    parser.logDebug('Skip clicked for index $currentIndex. Raw body: "$rawBody"');
+                                    parser.logDebug('Skip clicked for index $activeIndex. Raw body: "$rawBody"');
                                     final prefs = await SharedPreferences.getInstance();
                                     final skippedList = prefs.getStringList('skipped_sms_messages') ?? [];
                                     if (!skippedList.contains(rawBody)) {
@@ -3550,7 +3837,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                     }
                                     setState(() {
                                       skippedCount++;
-                                      currentIndex++;
+                                      if (reviewingRejected) {
+                                        processedIndices.add(activeIndex);
+                                        editingRejectedIndex = null;
+                                      } else {
+                                        currentIndex++;
+                                      }
                                     });
                                   },
                                   child: const Text('Skip', style: TextStyle(color: Colors.white70)),
@@ -3663,7 +3955,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                          } catch (_) {
                                            final loan = Loan()
                                              ..contactName = contact
-                                             ..isLent = false // borrowed debt
+                                             ..isLent = false
                                              ..amount = amt
                                              ..remainingBalance = amt
                                              ..startDate = DateTime.now()
@@ -3685,18 +3977,15 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                                          if (amt >= target.remainingBalance) {
                                            final overpaid = amt - target.remainingBalance;
                                            if (overpaid > 0) {
-                                             // Flip to Lent loan (receivable)
                                              target.isLent = true;
                                              target.remainingBalance = overpaid;
                                              target.amount = overpaid;
                                              target.isCompleted = false;
                                            } else {
-                                             // Fully paid
                                              target.remainingBalance = 0.0;
                                              target.isCompleted = true;
                                            }
                                          } else {
-                                           // Partially paid
                                            target.remainingBalance -= amt;
                                          }
                                          await ref.read(loansProvider.notifier).addLoan(target);
@@ -3706,10 +3995,15 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
 
                                     await ref.read(transactionsProvider.notifier).addTransaction(tx);
 
-                                    parser.logDebug('Approve clicked for index $currentIndex. Parsed: Amount=$amt, Merchant="$merchant", Type="${controller.selectedType}", Category="${controller.selectedCategory}", Account="${controller.selectedAccount}", Source="${geminiResult != null ? "gemini" : "regex"}". Raw body: "$rawBody"');
+                                    parser.logDebug('Approve clicked for index $activeIndex. Parsed: Amount=$amt, Merchant="$merchant", Type="${controller.selectedType}", Category="${controller.selectedCategory}", Account="${controller.selectedAccount}", Source="${geminiResult != null ? "gemini" : "regex"}". Raw body: "$rawBody"');
                                     setState(() {
                                       importedCount++;
-                                      currentIndex++;
+                                      if (reviewingRejected) {
+                                        processedIndices.add(activeIndex);
+                                        editingRejectedIndex = null;
+                                      } else {
+                                        currentIndex++;
+                                      }
                                     });
                                   },
                                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonEmerald),

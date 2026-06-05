@@ -547,6 +547,7 @@ class GoogleSyncService {
         ..transactionType = isIncome ? 'income' : 'expense'
         ..category = isIncome ? 'Salary' : 'Shopping'
         ..source = 'gmail'
+        ..rawMessage = body
         ..timestamp = date;
     } catch (_) {
       return null;
