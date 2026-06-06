@@ -77,14 +77,89 @@ class TransactionFormController {
   }
 }
 
+class _AccountLogoThumb extends StatefulWidget {
+  final String assetPath;
+  final Widget placeholder;
+  final BoxFit fit;
+  final double width;
+  final double height;
+
+  const _AccountLogoThumb({
+    required this.assetPath,
+    required this.placeholder,
+    required this.fit,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  State<_AccountLogoThumb> createState() => _AccountLogoThumbState();
+}
+
+class _AccountLogoThumbState extends State<_AccountLogoThumb> {
+  late final Future<void> _loadFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFuture = _precache();
+  }
+
+  Future<void> _precache() async {
+    if (widget.assetPath.toLowerCase().endsWith('.svg')) {
+      final loader = SvgAssetLoader(widget.assetPath);
+      await svg.cache.putIfAbsent(
+        loader.cacheKey(null),
+        () => loader.loadBytes(null),
+      );
+    } else {
+      await precacheImage(AssetImage(widget.assetPath), context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _loadFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return widget.placeholder;
+        }
+
+        if (widget.assetPath.toLowerCase().endsWith('.svg')) {
+          return SvgPicture.asset(
+            widget.assetPath,
+            width: widget.width,
+            height: widget.height,
+            fit: widget.fit,
+          );
+        }
+
+        return Image.asset(
+          widget.assetPath,
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit,
+        );
+      },
+    );
+  }
+}
+
 class TransactionFormFields extends ConsumerWidget {
   final TransactionFormController controller;
   final VoidCallback onStateChanged;
+  final List<String> expenseCategories;
+  final List<String> incomeCategories;
+  final List<String> transferCategories;
 
   const TransactionFormFields({
     super.key,
     required this.controller,
     required this.onStateChanged,
+    required this.expenseCategories,
+    required this.incomeCategories,
+    required this.transferCategories,
   });
 
   @override
@@ -94,43 +169,52 @@ class TransactionFormFields extends ConsumerWidget {
     final loansState = ref.watch(loansProvider);
     final holdingsState = ref.watch(holdingsProvider);
 
+    if (cardsState.isLoading ||
+        bankAccountsState.isLoading ||
+        loansState.isLoading ||
+        holdingsState.isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.neonTeal),
+        ),
+      );
+    }
+
     final existingInvestments = holdingsState.valueOrNull ?? [];
     final activeCards = cardsState.valueOrNull ?? [];
     final activeBanks = bankAccountsState.valueOrNull ?? [];
     final activeLoans = loansState.valueOrNull ?? [];
+    final List<String> currentCats = List<String>.from(
+      controller.selectedType == 'expense'
+          ? expenseCategories
+          : (controller.selectedType == 'income'
+              ? incomeCategories
+              : transferCategories),
+    );
 
-    return FutureBuilder<SharedPreferences>(
-      future: SharedPreferences.getInstance(),
-      builder: (context, snapshot) {
-        final prefs = snapshot.data;
-        final List<String> expenseCats = List<String>.from(prefs?.getStringList('categories_expense') ?? ['Food', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Health', 'Education', 'Payback', 'Other']);
-        final List<String> incomeCats = List<String>.from(prefs?.getStringList('categories_income') ?? ['Salary', 'Investment', 'Family Money transfer', 'Friend money transfer', 'Due Amount', 'Other']);
-        final List<String> transferCats = List<String>.from(prefs?.getStringList('categories_transfer') ?? ['Internal transfer', 'Credit card payment', 'Investment', 'Other']);
+    if (!currentCats.contains(controller.selectedCategory)) {
+      if (currentCats.contains('Other')) {
+        controller.selectedCategory = 'Other';
+      } else if (currentCats.isNotEmpty) {
+        controller.selectedCategory = currentCats.first;
+      } else {
+        controller.selectedCategory = '';
+      }
+    }
 
-        final List<String> currentCats = List<String>.from(controller.selectedType == 'expense'
-            ? expenseCats
-            : (controller.selectedType == 'income' ? incomeCats : transferCats));
-
-        if (!currentCats.contains(controller.selectedCategory)) {
-          if (currentCats.contains('Other')) {
-            controller.selectedCategory = 'Other';
-          } else if (currentCats.isNotEmpty) {
-            controller.selectedCategory = currentCats.first;
-          } else {
-            controller.selectedCategory = '';
-          }
+    if (controller.selectedCategory == 'Investment') {
+      if (controller.selectedInvestmentName.isEmpty &&
+          existingInvestments.isNotEmpty &&
+          !controller.isCreatingNewInvestment) {
+        controller.selectedInvestmentName = existingInvestments.first.name;
+        if (controller.descriptionController.text.isEmpty) {
+          controller.descriptionController.text = controller.selectedInvestmentName;
         }
-
-        if (controller.selectedCategory == 'Investment') {
-          if (controller.selectedInvestmentName.isEmpty && existingInvestments.isNotEmpty && !controller.isCreatingNewInvestment) {
-            controller.selectedInvestmentName = existingInvestments.first.name;
-            if (controller.descriptionController.text.isEmpty) {
-              controller.descriptionController.text = controller.selectedInvestmentName;
-            }
-          } else if (existingInvestments.isEmpty) {
-            controller.isCreatingNewInvestment = true;
-          }
-        }
+      } else if (existingInvestments.isEmpty) {
+        controller.isCreatingNewInvestment = true;
+      }
+    }
 
         List<DropdownMenuItem<String>> buildDropdownItems(String valueToVerify) {
           final List<DropdownMenuItem<String>> menu = [
@@ -147,10 +231,22 @@ class TransactionFormFields extends ConsumerWidget {
           ];
 
           for (final acc in activeBanks) {
-            Widget logoWidget = const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 18);
-            if (acc.logoAsset.isNotEmpty) {
-              logoWidget = SvgPicture.asset('assets/bank_logos/${acc.logoAsset}', width: 18, height: 18);
-            }
+            final logoPath = acc.logoAsset.isNotEmpty
+                ? 'assets/bank_logos/${acc.logoAsset}'
+                : '';
+            final logoWidget = logoPath.isEmpty
+                ? const Icon(Icons.account_balance_rounded, color: Colors.white70, size: 18)
+                : _AccountLogoThumb(
+                    assetPath: logoPath,
+                    width: 18,
+                    height: 18,
+                    fit: BoxFit.contain,
+                    placeholder: const Icon(
+                      Icons.account_balance_rounded,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                  );
             menu.add(
               DropdownMenuItem(
                 value: 'bank:${acc.id}',
@@ -166,28 +262,33 @@ class TransactionFormFields extends ConsumerWidget {
           }
 
           for (final card in activeCards) {
-            Widget cardVisual = Container(
-              width: 20,
-              height: 14,
-              decoration: BoxDecoration(
-                color: Colors.grey,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            );
-            if (card.imageUrl.isNotEmpty) {
-              cardVisual = ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: SizedBox(
-                  width: 20,
-                  height: 14,
-                  child: card.imageUrl.toLowerCase().endsWith('.svg')
-                      ? SvgPicture.asset('assets/credit_card_images/${card.imageUrl}', fit: BoxFit.fill)
-                      : Image.asset('assets/credit_card_images/${card.imageUrl}', fit: BoxFit.cover),
-                ),
-              );
-            } else {
-              cardVisual = const Icon(Icons.credit_card_rounded, color: Colors.blueAccent, size: 18);
-            }
+            final imagePath = card.imageUrl.isNotEmpty
+                ? 'assets/credit_card_images/${card.imageUrl}'
+                : '';
+            final cardVisual = imagePath.isEmpty
+                ? const Icon(Icons.credit_card_rounded, color: Colors.blueAccent, size: 18)
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: _AccountLogoThumb(
+                      assetPath: imagePath,
+                      width: 20,
+                      height: 14,
+                      fit: BoxFit.cover,
+                      placeholder: Container(
+                        width: 20,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.grey,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Icon(
+                          Icons.credit_card_rounded,
+                          color: Colors.white,
+                          size: 10,
+                        ),
+                      ),
+                    ),
+                  );
 
             menu.add(
               DropdownMenuItem(
@@ -221,7 +322,7 @@ class TransactionFormFields extends ConsumerWidget {
           return menu;
         }
 
-        return Column(
+    return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Type Switcher
@@ -695,18 +796,51 @@ class TransactionFormFields extends ConsumerWidget {
             ],
           ],
         );
-      },
-    );
   }
 }
 
 // Dialog helper to add or edit a transaction
-void showTransactionEntryDialog(
+Future<void> showTransactionEntryDialog(
   BuildContext context,
   WidgetRef ref, {
   Transaction? existingTransaction,
-}) {
+}) async {
   final controller = TransactionFormController();
+  final prefs = await SharedPreferences.getInstance();
+  final expenseCategories = List<String>.from(
+    prefs.getStringList('categories_expense') ??
+        const [
+          'Food',
+          'Shopping',
+          'Bills',
+          'Entertainment',
+          'Travel',
+          'Health',
+          'Education',
+          'Payback',
+          'Other',
+        ],
+  );
+  final incomeCategories = List<String>.from(
+    prefs.getStringList('categories_income') ??
+        const [
+          'Salary',
+          'Investment',
+          'Family Money transfer',
+          'Friend money transfer',
+          'Due Amount',
+          'Other',
+        ],
+  );
+  final transferCategories = List<String>.from(
+    prefs.getStringList('categories_transfer') ??
+        const [
+          'Internal transfer',
+          'Credit card payment',
+          'Investment',
+          'Other',
+        ],
+  );
 
   if (existingTransaction != null) {
     String account = 'Cash';
@@ -824,6 +958,9 @@ void showTransactionEntryDialog(
                       TransactionFormFields(
                         controller: controller,
                         onStateChanged: () => setState(() {}),
+                        expenseCategories: expenseCategories,
+                        incomeCategories: incomeCategories,
+                        transferCategories: transferCategories,
                       ),
                       const SizedBox(height: 20),
                       Row(

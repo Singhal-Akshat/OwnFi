@@ -44,6 +44,26 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# files
-client_secret.json
-client_secret_windows.json
+# Google OAuth & Security Keys
+client_secret*.json
+google-services.json
+.env*
+*.env
+
+# Local machine configurations & signing keys
+**/android/local.properties
+**/android/key.properties
+**/*.keystore
+**/*.jks
+*.jks
+*.keystore
+
+# Local databases and locks
+*.isar
+*.isar.lock
+default.isar
+*.db
+
+# Log files
+*.log
+sms_parser_debug.log

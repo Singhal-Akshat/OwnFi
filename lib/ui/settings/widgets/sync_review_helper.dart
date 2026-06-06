@@ -1169,6 +1169,9 @@ void showSyncReviewDialog(
                           TransactionFormFields(
                             controller: controller,
                             onStateChanged: () => setState(() {}),
+                            expenseCategories: expenseCats,
+                            incomeCategories: incomeCats,
+                            transferCategories: transferCats,
                           ),
                           const SizedBox(height: 16),
 
