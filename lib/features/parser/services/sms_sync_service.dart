@@ -190,21 +190,19 @@ class SmsSyncService {
             final bankIdInt =
                 int.tryParse(parsed.matchedAccountId!.substring(5));
             if (bankIdInt != null) {
-              try {
-                matchedBank = bankAccounts.firstWhere(
-                  (b) => b.id == bankIdInt,
-                );
-              } catch (_) {}
+              final matches = bankAccounts.where((b) => b.id == bankIdInt);
+              if (matches.isNotEmpty) {
+                matchedBank = matches.first;
+              }
             }
           }
 
-          // Fall back: match by last4 digits
+          // Fallback: match by last4 digits
           if (matchedBank == null && parsed.accountLast4 != null) {
-            try {
-              matchedBank = bankAccounts.firstWhere(
-                (b) => b.last4 == parsed.accountLast4,
-              );
-            } catch (_) {}
+            final matches = bankAccounts.where((b) => b.last4 == parsed.accountLast4);
+            if (matches.isNotEmpty) {
+              matchedBank = matches.first;
+            }
           }
 
           if (matchedBank != null) {

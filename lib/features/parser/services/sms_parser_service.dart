@@ -5,6 +5,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/model_repository.dart';
 import '../../cards_loans/models/card_loan_models.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 class ParsedSmsTransaction {
@@ -46,15 +47,14 @@ class SmsParserService {
   Future<void> logDebug(String message) async {
     print('[SMS_PARSER_DEBUG] $message');
     try {
-      if (Platform.isWindows) {
-        final logFile = File('e:/Projects/Money_Tracker/sms_parser_debug.log');
-        final timestamp = DateTime.now().toIso8601String();
-        await logFile.writeAsString(
-          '[$timestamp] $message\n',
-          mode: FileMode.append,
-          flush: true,
-        );
-      }
+      final dir = await getApplicationSupportDirectory();
+      final logFile = File('${dir.path}/sms_parser_debug.log');
+      final timestamp = DateTime.now().toIso8601String();
+      await logFile.writeAsString(
+        '[$timestamp] $message\n',
+        mode: FileMode.append,
+        flush: true,
+      );
     } catch (_) {}
   }
 

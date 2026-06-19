@@ -18,7 +18,9 @@ void callbackDispatcher() {
       final syncService = GoogleSyncService();
       await syncService.backupToCloud(dbService);
       await syncService.syncTransactionsFromGmail(dbService);
-    } catch (_) {}
+    } catch (e, stackTrace) {
+      debugPrint('Workmanager task execution failed: $e\n$stackTrace');
+    }
     return Future.value(true);
   });
 }
@@ -29,7 +31,7 @@ void main() async {
   try {
     await FlutterGemma.initialize();
   } catch (e) {
-    print('Failed to initialize FlutterGemma: $e');
+    debugPrint('Failed to initialize FlutterGemma: $e');
   }
 
   try {
@@ -44,7 +46,9 @@ void main() async {
         requiresDeviceIdle: true,
       ),
     );
-  } catch (_) {}
+  } catch (e, stackTrace) {
+    debugPrint('Workmanager initialization failed: $e\n$stackTrace');
+  }
 
   final dbService = DatabaseService();
   await dbService.init();
