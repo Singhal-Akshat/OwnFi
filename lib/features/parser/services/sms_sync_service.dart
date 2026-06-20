@@ -312,14 +312,16 @@ class SmsSyncService {
 
     for (final msg in newMessages) {
       if (msg.body == null) continue;
-      if (skippedList.contains(msg.body)) continue;
 
-      if (!allowDuplicates) {
-        final existing = await isar.transactions
-            .filter()
-            .rawMessageEqualTo(msg.body)
-            .findFirst();
-        if (existing != null) continue;
+      final isAlreadyRecorded = await isar.transactions
+          .filter()
+          .rawMessageEqualTo(msg.body)
+          .findFirst() != null;
+
+      final isSkipped = skippedList.contains(msg.body);
+
+      if (!allowDuplicates && (isAlreadyRecorded || isSkipped)) {
+        continue;
       }
 
       final isTx = await _parser.isTransactionalSms(msg.body!);
@@ -345,6 +347,8 @@ class SmsSyncService {
         'date': msg.date ?? DateTime.now(),
         'source': 'sms',
         'approvedByRegex': isTx,
+        'isAlreadyRecorded': isAlreadyRecorded,
+        'isSkipped': isSkipped,
       });
     }
 

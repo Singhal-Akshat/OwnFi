@@ -438,6 +438,7 @@ class DashboardView extends ConsumerWidget {
                                         children: [
                                           if (tx.source == 'sms') const Text('📱 SMS', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
                                           if (tx.source == 'email') const Text('📧 Email', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                          if (tx.source == 'sms_email') const Text('📱✉️ SMS & Email', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
                                           if (tx.source != 'manual' && tx.parserSource != null) const Text(' • ', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
                                           if (tx.parserSource != null)
                                             Text(

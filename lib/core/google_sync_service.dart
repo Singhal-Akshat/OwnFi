@@ -14,6 +14,7 @@ import 'database_service.dart';
 import '../features/expenses/models/transaction_model.dart';
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:isar/isar.dart';
 
 
 final googleSyncServiceProvider = Provider<GoogleSyncService>(
@@ -512,15 +513,16 @@ class GoogleSyncService {
         if (customStartStr != null && customEndStr != null) {
           final start = DateTime.parse(customStartStr);
           final end = DateTime.parse(customEndStr);
-          final startFilter = '${start.year}/${start.month.toString().padLeft(2, '0')}/${start.day.toString().padLeft(2, '0')}';
-          final endInclusive = end.add(const Duration(days: 1));
-          final endFilter = '${endInclusive.year}/${endInclusive.month.toString().padLeft(2, '0')}/${endInclusive.day.toString().padLeft(2, '0')}';
-          query = 'subject:(Alert OR Transaction OR statement OR e-statement) after:$startFilter before:$endFilter';
+          final startQuery = start.subtract(const Duration(days: 1));
+          final endQuery = end.add(const Duration(days: 2));
+          final startFilter = '${startQuery.year}/${startQuery.month.toString().padLeft(2, '0')}/${startQuery.day.toString().padLeft(2, '0')}';
+          final endFilter = '${endQuery.year}/${endQuery.month.toString().padLeft(2, '0')}/${endQuery.day.toString().padLeft(2, '0')}';
+          query = 'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$startFilter before:$endFilter';
         } else {
           final lastSyncStr = await _storage.read(key: lastSyncKey);
           final lastSyncTime = lastSyncStr != null ? DateTime.parse(lastSyncStr) : DateTime.now().subtract(const Duration(days: 7));
           final dateFilter = '${lastSyncTime.year}/${lastSyncTime.month.toString().padLeft(2, '0')}/${lastSyncTime.day.toString().padLeft(2, '0')}';
-          query = 'subject:(Alert OR Transaction OR statement OR e-statement) after:$dateFilter';
+          query = 'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$dateFilter';
         }
 
         final listRes = await gmailApi.users.messages.list('me', q: query);
@@ -529,6 +531,20 @@ class GoogleSyncService {
         for (var msgRef in listRes.messages!) {
           final msg = await gmailApi.users.messages.get('me', msgRef.id!, format: 'full');
           if (msg.payload == null) continue;
+
+          final date = msg.internalDate != null 
+              ? DateTime.fromMillisecondsSinceEpoch(int.parse(msg.internalDate!)) 
+              : DateTime.now();
+
+          if (customStartStr != null && customEndStr != null) {
+            final start = DateTime.parse(customStartStr);
+            final end = DateTime.parse(customEndStr);
+            final localStart = DateTime(start.year, start.month, start.day, 0, 0, 0);
+            final localEnd = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+            if (date.isBefore(localStart) || date.isAfter(localEnd)) {
+              continue;
+            }
+          }
 
           // Parse Snippet or Body for transaction info
           final bodyText = _parseGmailMessageBody(msg);
@@ -552,8 +568,40 @@ class GoogleSyncService {
   }
 
   String _parseGmailMessageBody(gmail.Message msg) {
-    if (msg.snippet != null) return msg.snippet!;
-    return '';
+    if (msg.payload == null) {
+      return msg.snippet ?? '';
+    }
+
+    String extractPart(gmail.MessagePart part) {
+      if (part.mimeType == 'text/plain' && part.body?.data != null) {
+        try {
+          return utf8.decode(base64Url.decode(part.body!.data!));
+        } catch (_) {}
+      }
+      if (part.mimeType == 'text/html' && part.body?.data != null) {
+        try {
+          final html = utf8.decode(base64Url.decode(part.body!.data!));
+          return html
+              .replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ')
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .trim();
+        } catch (_) {}
+      }
+      if (part.parts != null) {
+        var content = '';
+        for (var subPart in part.parts!) {
+          final subContent = extractPart(subPart);
+          if (subContent.isNotEmpty) {
+            content += '$subContent\n';
+          }
+        }
+        if (content.isNotEmpty) return content;
+      }
+      return '';
+    }
+
+    final fullBody = extractPart(msg.payload!);
+    return fullBody.isNotEmpty ? fullBody : (msg.snippet ?? '');
   }
 
   Transaction? _parseTransactionFromText(String body, String? internalDateMs) {
@@ -593,6 +641,167 @@ class GoogleSyncService {
         ..timestamp = date;
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchNewEmailsForReview(DatabaseService dbService) async {
+    final List<Map<String, dynamic>> results = [];
+    final accounts = await getLinkedAccounts();
+    debugPrint('fetchNewEmailsForReview: Found ${accounts.length} linked accounts.');
+    final prefs = await SharedPreferences.getInstance();
+    final skippedList = prefs.getStringList('skipped_sms_messages') ?? [];
+    final allowDuplicatesStr = await _storage.read(key: 'settings_sms_sync_allow_duplicates') ?? 'false';
+    final bool allowDuplicates = allowDuplicatesStr == 'true';
+
+    for (var acc in accounts) {
+      try {
+        debugPrint('fetchNewEmailsForReview: Authenticating account ${acc.email} (isPrimary: ${acc.isPrimary})...');
+        final client = await _getHttpClient(acc, acc.isPrimary ? _primaryScopes : _secondaryScopes);
+        if (client == null) {
+          debugPrint('fetchNewEmailsForReview: Failed to get authenticated client for ${acc.email} (client was null).');
+          continue;
+        }
+
+        final gmailApi = gmail.GmailApi(client);
+        final lastSyncKey = 'last_gmail_sync_time_${acc.email}';
+
+        final customStartStr = await _storage.read(key: 'settings_sync_start_date');
+        final customEndStr = await _storage.read(key: 'settings_sync_end_date');
+
+        String query;
+        if (customStartStr != null && customEndStr != null) {
+          final start = DateTime.parse(customStartStr);
+          final end = DateTime.parse(customEndStr);
+          final startQuery = start.subtract(const Duration(days: 1));
+          final endQuery = end.add(const Duration(days: 2));
+          final startFilter = '${startQuery.year}/${startQuery.month.toString().padLeft(2, '0')}/${startQuery.day.toString().padLeft(2, '0')}';
+          final endFilter = '${endQuery.year}/${endQuery.month.toString().padLeft(2, '0')}/${endQuery.day.toString().padLeft(2, '0')}';
+          query = 'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$startFilter before:$endFilter';
+        } else {
+          final lastSyncStr = await _storage.read(key: lastSyncKey);
+          final lastSyncTime = lastSyncStr != null ? DateTime.parse(lastSyncStr) : DateTime.now().subtract(const Duration(days: 7));
+          final dateFilter = '${lastSyncTime.year}/${lastSyncTime.month.toString().padLeft(2, '0')}/${lastSyncTime.day.toString().padLeft(2, '0')}';
+          query = 'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$dateFilter';
+        }
+
+        debugPrint('Gmail Sync Query: "$query" for account: ${acc.email}');
+        final listRes = await gmailApi.users.messages.list('me', q: query);
+        debugPrint('Gmail API returned ${listRes.messages?.length ?? 0} messages for ${acc.email}');
+        if (listRes.messages == null || listRes.messages!.isEmpty) continue;
+
+        for (var msgRef in listRes.messages!) {
+          final msg = await gmailApi.users.messages.get('me', msgRef.id!, format: 'full');
+          if (msg.payload == null) {
+            debugPrint('Email ID ${msgRef.id} skipped: No payload');
+            continue;
+          }
+
+          final subject = _getHeader(msg, 'subject');
+          final date = msg.internalDate != null 
+              ? DateTime.fromMillisecondsSinceEpoch(int.parse(msg.internalDate!)) 
+              : DateTime.now();
+
+          debugPrint('Processing Email ID: ${msgRef.id}, Subject: "$subject", Date (Local): $date');
+
+          if (customStartStr != null && customEndStr != null) {
+            final start = DateTime.parse(customStartStr);
+            final end = DateTime.parse(customEndStr);
+            final localStart = DateTime(start.year, start.month, start.day, 0, 0, 0);
+            final localEnd = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+            if (date.isBefore(localStart) || date.isAfter(localEnd)) {
+              debugPrint('Email ID ${msgRef.id} skipped: Out of date bounds ($date not between $localStart and $localEnd)');
+              continue;
+            }
+          }
+
+          final bodyText = _parseGmailMessageBody(msg);
+          if (bodyText.isEmpty) {
+            debugPrint('Email ID ${msgRef.id} skipped: Body is empty');
+            continue;
+          }
+
+          final isar = dbService.isar;
+          final isAlreadyRecorded = await isar.transactions
+              .filter()
+              .rawMessageEqualTo(bodyText)
+              .findFirst() != null;
+
+          final isSkipped = skippedList.contains(bodyText);
+
+          if (!allowDuplicates && (isAlreadyRecorded || isSkipped)) {
+            debugPrint('Email ID ${msgRef.id} skipped: Already recorded or skipped previously (allowDuplicates=false)');
+            continue;
+          }
+
+          final isTx = _isTransactionalEmail(bodyText);
+          debugPrint('Email ID ${msgRef.id}: isTx=$isTx, isAlreadyRecorded=$isAlreadyRecorded, isSkipped=$isSkipped');
+
+          if (!isTx) {
+            final regexSkippedList = prefs.getStringList('regex_skipped_messages') ?? [];
+            final fromHeader = _getHeader(msg, 'from');
+            final msgJson = jsonEncode({
+              'body': bodyText,
+              'date': date.toIso8601String(),
+              'sender': fromHeader.isNotEmpty ? fromHeader : acc.email,
+            });
+            if (!regexSkippedList.any((item) => jsonDecode(item)['body'] == bodyText)) {
+              regexSkippedList.insert(0, msgJson);
+              if (regexSkippedList.length > 200) {
+                regexSkippedList.removeLast();
+              }
+              await prefs.setStringList('regex_skipped_messages', regexSkippedList);
+            }
+          }
+
+          results.add({
+            'body': bodyText,
+            'date': date,
+            'source': 'email',
+            'approvedByRegex': isTx,
+            'isAlreadyRecorded': isAlreadyRecorded,
+            'isSkipped': isSkipped,
+          });
+        }
+      } catch (e) {
+        debugPrint('Gmail Fetch Review error for ${acc.email}: $e');
+      }
+    }
+
+    return results;
+  }
+
+  String _getHeader(gmail.Message msg, String name) {
+    if (msg.payload?.headers == null) return '';
+    for (var header in msg.payload!.headers!) {
+      if (header.name?.toLowerCase() == name.toLowerCase()) {
+        return header.value ?? '';
+      }
+    }
+    return '';
+  }
+
+  bool _isTransactionalEmail(String body) {
+    try {
+      final cleanBody = body.toLowerCase();
+      final amtRegex = RegExp(r'(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{2})?)');
+      final match = amtRegex.firstMatch(cleanBody);
+      if (match == null) return false;
+
+      final amount = double.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0.0;
+      if (amount <= 0) return false;
+
+      final isIncome = cleanBody.contains('credited') || cleanBody.contains('received') || cleanBody.contains('deposit');
+      final isExpense = cleanBody.contains('spent') || cleanBody.contains('debited') || cleanBody.contains('charged');
+      return isIncome || isExpense;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> updateLastSyncTimeForAllAccounts() async {
+    final accounts = await getLinkedAccounts();
+    for (var acc in accounts) {
+      await _storage.write(key: 'last_gmail_sync_time_${acc.email}', value: DateTime.now().toIso8601String());
     }
   }
 }

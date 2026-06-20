@@ -282,6 +282,7 @@ class _ClearDataDialogState extends ConsumerState<ClearDataDialog> {
                               if (widget.type == 'sync_history') {
                                 final prefs = await SharedPreferences.getInstance();
                                 await prefs.remove('skipped_sms_messages');
+                                await prefs.remove('regex_skipped_messages');
 
                                 await _storage.delete(key: 'last_sms_sync_time');
                                 await _storage.delete(key: 'last_email_sync_time');

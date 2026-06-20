@@ -9,3 +9,5 @@ This document lists outstanding items, design trade-offs, and issues to be resol
 ## 2. Fragile JSON Decoding & Restoration during Cloud Sync
 * **Description**: Restoring keys, API keys, and app preferences from the encrypted Google Drive backup casts types directly from JSON without verifying schema compatibility or verifying field types.
 * **Future Solution**: Introduce robust schema validation/deserialization layers for restoration.
+
+When restoring , while adding expense not showing existing lioands or debts, int the transaction addid part, through sync

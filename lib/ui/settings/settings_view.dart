@@ -524,10 +524,42 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                         'View ${skippedList.length} messages that did not match transaction rules',
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
-                      trailing: const Icon(
-                        Icons.history_edu_rounded,
-                        size: 20,
-                        color: AppColors.textSecondary,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                            onPressed: () async {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  backgroundColor: AppColors.obsidianSurface,
+                                  title: const Text('Delete Logs', style: TextStyle(color: Colors.white)),
+                                  content: const Text('Are you sure you want to delete all parser logs?', style: TextStyle(color: Colors.white70)),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirmed == true) {
+                                await prefs.remove('regex_skipped_messages');
+                                setState(() {});
+                              }
+                            },
+                          ),
+                          const Icon(
+                            Icons.history_edu_rounded,
+                            size: 20,
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
                       ),
                       onTap: () {
                         SkippedMessagesLogDialog.show(context, skippedList);
@@ -709,6 +741,29 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
           itemsForReview = await ref.read(smsSyncServiceProvider).fetchNewSmsForReview();
         }
 
+        final emailItems = await ref
+            .read(googleSyncServiceProvider)
+            .fetchNewEmailsForReview(ref.read(databaseServiceProvider));
+        itemsForReview.addAll(emailItems);
+
+        debugPrint('--- MERGE DEBUG: BEFORE MERGE (${itemsForReview.length} items) ---');
+        for (int i = 0; i < itemsForReview.length; i++) {
+          final it = itemsForReview[i];
+          debugPrint('Item $i: Source=${it['source']}, Date=${it['date']}, Body Length=${(it['body'] as String).length}');
+        }
+
+        // Merge duplicate transactions across SMS and Email
+        itemsForReview = _mergeDuplicateTransactions(itemsForReview);
+
+        debugPrint('--- MERGE DEBUG: AFTER MERGE (${itemsForReview.length} items) ---');
+        for (int i = 0; i < itemsForReview.length; i++) {
+          final it = itemsForReview[i];
+          debugPrint('Merged Item $i: Source=${it['source']}, Date=${it['date']}, Body Length=${(it['body'] as String).length}');
+        }
+
+        // Sort items by date ascending (oldest first)
+        itemsForReview.sort((a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
+
         Navigator.pop(context); // Close loading dialog
 
         if (itemsForReview.isEmpty) {
@@ -758,6 +813,121 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
         ),
       );
     }
+  }
+
+  List<Map<String, dynamic>> _mergeDuplicateTransactions(List<Map<String, dynamic>> items) {
+    final parser = SmsParserService();
+    final List<Map<String, dynamic>> merged = [];
+    final Set<int> mergedIndices = {};
+
+    Map<String, dynamic>? parseGeneric(String body) {
+      final res = parser.parseRegexOnly(body);
+      if (res != null && res.amount > 0) {
+        return {
+          'amount': res.amount,
+          'transactionType': res.transactionType,
+        };
+      }
+      try {
+        final cleanBody = body.toLowerCase();
+        final amtRegex = RegExp(r'(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{2})?)');
+        final match = amtRegex.firstMatch(cleanBody);
+        if (match == null) return null;
+        final amount = double.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0.0;
+        if (amount <= 0) return null;
+
+        final isIncome = cleanBody.contains('credited') || cleanBody.contains('received') || cleanBody.contains('deposit');
+        final isExpense = cleanBody.contains('spent') || cleanBody.contains('debited') || cleanBody.contains('charged') || cleanBody.contains('sent');
+        if (!isIncome && !isExpense) return null;
+
+        return {
+          'amount': amount,
+          'transactionType': isIncome ? 'income' : 'expense',
+        };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    for (int i = 0; i < items.length; i++) {
+      if (mergedIndices.contains(i)) continue;
+
+      final itemA = items[i];
+      final bodyA = itemA['body'] as String;
+      final dateA = itemA['date'] as DateTime;
+      final sourceA = itemA['source'] as String;
+
+      final parsedA = parseGeneric(bodyA);
+      if (parsedA == null || (parsedA['amount'] as double) <= 0) {
+        merged.add(itemA);
+        continue;
+      }
+
+      final List<int> matches = [];
+      for (int j = i + 1; j < items.length; j++) {
+        if (mergedIndices.contains(j)) continue;
+
+        final itemB = items[j];
+        final bodyB = itemB['body'] as String;
+        final dateB = itemB['date'] as DateTime;
+        final sourceB = itemB['source'] as String;
+
+        if (sourceA == sourceB) {
+          if (bodyA == bodyB) {
+            matches.add(j);
+          }
+          continue;
+        }
+
+        if (dateA.difference(dateB).abs().inMinutes > 10) continue;
+
+        final parsedB = parseGeneric(bodyB);
+        if (parsedB == null || (parsedB['amount'] as double) <= 0) continue;
+
+        if (((parsedA['amount'] as double) - (parsedB['amount'] as double)).abs() > 0.01) continue;
+
+        final typeA = parsedA['transactionType'] == 'transfer' ? 'expense' : parsedA['transactionType'];
+        final typeB = parsedB['transactionType'] == 'transfer' ? 'expense' : parsedB['transactionType'];
+        if (typeA != typeB) continue;
+
+        matches.add(j);
+      }
+
+      if (matches.isNotEmpty) {
+        String smsBody = sourceA == 'sms' ? bodyA : '';
+        String emailBody = sourceA == 'email' ? bodyA : '';
+        bool approvedByRegex = itemA['approvedByRegex'] == true;
+        bool isAlreadyRecorded = itemA['isAlreadyRecorded'] == true;
+        bool isSkipped = itemA['isSkipped'] == true;
+
+        for (final matchIdx in matches) {
+          mergedIndices.add(matchIdx);
+          final matchItem = items[matchIdx];
+          final matchSrc = matchItem['source'] as String;
+          final matchBody = matchItem['body'] as String;
+          if (matchSrc == 'sms') smsBody = matchBody;
+          if (matchSrc == 'email') emailBody = matchBody;
+          if (matchItem['approvedByRegex'] == true) approvedByRegex = true;
+          if (matchItem['isAlreadyRecorded'] == true) isAlreadyRecorded = true;
+          if (matchItem['isSkipped'] == true) isSkipped = true;
+        }
+
+        merged.add({
+          'body': '📱 SMS:\n$smsBody\n\n📧 EMAIL:\n$emailBody',
+          'date': dateA,
+          'source': 'sms_email',
+          'approvedByRegex': approvedByRegex,
+          'smsBody': smsBody,
+          'emailBody': emailBody,
+          'isAlreadyRecorded': isAlreadyRecorded,
+          'isSkipped': isSkipped,
+        });
+      } else {
+        merged.add(itemA);
+      }
+    }
+
+    return merged;
   }
 
   // API Keys Dialog extracted to widgets/api_keys_dialog.dart

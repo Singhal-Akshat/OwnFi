@@ -14,6 +14,8 @@ import '../../../../features/cards_loans/models/card_loan_models.dart';
 import '../../../../features/investments/models/holding_model.dart';
 import '../../../../features/parser/services/sms_parser_service.dart';
 import '../../../../features/expenses/ui/widgets/transaction_dialogs.dart';
+import '../../../../core/google_sync_service.dart';
+
 
 // Expose GlassBlur if defined locally or copy its style
 // In settings_view, GlassBlur was imported/used. Since we don't know where it is, let's look at settings_view imports.
@@ -205,6 +207,7 @@ void showSyncReviewDialog(
                           onPressed: () async {
                             const storage = FlutterSecureStorage();
                             await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
+                            await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
                             ref.read(transactionsProvider.notifier).loadTransactions();
                             ref.read(creditCardsProvider.notifier).loadCreditCards();
                             ref.read(loansProvider.notifier).loadLoans();
@@ -227,7 +230,7 @@ void showSyncReviewDialog(
               child: GlassBlur(
                 borderRadius: 24,
                 child: Padding(
-                  padding: const EdgeInsets.all(20.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,6 +253,7 @@ void showSyncReviewDialog(
                             onPressed: () async {
                               const storage = FlutterSecureStorage();
                               await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
+                              await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
                               ref.read(transactionsProvider.notifier).loadTransactions();
                               ref.read(creditCardsProvider.notifier).loadCreditCards();
                               ref.read(loansProvider.notifier).loadLoans();
@@ -258,15 +262,15 @@ void showSyncReviewDialog(
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       const Text(
                         'These messages were filtered out by rules. Tap any message to manually approve it as a transaction.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       Container(
                         constraints: BoxConstraints(
-                          maxHeight: MediaQuery.of(context).size.height * 0.5,
+                          maxHeight: MediaQuery.of(context).size.height * 0.42,
                         ),
                         child: ListView.builder(
                           shrinkWrap: true,
@@ -297,19 +301,23 @@ void showSyncReviewDialog(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Row(
+                        Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Row(
                                             children: [
                                               Icon(
-                                                source == 'sms' ? Icons.sms_rounded : Icons.email_rounded,
+                                                source == 'sms' 
+                                                    ? Icons.sms_rounded 
+                                                    : (source == 'email' 
+                                                        ? Icons.email_rounded 
+                                                        : Icons.phonelink_setup_rounded),
                                                 size: 14,
                                                 color: Colors.blueAccent,
                                               ),
                                               const SizedBox(width: 6),
                                               Text(
-                                                source.toUpperCase(),
+                                                source == 'sms_email' ? 'SMS & EMAIL' : source.toUpperCase(),
                                                 style: const TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.bold,
@@ -366,7 +374,7 @@ void showSyncReviewDialog(
                           },
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -404,6 +412,7 @@ void showSyncReviewDialog(
                             onPressed: () async {
                               const storage = FlutterSecureStorage();
                               await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
+                              await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
                               ref.read(transactionsProvider.notifier).loadTransactions();
                               ref.read(creditCardsProvider.notifier).loadCreditCards();
                               ref.read(loansProvider.notifier).loadLoans();
@@ -476,6 +485,7 @@ void showSyncReviewDialog(
                               onPressed: () async {
                                 const storage = FlutterSecureStorage();
                                 await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
+                                await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
                                 ref.read(transactionsProvider.notifier).loadTransactions();
                                 ref.read(creditCardsProvider.notifier).loadCreditCards();
                                 ref.read(loansProvider.notifier).loadLoans();
@@ -551,6 +561,7 @@ void showSyncReviewDialog(
                         onPressed: () async {
                           const storage = FlutterSecureStorage();
                           await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
+                          await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
                           ref.read(transactionsProvider.notifier).loadTransactions();
                           ref.read(creditCardsProvider.notifier).loadCreditCards();
                           ref.read(loansProvider.notifier).loadLoans();
@@ -847,7 +858,11 @@ void showSyncReviewDialog(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  item['source'] == 'sms' ? '📱 SMS' : '📧 Email',
+                                  item['source'] == 'sms' 
+                                      ? '📱 SMS' 
+                                      : (item['source'] == 'email' 
+                                          ? '📧 Email' 
+                                          : '📱📧 SMS & Email'),
                                   style: const TextStyle(fontSize: 10, color: Colors.blueAccent),
                                 ),
                               ),
@@ -883,6 +898,46 @@ void showSyncReviewDialog(
                                   ),
                                 ),
                               ),
+                              if (item['isAlreadyRecorded'] == true)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blueAccent.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: Colors.blueAccent,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Already Recorded',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blueAccent,
+                                    ),
+                                  ),
+                                ),
+                              if (item['isSkipped'] == true)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orangeAccent.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: Colors.orangeAccent,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Skipped previously',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orangeAccent,
+                                    ),
+                                  ),
+                                ),
                               if (!(item['approvedByRegex'] ?? false) && !(forceGemini[activeIndex] ?? false) && geminiCache[activeIndex] == null) ...[
                                 InkWell(
                                   onTap: () {
@@ -1200,20 +1255,42 @@ void showSyncReviewDialog(
                                     onPressed: () async {
                                       parser.logDebug('Skip clicked for index $activeIndex. Raw body: "$rawBody"');
                                       final prefs = await SharedPreferences.getInstance();
-                                      final skippedList = prefs.getStringList('skipped_sms_messages') ?? [];
-                                      if (!skippedList.contains(rawBody)) {
-                                        skippedList.add(rawBody);
-                                        await prefs.setStringList('skipped_sms_messages', skippedList);
-                                      }
-                                      setState(() {
-                                        skippedCount++;
-                                        if (reviewingRejected) {
-                                          processedIndices.add(activeIndex);
-                                          editingRejectedIndex = null;
+                                      final isSmsEmail = item['source'] == 'sms_email';
+
+                                      if (reviewingRejected || !showOnlyValidSmsEmail) {
+                                        final skippedList = prefs.getStringList('skipped_sms_messages') ?? [];
+                                        if (isSmsEmail) {
+                                          final smsBody = item['smsBody'] as String?;
+                                          final emailBody = item['emailBody'] as String?;
+                                          if (smsBody != null && !skippedList.contains(smsBody)) {
+                                            skippedList.add(smsBody);
+                                          }
+                                          if (emailBody != null && !skippedList.contains(emailBody)) {
+                                            skippedList.add(emailBody);
+                                          }
                                         } else {
-                                          currentIndex++;
+                                          if (!skippedList.contains(rawBody)) {
+                                            skippedList.add(rawBody);
+                                          }
                                         }
-                                      });
+                                        await prefs.setStringList('skipped_sms_messages', skippedList);
+
+                                        setState(() {
+                                          skippedCount++;
+                                          if (reviewingRejected) {
+                                            processedIndices.add(activeIndex);
+                                            editingRejectedIndex = null;
+                                          } else {
+                                            currentIndex++;
+                                          }
+                                        });
+                                      } else {
+                                        setState(() {
+                                          item['isSkipped'] = true;
+                                          rejectedItems.add(item);
+                                          validItems.remove(item);
+                                        });
+                                      }
                                     },
                                     child: const Text('Skip', style: TextStyle(color: Colors.white70)),
                                   ),

@@ -1013,6 +1013,11 @@ class CardsLoansView extends ConsumerWidget {
       'hsbc_vertical_card_final.webp',
     ];
 
+    if (selectedImage.isNotEmpty && !imageOptions.contains(selectedImage)) {
+      imageOptions.add(selectedImage);
+    }
+
+
     showDialog(
       context: context,
       builder: (context) {
