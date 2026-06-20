@@ -53,7 +53,7 @@ class SkippedMessagesLogDialog extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Scrollable list of SMS alerts that were automatically skipped by the regex parser.',
+                'Scrollable list of SMS and email alerts that were automatically skipped by the regex parser.',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 16),
@@ -71,6 +71,7 @@ class SkippedMessagesLogDialog extends ConsumerWidget {
                       final body = item['body'] ?? '';
                       final dateStr = item['date'] ?? '';
                       final sender = item['sender'] ?? 'Unknown';
+                      final source = item['source'] ?? 'sms';
                       final date = DateTime.tryParse(dateStr) ?? DateTime.now();
 
                       return InkWell(
@@ -83,7 +84,7 @@ class SkippedMessagesLogDialog extends ConsumerWidget {
                               {
                                 'body': body,
                                 'date': date,
-                                'source': 'sms',
+                                'source': source,
                                 'approvedByRegex': true,
                               }
                             ],
@@ -108,7 +109,7 @@ class SkippedMessagesLogDialog extends ConsumerWidget {
                                   Row(
                                     children: [
                                       Text(
-                                        sender.toUpperCase(),
+                                        '${source == 'email' ? '📧' : '📱'} ${sender.toUpperCase()}',
                                         style: const TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,

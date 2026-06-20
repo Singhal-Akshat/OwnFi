@@ -517,11 +517,11 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                   children: [
                     ListTile(
                       title: const Text(
-                        'Regex Skipped SMS Log',
+                        'Regex Skipped SMS & Email Log',
                         style: TextStyle(fontSize: 14),
                       ),
                       subtitle: Text(
-                        'View ${skippedList.length} messages that did not match transaction rules',
+                        'View ${skippedList.length} SMS & email alerts that did not match transaction rules',
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                       trailing: Row(
@@ -837,7 +837,15 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
         if (amount <= 0) return null;
 
         final isIncome = cleanBody.contains('credited') || cleanBody.contains('received') || cleanBody.contains('deposit');
-        final isExpense = cleanBody.contains('spent') || cleanBody.contains('debited') || cleanBody.contains('charged') || cleanBody.contains('sent');
+        final isExpense = cleanBody.contains('spent') ||
+            cleanBody.contains('debited') ||
+            cleanBody.contains('charged') ||
+            cleanBody.contains('sent') ||
+            cleanBody.contains('transaction') ||
+            cleanBody.contains('txn') ||
+            cleanBody.contains('purchase') ||
+            cleanBody.contains('payment') ||
+            cleanBody.contains('upi');
         if (!isIncome && !isExpense) return null;
 
         return {
@@ -896,6 +904,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
       if (matches.isNotEmpty) {
         String smsBody = sourceA == 'sms' ? bodyA : '';
         String emailBody = sourceA == 'email' ? bodyA : '';
+        String? mergedSubject = itemA['subject'] as String?;
         bool approvedByRegex = itemA['approvedByRegex'] == true;
         bool isAlreadyRecorded = itemA['isAlreadyRecorded'] == true;
         bool isSkipped = itemA['isSkipped'] == true;
@@ -905,20 +914,33 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
           final matchItem = items[matchIdx];
           final matchSrc = matchItem['source'] as String;
           final matchBody = matchItem['body'] as String;
+          final matchSubject = matchItem['subject'] as String?;
           if (matchSrc == 'sms') smsBody = matchBody;
           if (matchSrc == 'email') emailBody = matchBody;
+          if (mergedSubject == null || mergedSubject.isEmpty) {
+            mergedSubject = matchSubject;
+          }
           if (matchItem['approvedByRegex'] == true) approvedByRegex = true;
           if (matchItem['isAlreadyRecorded'] == true) isAlreadyRecorded = true;
           if (matchItem['isSkipped'] == true) isSkipped = true;
         }
 
+        final finalSource = (smsBody.isNotEmpty && emailBody.isNotEmpty)
+            ? 'sms_email'
+            : (smsBody.isNotEmpty ? 'sms' : 'email');
+
+        final finalBody = finalSource == 'sms_email'
+            ? '📱 SMS:\n$smsBody\n\n📧 EMAIL:\n$emailBody'
+            : (smsBody.isNotEmpty ? smsBody : emailBody);
+
         merged.add({
-          'body': '📱 SMS:\n$smsBody\n\n📧 EMAIL:\n$emailBody',
+          'body': finalBody,
           'date': dateA,
-          'source': 'sms_email',
+          'source': finalSource,
           'approvedByRegex': approvedByRegex,
-          'smsBody': smsBody,
-          'emailBody': emailBody,
+          'smsBody': smsBody.isNotEmpty ? smsBody : null,
+          'emailBody': emailBody.isNotEmpty ? emailBody : null,
+          'subject': mergedSubject,
           'isAlreadyRecorded': isAlreadyRecorded,
           'isSkipped': isSkipped,
         });

@@ -16,7 +16,6 @@ import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:isar/isar.dart';
 
-
 final googleSyncServiceProvider = Provider<GoogleSyncService>(
   (ref) => GoogleSyncService(),
 );
@@ -44,19 +43,20 @@ class LinkedGoogleAccount {
     'desktopClientSecret': desktopClientSecret,
   };
 
-  factory LinkedGoogleAccount.fromJson(Map<String, dynamic> json) => LinkedGoogleAccount(
-    email: json['email'] as String,
-    isPrimary: json['isPrimary'] as bool? ?? false,
-    refreshToken: json['refreshToken'] as String?,
-    desktopClientId: json['desktopClientId'] as String?,
-    desktopClientSecret: json['desktopClientSecret'] as String?,
-  );
+  factory LinkedGoogleAccount.fromJson(Map<String, dynamic> json) =>
+      LinkedGoogleAccount(
+        email: json['email'] as String,
+        isPrimary: json['isPrimary'] as bool? ?? false,
+        refreshToken: json['refreshToken'] as String?,
+        desktopClientId: json['desktopClientId'] as String?,
+        desktopClientSecret: json['desktopClientSecret'] as String?,
+      );
 }
 
 class GoogleSyncService {
   final _storage = const FlutterSecureStorage();
   Timer? _backupDebounceTimer;
-  
+
   // Scopes required for primary: Gmail Read + Drive AppData config + email
   static const _primaryScopes = [
     drive.DriveApi.driveAppdataScope,
@@ -65,16 +65,11 @@ class GoogleSyncService {
   ];
 
   // Scopes required for secondary: Gmail Read only + email
-  static const _secondaryScopes = [
-    gmail.GmailApi.gmailReadonlyScope,
-    'email',
-  ];
+  static const _secondaryScopes = [gmail.GmailApi.gmailReadonlyScope, 'email'];
 
   // Helper to initialize Google Sign In instance with specific scope (mobile)
   GoogleSignIn _getSignInInstance(bool isPrimary) {
-    return GoogleSignIn(
-      scopes: isPrimary ? _primaryScopes : _secondaryScopes,
-    );
+    return GoogleSignIn(scopes: isPrimary ? _primaryScopes : _secondaryScopes);
   }
 
   // Get list of linked accounts
@@ -96,15 +91,23 @@ class GoogleSyncService {
   }
 
   // Helper to get authenticated Client on either mobile or Windows
-  Future<http.Client?> _getHttpClient(LinkedGoogleAccount account, List<String> scopes) async {
+  Future<http.Client?> _getHttpClient(
+    LinkedGoogleAccount account,
+    List<String> scopes,
+  ) async {
     if (Platform.isWindows) {
-      if (account.refreshToken == null || account.desktopClientId == null) return null;
+      if (account.refreshToken == null || account.desktopClientId == null)
+        return null;
       final client = http.Client();
       try {
         final credentials = await auth.refreshCredentials(
           auth.ClientId(account.desktopClientId!, account.desktopClientSecret),
           auth.AccessCredentials(
-            auth.AccessToken('Bearer', '', DateTime.now().toUtc().subtract(const Duration(hours: 1))),
+            auth.AccessToken(
+              'Bearer',
+              '',
+              DateTime.now().toUtc().subtract(const Duration(hours: 1)),
+            ),
             account.refreshToken,
             scopes,
           ),
@@ -117,7 +120,8 @@ class GoogleSyncService {
       }
     } else {
       final googleSignIn = _getSignInInstance(account.isPrimary);
-      final GoogleSignInAccount? signedInAccount = await googleSignIn.signInSilently();
+      final GoogleSignInAccount? signedInAccount = await googleSignIn
+          .signInSilently();
       if (signedInAccount == null) return null;
       return await googleSignIn.authenticatedClient();
     }
@@ -132,14 +136,18 @@ class GoogleSyncService {
           clientSecretFile = File('client_secret.json');
         }
         if (!await clientSecretFile.exists()) {
-          throw StateError('OAuth configuration file (client_secret_windows.json or client_secret.json) not found in the project root folder. Please download your OAuth Desktop client credentials JSON from Google Cloud Console and save it in the root folder of this project.');
+          throw StateError(
+            'OAuth configuration file (client_secret_windows.json or client_secret.json) not found in the project root folder. Please download your OAuth Desktop client credentials JSON from Google Cloud Console and save it in the root folder of this project.',
+          );
         }
 
         final jsonContent = await clientSecretFile.readAsString();
         final config = jsonDecode(jsonContent);
         final oauthParams = config['installed'] ?? config['web'];
         if (oauthParams == null) {
-          throw const FormatException('Invalid OAuth configuration file format. Expected "installed" or "web" root key.');
+          throw const FormatException(
+            'Invalid OAuth configuration file format. Expected "installed" or "web" root key.',
+          );
         }
 
         final String clientId = oauthParams['client_id'];
@@ -152,13 +160,17 @@ class GoogleSyncService {
           client,
           (url) async {
             // Open user's default browser window using PowerShell to prevent CMD escaping/ampersand issues
-            await Process.run('powershell', ['-Command', "Start-Process '$url'"]);
+            await Process.run('powershell', [
+              '-Command',
+              "Start-Process '$url'",
+            ]);
           },
         );
 
         // Fetch user email using details endpoint
         final oauth2Api = http.Client();
-        final userInfoRes = await auth.authenticatedClient(oauth2Api, credentials)
+        final userInfoRes = await auth
+            .authenticatedClient(oauth2Api, credentials)
             .get(Uri.parse('https://www.googleapis.com/oauth2/v2/userinfo'));
 
         String email = 'unknown@gmail.com';
@@ -222,7 +234,10 @@ class GoogleSyncService {
 
         accounts.removeWhere((element) => element.email == account.email);
 
-        final newAccount = LinkedGoogleAccount(email: account.email, isPrimary: isPrimary);
+        final newAccount = LinkedGoogleAccount(
+          email: account.email,
+          isPrimary: isPrimary,
+        );
         accounts.add(newAccount);
         await _saveLinkedAccounts(accounts);
         return newAccount;
@@ -274,17 +289,26 @@ class GoogleSyncService {
       final cloudModifiedTime = cloudFile.modifiedTime;
       if (cloudModifiedTime == null) return false;
 
-      final localLastBackupStr = await _storage.read(key: 'last_local_backup_time');
-      final localLastBackup = localLastBackupStr != null 
-          ? DateTime.parse(localLastBackupStr) 
+      final localLastBackupStr = await _storage.read(
+        key: 'last_local_backup_time',
+      );
+      final localLastBackup = localLastBackupStr != null
+          ? DateTime.parse(localLastBackupStr)
           : DateTime.fromMillisecondsSinceEpoch(0);
 
       // If the cloud backup is newer than our last local backup/sync by more than 10 seconds
-      if (cloudModifiedTime.toUtc().isAfter(localLastBackup.toUtc().add(const Duration(seconds: 10)))) {
-        debugPrint('Newer backup found on Google Drive ($cloudModifiedTime). Auto-restoring...');
+      if (cloudModifiedTime.toUtc().isAfter(
+        localLastBackup.toUtc().add(const Duration(seconds: 10)),
+      )) {
+        debugPrint(
+          'Newer backup found on Google Drive ($cloudModifiedTime). Auto-restoring...',
+        );
         final error = await restoreFromCloud(dbService);
         if (error == null) {
-          await _storage.write(key: 'last_local_backup_time', value: cloudModifiedTime.toUtc().toIso8601String());
+          await _storage.write(
+            key: 'last_local_backup_time',
+            value: cloudModifiedTime.toUtc().toIso8601String(),
+          );
           return true;
         }
       }
@@ -299,19 +323,25 @@ class GoogleSyncService {
   Future<String?> backupToCloud(DatabaseService dbService) async {
     try {
       final accounts = await getLinkedAccounts();
-      final primary = accounts.firstWhere((element) => element.isPrimary, orElse: () => throw StateError('No primary backup account configured.'));
-      
+      final primary = accounts.firstWhere(
+        (element) => element.isPrimary,
+        orElse: () => throw StateError('No primary backup account configured.'),
+      );
+
       final client = await _getHttpClient(primary, _primaryScopes);
-      if (client == null) return 'Could not authenticate. Please re-link your Google account.';
+      if (client == null)
+        return 'Could not authenticate. Please re-link your Google account.';
 
       final driveApi = drive.DriveApi(client);
 
       // Get DB directory & copy DB bytes
       final dir = await getApplicationSupportDirectory();
-      final isarDbFile = File(Platform.isWindows 
-          ? '${dir.path}\\default.isar'
-          : '${dir.path}/default.isar');
-          
+      final isarDbFile = File(
+        Platform.isWindows
+            ? '${dir.path}\\default.isar'
+            : '${dir.path}/default.isar',
+      );
+
       if (!await isarDbFile.exists()) return 'Local database file not found.';
       final bytes = await isarDbFile.readAsBytes();
 
@@ -329,12 +359,16 @@ class GoogleSyncService {
       if (list.files != null && list.files!.isNotEmpty) {
         // Update existing backup
         final existingId = list.files!.first.id!;
-        await driveApi.files.update(drive.File(), existingId, uploadMedia: media);
+        await driveApi.files.update(
+          drive.File(),
+          existingId,
+          uploadMedia: media,
+        );
       } else {
         // Create new backup
         await driveApi.files.create(driveFile, uploadMedia: media);
       }
-      
+
       // Backup API keys and UI/AI preferences securely to appDataFolder
       final geminiKey = await _storage.read(key: 'ai_gemini_key') ?? '';
       final openaiKey = await _storage.read(key: 'ai_openai_key') ?? '';
@@ -345,7 +379,9 @@ class GoogleSyncService {
       final categoriesIncome = prefs.getStringList('categories_income');
       final categoriesTransfer = prefs.getStringList('categories_transfer');
       final customCategoryIcons = prefs.getStringList('custom_category_icons');
-      final customCategoryColors = prefs.getStringList('custom_category_colors');
+      final customCategoryColors = prefs.getStringList(
+        'custom_category_colors',
+      );
       final selectedModelId = prefs.getString('selectedModelId');
       final hasSeenModelOnboarding = prefs.getBool('hasSeenModelOnboarding');
 
@@ -355,11 +391,15 @@ class GoogleSyncService {
         'ai_ollama_host': ollamaHost,
         if (categoriesExpense != null) 'categories_expense': categoriesExpense,
         if (categoriesIncome != null) 'categories_income': categoriesIncome,
-        if (categoriesTransfer != null) 'categories_transfer': categoriesTransfer,
-        if (customCategoryIcons != null) 'custom_category_icons': customCategoryIcons,
-        if (customCategoryColors != null) 'custom_category_colors': customCategoryColors,
+        if (categoriesTransfer != null)
+          'categories_transfer': categoriesTransfer,
+        if (customCategoryIcons != null)
+          'custom_category_icons': customCategoryIcons,
+        if (customCategoryColors != null)
+          'custom_category_colors': customCategoryColors,
         if (selectedModelId != null) 'selectedModelId': selectedModelId,
-        if (hasSeenModelOnboarding != null) 'hasSeenModelOnboarding': hasSeenModelOnboarding,
+        if (hasSeenModelOnboarding != null)
+          'hasSeenModelOnboarding': hasSeenModelOnboarding,
       };
       final keysBytes = utf8.encode(jsonEncode(keysMap));
       final keysMedia = drive.Media(Stream.value(keysBytes), keysBytes.length);
@@ -372,14 +412,21 @@ class GoogleSyncService {
         spaces: 'appDataFolder',
       );
       if (keysList.files != null && keysList.files!.isNotEmpty) {
-        await driveApi.files.update(drive.File(), keysList.files!.first.id!, uploadMedia: keysMedia);
+        await driveApi.files.update(
+          drive.File(),
+          keysList.files!.first.id!,
+          uploadMedia: keysMedia,
+        );
       } else {
         await driveApi.files.create(keysFile, uploadMedia: keysMedia);
       }
-      
+
       // Save last local backup/sync timestamp
-      await _storage.write(key: 'last_local_backup_time', value: DateTime.now().toUtc().toIso8601String());
-      
+      await _storage.write(
+        key: 'last_local_backup_time',
+        value: DateTime.now().toUtc().toIso8601String(),
+      );
+
       return null;
     } catch (e) {
       debugPrint('Error backing up database to Google Drive: $e');
@@ -391,10 +438,14 @@ class GoogleSyncService {
   Future<String?> restoreFromCloud(DatabaseService dbService) async {
     try {
       final accounts = await getLinkedAccounts();
-      final primary = accounts.firstWhere((element) => element.isPrimary, orElse: () => throw StateError('No primary backup account configured.'));
+      final primary = accounts.firstWhere(
+        (element) => element.isPrimary,
+        orElse: () => throw StateError('No primary backup account configured.'),
+      );
 
       final client = await _getHttpClient(primary, _primaryScopes);
-      if (client == null) return 'Could not authenticate. Please re-link your Google account.';
+      if (client == null)
+        return 'Could not authenticate. Please re-link your Google account.';
 
       final driveApi = drive.DriveApi(client);
 
@@ -405,15 +456,18 @@ class GoogleSyncService {
         $fields: 'files(id, name, modifiedTime)',
       );
 
-      if (list.files == null || list.files!.isEmpty) return 'No backup file found on Google Drive AppData folder.';
+      if (list.files == null || list.files!.isEmpty)
+        return 'No backup file found on Google Drive AppData folder.';
       final cloudFile = list.files!.first;
       final fileId = cloudFile.id!;
 
       // Download bytes
-      final drive.Media response = await driveApi.files.get(
-        fileId, 
-        downloadOptions: drive.DownloadOptions.fullMedia,
-      ) as drive.Media;
+      final drive.Media response =
+          await driveApi.files.get(
+                fileId,
+                downloadOptions: drive.DownloadOptions.fullMedia,
+              )
+              as drive.Media;
 
       final List<int> dataBytes = [];
       await response.stream.forEach((element) => dataBytes.addAll(element));
@@ -421,9 +475,11 @@ class GoogleSyncService {
       // Close database, write files, re-initialize
       await dbService.close();
       final dir = await getApplicationSupportDirectory();
-      final isarDbFile = File(Platform.isWindows 
-          ? '${dir.path}\\default.isar'
-          : '${dir.path}/default.isar');
+      final isarDbFile = File(
+        Platform.isWindows
+            ? '${dir.path}\\default.isar'
+            : '${dir.path}/default.isar',
+      );
 
       await isarDbFile.writeAsBytes(dataBytes);
       await dbService.init();
@@ -435,40 +491,77 @@ class GoogleSyncService {
         $fields: 'files(id, name)',
       );
       if (keysList.files != null && keysList.files!.isNotEmpty) {
-        final keysResponse = await driveApi.files.get(
-          keysList.files!.first.id!,
-          downloadOptions: drive.DownloadOptions.fullMedia,
-        ) as drive.Media;
+        final keysResponse =
+            await driveApi.files.get(
+                  keysList.files!.first.id!,
+                  downloadOptions: drive.DownloadOptions.fullMedia,
+                )
+                as drive.Media;
         final List<int> keysData = [];
-        await keysResponse.stream.forEach((element) => keysData.addAll(element));
+        await keysResponse.stream.forEach(
+          (element) => keysData.addAll(element),
+        );
         if (keysData.isNotEmpty) {
           try {
             final keysMap = jsonDecode(utf8.decode(keysData));
-            if (keysMap['ai_gemini_key'] != null) await _storage.write(key: 'ai_gemini_key', value: keysMap['ai_gemini_key']);
-            if (keysMap['ai_openai_key'] != null) await _storage.write(key: 'ai_openai_key', value: keysMap['ai_openai_key']);
-            if (keysMap['ai_ollama_host'] != null) await _storage.write(key: 'ai_ollama_host', value: keysMap['ai_ollama_host']);
+            if (keysMap['ai_gemini_key'] != null)
+              await _storage.write(
+                key: 'ai_gemini_key',
+                value: keysMap['ai_gemini_key'],
+              );
+            if (keysMap['ai_openai_key'] != null)
+              await _storage.write(
+                key: 'ai_openai_key',
+                value: keysMap['ai_openai_key'],
+              );
+            if (keysMap['ai_ollama_host'] != null)
+              await _storage.write(
+                key: 'ai_ollama_host',
+                value: keysMap['ai_ollama_host'],
+              );
 
             final prefs = await SharedPreferences.getInstance();
             if (keysMap['categories_expense'] != null) {
-              await prefs.setStringList('categories_expense', List<String>.from(keysMap['categories_expense'] as List));
+              await prefs.setStringList(
+                'categories_expense',
+                List<String>.from(keysMap['categories_expense'] as List),
+              );
             }
             if (keysMap['categories_income'] != null) {
-              await prefs.setStringList('categories_income', List<String>.from(keysMap['categories_income'] as List));
+              await prefs.setStringList(
+                'categories_income',
+                List<String>.from(keysMap['categories_income'] as List),
+              );
             }
             if (keysMap['categories_transfer'] != null) {
-              await prefs.setStringList('categories_transfer', List<String>.from(keysMap['categories_transfer'] as List));
+              await prefs.setStringList(
+                'categories_transfer',
+                List<String>.from(keysMap['categories_transfer'] as List),
+              );
             }
             if (keysMap['custom_category_icons'] != null) {
-              await prefs.setStringList('custom_category_icons', List<String>.from(keysMap['custom_category_icons'] as List));
+              await prefs.setStringList(
+                'custom_category_icons',
+                List<String>.from(keysMap['custom_category_icons'] as List),
+              );
             }
             if (keysMap['custom_category_colors'] != null) {
-              await prefs.setStringList('custom_category_colors', List<String>.from(keysMap['custom_category_colors'] as List));
+              await prefs.setStringList(
+                'custom_category_colors',
+                List<String>.from(keysMap['custom_category_colors'] as List),
+              );
             }
             if (keysMap['selectedModelId'] != null) {
-              await prefs.setString('selectedModelId', keysMap['selectedModelId'] as String);
+              await prefs.setString(
+                'selectedModelId',
+                keysMap['selectedModelId'] as String,
+              );
             }
             if (keysMap['hasSeenModelOnboarding'] != null) {
-              await prefs.setBool('hasSeenModelOnboarding', keysMap['hasSeenModelOnboarding'] as bool);
+              await prefs.setBool(
+                'hasSeenModelOnboarding',
+                keysMap['hasSeenModelOnboarding'] as bool,
+              );
             }
           } catch (e) {
             debugPrint('Failed to decode restored keys: $e');
@@ -479,9 +572,15 @@ class GoogleSyncService {
       // Align local sync timestamp with cloud modified time
       final cloudModifiedTime = cloudFile.modifiedTime;
       if (cloudModifiedTime != null) {
-        await _storage.write(key: 'last_local_backup_time', value: cloudModifiedTime.toUtc().toIso8601String());
+        await _storage.write(
+          key: 'last_local_backup_time',
+          value: cloudModifiedTime.toUtc().toIso8601String(),
+        );
       } else {
-        await _storage.write(key: 'last_local_backup_time', value: DateTime.now().toUtc().toIso8601String());
+        await _storage.write(
+          key: 'last_local_backup_time',
+          value: DateTime.now().toUtc().toIso8601String(),
+        );
       }
 
       return null;
@@ -492,13 +591,18 @@ class GoogleSyncService {
   }
 
   // Fetch emails from all linked Gmail accounts and parse transactions
-  Future<List<Transaction>> syncTransactionsFromGmail(DatabaseService dbService) async {
+  Future<List<Transaction>> syncTransactionsFromGmail(
+    DatabaseService dbService,
+  ) async {
     final List<Transaction> parsedTxs = [];
     final accounts = await getLinkedAccounts();
 
     for (var acc in accounts) {
       try {
-        final client = await _getHttpClient(acc, acc.isPrimary ? _primaryScopes : _secondaryScopes);
+        final client = await _getHttpClient(
+          acc,
+          acc.isPrimary ? _primaryScopes : _secondaryScopes,
+        );
         if (client == null) continue;
 
         final gmailApi = gmail.GmailApi(client);
@@ -506,41 +610,86 @@ class GoogleSyncService {
         final lastSyncKey = 'last_gmail_sync_time_${acc.email}';
 
         // Fetch last sync timestamp for this specific email account or custom range
-        final customStartStr = await _storage.read(key: 'settings_sync_start_date');
+        final customStartStr = await _storage.read(
+          key: 'settings_sync_start_date',
+        );
         final customEndStr = await _storage.read(key: 'settings_sync_end_date');
 
         String query;
         if (customStartStr != null && customEndStr != null) {
           final start = DateTime.parse(customStartStr);
           final end = DateTime.parse(customEndStr);
-          final startQuery = start.subtract(const Duration(days: 1));
-          final endQuery = end.add(const Duration(days: 2));
-          final startFilter = '${startQuery.year}/${startQuery.month.toString().padLeft(2, '0')}/${startQuery.day.toString().padLeft(2, '0')}';
-          final endFilter = '${endQuery.year}/${endQuery.month.toString().padLeft(2, '0')}/${endQuery.day.toString().padLeft(2, '0')}';
-          query = 'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$startFilter before:$endFilter';
+          final localStart = DateTime(
+            start.year,
+            start.month,
+            start.day,
+            0,
+            0,
+            0,
+          );
+          final localEnd = DateTime(
+            end.year,
+            end.month,
+            end.day,
+            23,
+            59,
+            59,
+            999,
+          );
+          final startSeconds = localStart.millisecondsSinceEpoch ~/ 1000;
+          final endSeconds = localEnd.millisecondsSinceEpoch ~/ 1000;
+          query =
+              'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:${startSeconds - 1} before:${endSeconds + 1}';
         } else {
-          final lastSyncStr = await _storage.read(key: lastSyncKey);
-          final lastSyncTime = lastSyncStr != null ? DateTime.parse(lastSyncStr) : DateTime.now().subtract(const Duration(days: 7));
-          final dateFilter = '${lastSyncTime.year}/${lastSyncTime.month.toString().padLeft(2, '0')}/${lastSyncTime.day.toString().padLeft(2, '0')}';
-          query = 'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$dateFilter';
+          final lastEmailTx = await dbService.isar.transactions
+              .filter()
+              .isDeletedEqualTo(false)
+              .group((q) => q.sourceEqualTo('gmail').or().sourceEqualTo('sms_email'))
+              .sortByTimestampDesc()
+              .findFirst();
+          final lastSyncTime = lastEmailTx?.timestamp ?? DateTime.now().subtract(const Duration(days: 7));
+          final seconds = lastSyncTime.millisecondsSinceEpoch ~/ 1000;
+          query =
+              'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$seconds';
         }
 
         final listRes = await gmailApi.users.messages.list('me', q: query);
         if (listRes.messages == null || listRes.messages!.isEmpty) continue;
 
         for (var msgRef in listRes.messages!) {
-          final msg = await gmailApi.users.messages.get('me', msgRef.id!, format: 'full');
+          final msg = await gmailApi.users.messages.get(
+            'me',
+            msgRef.id!,
+            format: 'full',
+          );
           if (msg.payload == null) continue;
 
-          final date = msg.internalDate != null 
-              ? DateTime.fromMillisecondsSinceEpoch(int.parse(msg.internalDate!)) 
+          final date = msg.internalDate != null
+              ? DateTime.fromMillisecondsSinceEpoch(
+                  int.parse(msg.internalDate!),
+                )
               : DateTime.now();
 
           if (customStartStr != null && customEndStr != null) {
             final start = DateTime.parse(customStartStr);
             final end = DateTime.parse(customEndStr);
-            final localStart = DateTime(start.year, start.month, start.day, 0, 0, 0);
-            final localEnd = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+            final localStart = DateTime(
+              start.year,
+              start.month,
+              start.day,
+              0,
+              0,
+              0,
+            );
+            final localEnd = DateTime(
+              end.year,
+              end.month,
+              end.day,
+              23,
+              59,
+              59,
+              999,
+            );
             if (date.isBefore(localStart) || date.isAfter(localEnd)) {
               continue;
             }
@@ -558,7 +707,10 @@ class GoogleSyncService {
         }
 
         // Save last sync time
-        await _storage.write(key: lastSyncKey, value: DateTime.now().toIso8601String());
+        await _storage.write(
+          key: lastSyncKey,
+          value: DateTime.now().toIso8601String(),
+        );
       } catch (e) {
         debugPrint('Gmail Sync error for ${acc.email}: $e');
       }
@@ -580,7 +732,19 @@ class GoogleSyncService {
       }
       if (part.mimeType == 'text/html' && part.body?.data != null) {
         try {
-          final html = utf8.decode(base64Url.decode(part.body!.data!));
+          var html = utf8.decode(base64Url.decode(part.body!.data!));
+          html = html.replaceAll(
+            RegExp(r'<style[^>]*>[\s\S]*?</style>', caseSensitive: false),
+            '',
+          );
+          html = html.replaceAll(
+            RegExp(r'<script[^>]*>[\s\S]*?</script>', caseSensitive: false),
+            '',
+          );
+          html = html.replaceAll(
+            RegExp(r'<head[^>]*>[\s\S]*?</head>', caseSensitive: false),
+            '',
+          );
           return html
               .replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ')
               .replaceAll(RegExp(r'\s+'), ' ')
@@ -611,15 +775,37 @@ class GoogleSyncService {
       final match = amtRegex.firstMatch(cleanBody);
       if (match == null) return null;
 
-      final amount = double.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0.0;
+      final amount =
+          double.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0.0;
       if (amount <= 0) return null;
 
-      final isIncome = cleanBody.contains('credited') || cleanBody.contains('received') || cleanBody.contains('deposit');
-      final isExpense = cleanBody.contains('spent') || cleanBody.contains('debited') || cleanBody.contains('charged');
+      final isIncome =
+          cleanBody.contains('credited') ||
+          cleanBody.contains('received') ||
+          cleanBody.contains('deposit');
+      final isExpense =
+          cleanBody.contains('spent') ||
+          cleanBody.contains('debited') ||
+          cleanBody.contains('charged') ||
+          cleanBody.contains('sent') ||
+          cleanBody.contains('transaction') ||
+          cleanBody.contains('txn') ||
+          cleanBody.contains('purchase') ||
+          cleanBody.contains('payment') ||
+          cleanBody.contains('upi');
       if (!isIncome && !isExpense) return null;
 
       String desc = 'Gmail Transaction Alert';
-      final merchants = ['netflix', 'amazon', 'uber', 'zomato', 'swiggy', 'zerodha', 'starbucks', 'spotify'];
+      final merchants = [
+        'netflix',
+        'amazon',
+        'uber',
+        'zomato',
+        'swiggy',
+        'zerodha',
+        'starbucks',
+        'spotify',
+      ];
       for (var m in merchants) {
         if (cleanBody.contains(m)) {
           desc = '${m.toUpperCase()} Transaction';
@@ -627,8 +813,8 @@ class GoogleSyncService {
         }
       }
 
-      final date = internalDateMs != null 
-          ? DateTime.fromMillisecondsSinceEpoch(int.parse(internalDateMs)) 
+      final date = internalDateMs != null
+          ? DateTime.fromMillisecondsSinceEpoch(int.parse(internalDateMs))
           : DateTime.now();
 
       return Transaction()
@@ -644,74 +830,160 @@ class GoogleSyncService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> fetchNewEmailsForReview(DatabaseService dbService) async {
+  Future<List<Map<String, dynamic>>> fetchNewEmailsForReview(
+    DatabaseService dbService, {
+    DateTime? since,
+  }) async {
     final List<Map<String, dynamic>> results = [];
     final accounts = await getLinkedAccounts();
-    debugPrint('fetchNewEmailsForReview: Found ${accounts.length} linked accounts.');
+    debugPrint(
+      'fetchNewEmailsForReview: Found ${accounts.length} linked accounts.',
+    );
     final prefs = await SharedPreferences.getInstance();
     final skippedList = prefs.getStringList('skipped_sms_messages') ?? [];
-    final allowDuplicatesStr = await _storage.read(key: 'settings_sms_sync_allow_duplicates') ?? 'false';
+    final allowDuplicatesStr =
+        await _storage.read(key: 'settings_sms_sync_allow_duplicates') ??
+        'false';
     final bool allowDuplicates = allowDuplicatesStr == 'true';
 
     for (var acc in accounts) {
       try {
-        debugPrint('fetchNewEmailsForReview: Authenticating account ${acc.email} (isPrimary: ${acc.isPrimary})...');
-        final client = await _getHttpClient(acc, acc.isPrimary ? _primaryScopes : _secondaryScopes);
+        debugPrint(
+          'fetchNewEmailsForReview: Authenticating account ${acc.email} (isPrimary: ${acc.isPrimary})...',
+        );
+        final client = await _getHttpClient(
+          acc,
+          acc.isPrimary ? _primaryScopes : _secondaryScopes,
+        );
         if (client == null) {
-          debugPrint('fetchNewEmailsForReview: Failed to get authenticated client for ${acc.email} (client was null).');
+          debugPrint(
+            'fetchNewEmailsForReview: Failed to get authenticated client for ${acc.email} (client was null).',
+          );
           continue;
         }
 
         final gmailApi = gmail.GmailApi(client);
         final lastSyncKey = 'last_gmail_sync_time_${acc.email}';
 
-        final customStartStr = await _storage.read(key: 'settings_sync_start_date');
+        final customStartStr = await _storage.read(
+          key: 'settings_sync_start_date',
+        );
         final customEndStr = await _storage.read(key: 'settings_sync_end_date');
 
         String query;
-        if (customStartStr != null && customEndStr != null) {
+        final bool useCustomRange =
+            since == null && customStartStr != null && customEndStr != null;
+        if (useCustomRange) {
           final start = DateTime.parse(customStartStr);
           final end = DateTime.parse(customEndStr);
-          final startQuery = start.subtract(const Duration(days: 1));
-          final endQuery = end.add(const Duration(days: 2));
-          final startFilter = '${startQuery.year}/${startQuery.month.toString().padLeft(2, '0')}/${startQuery.day.toString().padLeft(2, '0')}';
-          final endFilter = '${endQuery.year}/${endQuery.month.toString().padLeft(2, '0')}/${endQuery.day.toString().padLeft(2, '0')}';
-          query = 'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$startFilter before:$endFilter';
+          final localStart = DateTime(
+            start.year,
+            start.month,
+            start.day,
+            0,
+            0,
+            0,
+          );
+          final localEnd = DateTime(
+            end.year,
+            end.month,
+            end.day,
+            23,
+            59,
+            59,
+            999,
+          );
+          final startSeconds = localStart.millisecondsSinceEpoch ~/ 1000;
+          final endSeconds = localEnd.millisecondsSinceEpoch ~/ 1000;
+          query =
+              'subject:(Alert OR Transaction OR transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:${startSeconds - 1} before:${endSeconds + 1}';
         } else {
-          final lastSyncStr = await _storage.read(key: lastSyncKey);
-          final lastSyncTime = lastSyncStr != null ? DateTime.parse(lastSyncStr) : DateTime.now().subtract(const Duration(days: 7));
-          final dateFilter = '${lastSyncTime.year}/${lastSyncTime.month.toString().padLeft(2, '0')}/${lastSyncTime.day.toString().padLeft(2, '0')}';
-          query = 'subject:(Alert OR Transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$dateFilter';
+          final lastEmailTx = await dbService.isar.transactions
+              .filter()
+              .isDeletedEqualTo(false)
+              .group((q) => q.sourceEqualTo('gmail').or().sourceEqualTo('sms_email'))
+              .sortByTimestampDesc()
+              .findFirst();
+          DateTime lastSyncTime = lastEmailTx?.timestamp ?? DateTime.now().subtract(const Duration(days: 7));
+          if (since != null && since.isBefore(lastSyncTime)) {
+            lastSyncTime = since;
+          }
+          final seconds = lastSyncTime.millisecondsSinceEpoch ~/ 1000;
+          query =
+              'subject:(Alert OR Transaction OR transaction OR statement OR e-statement OR UPI OR txn OR debited OR credited) after:$seconds';
         }
 
         debugPrint('Gmail Sync Query: "$query" for account: ${acc.email}');
         final listRes = await gmailApi.users.messages.list('me', q: query);
-        debugPrint('Gmail API returned ${listRes.messages?.length ?? 0} messages for ${acc.email}');
+        debugPrint(
+          'Gmail API returned ${listRes.messages?.length ?? 0} messages for ${acc.email}',
+        );
         if (listRes.messages == null || listRes.messages!.isEmpty) continue;
 
         for (var msgRef in listRes.messages!) {
-          final msg = await gmailApi.users.messages.get('me', msgRef.id!, format: 'full');
-          if (msg.payload == null) {
-            debugPrint('Email ID ${msgRef.id} skipped: No payload');
+          // Fetch metadata first to inspect Subject, Date and Sender without downloading the body
+          final metaMsg = await gmailApi.users.messages.get(
+            'me',
+            msgRef.id!,
+            format: 'metadata',
+            metadataHeaders: ['subject', 'from'],
+          );
+
+          final subject = _getHeader(metaMsg, 'subject');
+          final date = metaMsg.internalDate != null
+              ? DateTime.fromMillisecondsSinceEpoch(
+                  int.parse(metaMsg.internalDate!),
+                )
+              : DateTime.now();
+
+          debugPrint(
+            'Processing Email ID: ${msgRef.id}, Subject: "$subject", Date (Local): $date',
+          );
+
+          if (customStartStr == null && since != null && date.isBefore(since)) {
+            debugPrint(
+              'Email ID ${msgRef.id} skipped: Received before since ($date is before $since)',
+            );
             continue;
           }
 
-          final subject = _getHeader(msg, 'subject');
-          final date = msg.internalDate != null 
-              ? DateTime.fromMillisecondsSinceEpoch(int.parse(msg.internalDate!)) 
-              : DateTime.now();
-
-          debugPrint('Processing Email ID: ${msgRef.id}, Subject: "$subject", Date (Local): $date');
-
-          if (customStartStr != null && customEndStr != null) {
+          if (since == null && customStartStr != null && customEndStr != null) {
             final start = DateTime.parse(customStartStr);
             final end = DateTime.parse(customEndStr);
-            final localStart = DateTime(start.year, start.month, start.day, 0, 0, 0);
-            final localEnd = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+            final localStart = DateTime(
+              start.year,
+              start.month,
+              start.day,
+              0,
+              0,
+              0,
+            );
+            final localEnd = DateTime(
+              end.year,
+              end.month,
+              end.day,
+              23,
+              59,
+              59,
+              999,
+            );
             if (date.isBefore(localStart) || date.isAfter(localEnd)) {
-              debugPrint('Email ID ${msgRef.id} skipped: Out of date bounds ($date not between $localStart and $localEnd)');
+              debugPrint(
+                'Email ID ${msgRef.id} skipped: Out of date bounds ($date not between $localStart and $localEnd)',
+              );
               continue;
             }
+          }
+
+          // Fetch full message body only if it passes the date checks
+          final msg = await gmailApi.users.messages.get(
+            'me',
+            msgRef.id!,
+            format: 'full',
+          );
+          if (msg.payload == null) {
+            debugPrint('Email ID ${msgRef.id} skipped: No payload');
+            continue;
           }
 
           final bodyText = _parseGmailMessageBody(msg);
@@ -721,40 +993,55 @@ class GoogleSyncService {
           }
 
           final isar = dbService.isar;
-          final isAlreadyRecorded = await isar.transactions
-              .filter()
-              .rawMessageEqualTo(bodyText)
-              .findFirst() != null;
+          final isAlreadyRecorded =
+              await isar.transactions
+                  .filter()
+                  .rawMessageEqualTo(bodyText)
+                  .isDeletedEqualTo(false)
+                  .findFirst() !=
+              null;
 
           final isSkipped = skippedList.contains(bodyText);
 
           if (!allowDuplicates && (isAlreadyRecorded || isSkipped)) {
-            debugPrint('Email ID ${msgRef.id} skipped: Already recorded or skipped previously (allowDuplicates=false)');
+            debugPrint(
+              'Email ID ${msgRef.id} skipped: Already recorded or skipped previously (allowDuplicates=false)',
+            );
             continue;
           }
 
           final isTx = _isTransactionalEmail(bodyText);
-          debugPrint('Email ID ${msgRef.id}: isTx=$isTx, isAlreadyRecorded=$isAlreadyRecorded, isSkipped=$isSkipped');
+          debugPrint(
+            'Email ID ${msgRef.id}: isTx=$isTx, isAlreadyRecorded=$isAlreadyRecorded, isSkipped=$isSkipped',
+          );
 
           if (!isTx) {
-            final regexSkippedList = prefs.getStringList('regex_skipped_messages') ?? [];
+            final regexSkippedList =
+                prefs.getStringList('regex_skipped_messages') ?? [];
             final fromHeader = _getHeader(msg, 'from');
             final msgJson = jsonEncode({
               'body': bodyText,
               'date': date.toIso8601String(),
               'sender': fromHeader.isNotEmpty ? fromHeader : acc.email,
+              'source': 'email',
             });
-            if (!regexSkippedList.any((item) => jsonDecode(item)['body'] == bodyText)) {
+            if (!regexSkippedList.any(
+              (item) => jsonDecode(item)['body'] == bodyText,
+            )) {
               regexSkippedList.insert(0, msgJson);
               if (regexSkippedList.length > 200) {
                 regexSkippedList.removeLast();
               }
-              await prefs.setStringList('regex_skipped_messages', regexSkippedList);
+              await prefs.setStringList(
+                'regex_skipped_messages',
+                regexSkippedList,
+              );
             }
           }
 
           results.add({
             'body': bodyText,
+            'subject': subject,
             'date': date,
             'source': 'email',
             'approvedByRegex': isTx,
@@ -787,11 +1074,24 @@ class GoogleSyncService {
       final match = amtRegex.firstMatch(cleanBody);
       if (match == null) return false;
 
-      final amount = double.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0.0;
+      final amount =
+          double.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0.0;
       if (amount <= 0) return false;
 
-      final isIncome = cleanBody.contains('credited') || cleanBody.contains('received') || cleanBody.contains('deposit');
-      final isExpense = cleanBody.contains('spent') || cleanBody.contains('debited') || cleanBody.contains('charged');
+      final isIncome =
+          cleanBody.contains('credited') ||
+          cleanBody.contains('received') ||
+          cleanBody.contains('deposit');
+      final isExpense =
+          cleanBody.contains('spent') ||
+          cleanBody.contains('debited') ||
+          cleanBody.contains('charged') ||
+          cleanBody.contains('sent') ||
+          cleanBody.contains('transaction') ||
+          cleanBody.contains('txn') ||
+          cleanBody.contains('purchase') ||
+          cleanBody.contains('payment') ||
+          cleanBody.contains('upi');
       return isIncome || isExpense;
     } catch (_) {
       return false;
@@ -801,7 +1101,10 @@ class GoogleSyncService {
   Future<void> updateLastSyncTimeForAllAccounts() async {
     final accounts = await getLinkedAccounts();
     for (var acc in accounts) {
-      await _storage.write(key: 'last_gmail_sync_time_${acc.email}', value: DateTime.now().toIso8601String());
+      await _storage.write(
+        key: 'last_gmail_sync_time_${acc.email}',
+        value: DateTime.now().toIso8601String(),
+      );
     }
   }
 }

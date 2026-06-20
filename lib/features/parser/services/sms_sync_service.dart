@@ -292,7 +292,7 @@ class SmsSyncService {
 
     final newMessages = messages.where((msg) {
       if (msg.date == null || msg.body == null) return false;
-      if (customStart != null && customEnd != null) {
+      if (since == null && customStart != null && customEnd != null) {
         return msg.date!.isAfter(customStart!) && msg.date!.isBefore(customEnd!.add(const Duration(days: 1)));
       }
       return msg.date!.isAfter(lastSyncTime!);
@@ -316,6 +316,7 @@ class SmsSyncService {
       final isAlreadyRecorded = await isar.transactions
           .filter()
           .rawMessageEqualTo(msg.body)
+          .isDeletedEqualTo(false)
           .findFirst() != null;
 
       final isSkipped = skippedList.contains(msg.body);
@@ -332,6 +333,7 @@ class SmsSyncService {
           'body': msg.body,
           'date': (msg.date ?? DateTime.now()).toIso8601String(),
           'sender': msg.sender ?? 'Unknown',
+          'source': 'sms',
         });
         if (!regexSkippedList.any((item) => jsonDecode(item)['body'] == msg.body)) {
           regexSkippedList.insert(0, msgJson);

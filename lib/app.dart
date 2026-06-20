@@ -12,6 +12,7 @@ import 'core/google_sync_service.dart';
 import 'core/database_service.dart';
 import 'core/providers.dart';
 import 'ui/onboarding/model_onboarding.dart';
+import 'dart:io';
 import 'features/expenses/ui/dashboard_view.dart';
 import 'features/cards_loans/ui/cards_loans_view.dart';
 import 'features/investments/ui/investments_view.dart';
@@ -19,6 +20,7 @@ import 'features/advisor/ui/advisor_view.dart';
 import 'ui/settings/settings_view.dart';
 import 'ui/settings/widgets/sync_review_helper.dart';
 import 'features/expenses/models/transaction_model.dart';
+import 'features/parser/services/sms_parser_service.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -99,13 +101,32 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
 
     try {
       final dbService = ref.read(databaseServiceProvider);
-      final lastTx = await dbService.isar.transactions.where().sortByTimestampDesc().findFirst();
+      final lastTx = await dbService.isar.transactions
+          .filter()
+          .isDeletedEqualTo(false)
+          .sortByTimestampDesc()
+          .findFirst();
       final DateTime? since = lastTx?.timestamp;
       if (since == null) return;
 
-      final smsSync = ref.read(smsSyncServiceProvider);
-      final itemsForReview = await smsSync.fetchNewSmsForReview(since: since);
+      List<Map<String, dynamic>> itemsForReview = [];
+      if (Platform.isAndroid) {
+        final smsSync = ref.read(smsSyncServiceProvider);
+        itemsForReview = await smsSync.fetchNewSmsForReview(since: since);
+      }
+
+      final emailItems = await ref
+          .read(googleSyncServiceProvider)
+          .fetchNewEmailsForReview(dbService, since: since);
+      itemsForReview.addAll(emailItems);
+
+      // Merge duplicate transactions across SMS and Email
+      itemsForReview = _mergeDuplicateTransactions(itemsForReview);
+
       if (itemsForReview.isEmpty) return;
+
+      // Sort items by date ascending (oldest first)
+      itemsForReview.sort((a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
 
       if (!mounted) return;
 
@@ -138,7 +159,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'You have ${itemsForReview.length} new SMS messages since your last logged transaction. Would you like to review and add them now?',
+                      'You have ${itemsForReview.length} new messages since your last logged transaction. Would you like to review and add them now?',
                       style: const TextStyle(color: Colors.white70, fontSize: 13),
                       textAlign: TextAlign.center,
                     ),
@@ -183,6 +204,143 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     } catch (e) {
       debugPrint('Startup sync review check failed: $e');
     }
+  }
+
+  List<Map<String, dynamic>> _mergeDuplicateTransactions(List<Map<String, dynamic>> items) {
+    final parser = SmsParserService();
+    final List<Map<String, dynamic>> merged = [];
+    final Set<int> mergedIndices = {};
+
+    Map<String, dynamic>? parseGeneric(String body) {
+      final res = parser.parseRegexOnly(body);
+      if (res != null && res.amount > 0) {
+        return {
+          'amount': res.amount,
+          'transactionType': res.transactionType,
+        };
+      }
+      try {
+        final cleanBody = body.toLowerCase();
+        final amtRegex = RegExp(r'(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{2})?)');
+        final match = amtRegex.firstMatch(cleanBody);
+        if (match == null) return null;
+        final amount = double.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0.0;
+        if (amount <= 0) return null;
+
+        final isIncome = cleanBody.contains('credited') || cleanBody.contains('received') || cleanBody.contains('deposit');
+        final isExpense = cleanBody.contains('spent') ||
+            cleanBody.contains('debited') ||
+            cleanBody.contains('charged') ||
+            cleanBody.contains('sent') ||
+            cleanBody.contains('transaction') ||
+            cleanBody.contains('txn') ||
+            cleanBody.contains('purchase') ||
+            cleanBody.contains('payment') ||
+            cleanBody.contains('upi');
+        if (!isIncome && !isExpense) return null;
+
+        return {
+          'amount': amount,
+          'transactionType': isIncome ? 'income' : 'expense',
+        };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    for (int i = 0; i < items.length; i++) {
+      if (mergedIndices.contains(i)) continue;
+
+      final itemA = items[i];
+      final bodyA = itemA['body'] as String;
+      final dateA = itemA['date'] as DateTime;
+      final sourceA = itemA['source'] as String;
+
+      final parsedA = parseGeneric(bodyA);
+      if (parsedA == null || (parsedA['amount'] as double) <= 0) {
+        merged.add(itemA);
+        continue;
+      }
+
+      final List<int> matches = [];
+      for (int j = i + 1; j < items.length; j++) {
+        if (mergedIndices.contains(j)) continue;
+
+        final itemB = items[j];
+        final bodyB = itemB['body'] as String;
+        final dateB = itemB['date'] as DateTime;
+        final sourceB = itemB['source'] as String;
+
+        if (sourceA == sourceB) {
+          if (bodyA == bodyB) {
+            matches.add(j);
+          }
+          continue;
+        }
+
+        if (dateA.difference(dateB).abs().inMinutes > 10) continue;
+
+        final parsedB = parseGeneric(bodyB);
+        if (parsedB == null || (parsedB['amount'] as double) <= 0) continue;
+
+        if (((parsedA['amount'] as double) - (parsedB['amount'] as double)).abs() > 0.01) continue;
+
+        final typeA = parsedA['transactionType'] == 'transfer' ? 'expense' : parsedA['transactionType'];
+        final typeB = parsedB['transactionType'] == 'transfer' ? 'expense' : parsedB['transactionType'];
+        if (typeA != typeB) continue;
+
+        matches.add(j);
+      }
+
+      if (matches.isNotEmpty) {
+        String smsBody = sourceA == 'sms' ? bodyA : '';
+        String emailBody = sourceA == 'email' ? bodyA : '';
+        String? mergedSubject = itemA['subject'] as String?;
+        bool approvedByRegex = itemA['approvedByRegex'] == true;
+        bool isAlreadyRecorded = itemA['isAlreadyRecorded'] == true;
+        bool isSkipped = itemA['isSkipped'] == true;
+
+        for (final matchIdx in matches) {
+          mergedIndices.add(matchIdx);
+          final matchItem = items[matchIdx];
+          final matchSrc = matchItem['source'] as String;
+          final matchBody = matchItem['body'] as String;
+          final matchSubject = matchItem['subject'] as String?;
+          if (matchSrc == 'sms') smsBody = matchBody;
+          if (matchSrc == 'email') emailBody = matchBody;
+          if (mergedSubject == null || mergedSubject.isEmpty) {
+            mergedSubject = matchSubject;
+          }
+          if (matchItem['approvedByRegex'] == true) approvedByRegex = true;
+          if (matchItem['isAlreadyRecorded'] == true) isAlreadyRecorded = true;
+          if (matchItem['isSkipped'] == true) isSkipped = true;
+        }
+
+        final finalSource = (smsBody.isNotEmpty && emailBody.isNotEmpty)
+            ? 'sms_email'
+            : (smsBody.isNotEmpty ? 'sms' : 'email');
+
+        final finalBody = finalSource == 'sms_email'
+            ? '📱 SMS:\n$smsBody\n\n📧 EMAIL:\n$emailBody'
+            : (smsBody.isNotEmpty ? smsBody : emailBody);
+
+        merged.add({
+          'body': finalBody,
+          'date': dateA,
+          'source': finalSource,
+          'approvedByRegex': approvedByRegex,
+          'smsBody': smsBody.isNotEmpty ? smsBody : null,
+          'emailBody': emailBody.isNotEmpty ? emailBody : null,
+          'subject': mergedSubject,
+          'isAlreadyRecorded': isAlreadyRecorded,
+          'isSkipped': isSkipped,
+        });
+      } else {
+        merged.add(itemA);
+      }
+    }
+
+    return merged;
   }
 
   Future<void> _performBackgroundSync() async {

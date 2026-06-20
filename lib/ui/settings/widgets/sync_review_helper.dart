@@ -970,6 +970,31 @@ void showSyncReviewDialog(
                             ],
                           ),
                           const SizedBox(height: 12),
+                          if (item['subject'] != null && (item['subject'] as String).isNotEmpty) ...[
+                            const Text(
+                              'Subject:',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white70),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white10),
+                              ),
+                              child: Text(
+                                item['subject'] as String,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.neonTeal,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                           const Text(
                             'Raw Message Context:',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white70),
