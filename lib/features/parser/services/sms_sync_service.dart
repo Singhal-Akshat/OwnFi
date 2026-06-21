@@ -154,7 +154,34 @@ class SmsSyncService {
             .timestampEqualTo(txDate)
             .findFirst();
 
-        if (existing != null) continue; // Duplicate
+        bool isDuplicate = existing != null;
+        if (!isDuplicate) {
+          final bodyLower = (msg.body ?? '').toLowerCase();
+          final isCardPayment = bodyLower.contains('cred') ||
+              bodyLower.contains('towards') ||
+              bodyLower.contains('card payment') ||
+              bodyLower.contains('credit card');
+          if (isCardPayment) {
+            final startTime = txDate.subtract(const Duration(minutes: 15));
+            final endTime = txDate.add(const Duration(minutes: 15));
+            final similarTxs = await isar.transactions
+                .filter()
+                .timestampBetween(startTime, endTime)
+                .isDeletedEqualTo(false)
+                .findAll();
+            for (final tx in similarTxs) {
+              final diff = (tx.amount - parsed.amount).abs();
+              if (diff <= 150.0 && (diff / tx.amount) < 0.02) {
+                if (tx.transactionType == 'transfer' || tx.category == 'Credit card payment' || tx.category == 'Bills') {
+                  isDuplicate = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (isDuplicate) continue; // Duplicate
 
         // --- Resolve Account ---
         String? matchedCardId;
@@ -313,11 +340,45 @@ class SmsSyncService {
     for (final msg in newMessages) {
       if (msg.body == null) continue;
 
-      final isAlreadyRecorded = await isar.transactions
+      var isAlreadyRecorded = await isar.transactions
           .filter()
           .rawMessageEqualTo(msg.body)
           .isDeletedEqualTo(false)
           .findFirst() != null;
+
+      if (!isAlreadyRecorded) {
+        final bodyLower = (msg.body ?? '').toLowerCase();
+        final isCardPayment = bodyLower.contains('cred') ||
+            bodyLower.contains('towards') ||
+            bodyLower.contains('card payment') ||
+            bodyLower.contains('credit card');
+        if (isCardPayment) {
+          final amountReg = RegExp(r'(?:rs\.?|inr|₹)\s*([0-9,]+(?:\.[0-9]{2})?)', caseSensitive: false);
+          final amtMatch = amountReg.firstMatch(msg.body!);
+          if (amtMatch != null) {
+            final amt = double.tryParse(amtMatch.group(1)!.replaceAll(',', '')) ?? 0.0;
+            if (amt > 0) {
+              final txDate = msg.date ?? DateTime.now();
+              final startTime = txDate.subtract(const Duration(minutes: 15));
+              final endTime = txDate.add(const Duration(minutes: 15));
+              final similarTxs = await isar.transactions
+                  .filter()
+                  .timestampBetween(startTime, endTime)
+                  .isDeletedEqualTo(false)
+                  .findAll();
+              for (final tx in similarTxs) {
+                final diff = (tx.amount - amt).abs();
+                if (diff <= 150.0 && (diff / tx.amount) < 0.02) {
+                  if (tx.transactionType == 'transfer' || tx.category == 'Credit card payment' || tx.category == 'Bills') {
+                    isAlreadyRecorded = true;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
 
       final isSkipped = skippedList.contains(msg.body);
 

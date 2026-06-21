@@ -821,6 +821,7 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
     final Set<int> mergedIndices = {};
 
     Map<String, dynamic>? parseGeneric(String body) {
+      if (SmsParserService.isOtpOrPromo(body)) return null;
       final res = parser.parseRegexOnly(body);
       if (res != null && res.amount > 0) {
         return {
@@ -878,27 +879,52 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
         final itemB = items[j];
         final bodyB = itemB['body'] as String;
         final dateB = itemB['date'] as DateTime;
-        final sourceB = itemB['source'] as String;
 
-        if (sourceA == sourceB) {
-          if (bodyA == bodyB) {
-            matches.add(j);
-          }
+        if (bodyA == bodyB) {
+          matches.add(j);
           continue;
         }
 
-        if (dateA.difference(dateB).abs().inMinutes > 10) continue;
+        final timeDiff = dateA.difference(dateB).abs().inMinutes;
+        if (timeDiff > 15) continue;
 
         final parsedB = parseGeneric(bodyB);
         if (parsedB == null || (parsedB['amount'] as double) <= 0) continue;
 
-        if (((parsedA['amount'] as double) - (parsedB['amount'] as double)).abs() > 0.01) continue;
+        final amtA = parsedA['amount'] as double;
+        final amtB = parsedB['amount'] as double;
+        final amtDiff = (amtA - amtB).abs();
 
-        final typeA = parsedA['transactionType'] == 'transfer' ? 'expense' : parsedA['transactionType'];
-        final typeB = parsedB['transactionType'] == 'transfer' ? 'expense' : parsedB['transactionType'];
-        if (typeA != typeB) continue;
+        final bodyALower = bodyA.toLowerCase();
+        final bodyBLower = bodyB.toLowerCase();
+        final isCardPayment = bodyALower.contains('cred') ||
+            bodyALower.contains('towards') ||
+            bodyALower.contains('card payment') ||
+            bodyALower.contains('credit card') ||
+            bodyBLower.contains('cred') ||
+            bodyBLower.contains('towards') ||
+            bodyBLower.contains('card payment') ||
+            bodyBLower.contains('credit card');
 
-        matches.add(j);
+        bool isMatch = false;
+
+        if (isCardPayment) {
+          if (amtDiff <= 150.0 && (amtDiff / amtA) < 0.02) {
+            isMatch = true;
+          }
+        } else {
+          if (amtDiff <= 0.05) {
+            final typeA = parsedA['transactionType'] == 'transfer' ? 'expense' : parsedA['transactionType'];
+            final typeB = parsedB['transactionType'] == 'transfer' ? 'expense' : parsedB['transactionType'];
+            if (typeA == typeB) {
+              isMatch = true;
+            }
+          }
+        }
+
+        if (isMatch) {
+          matches.add(j);
+        }
       }
 
       if (matches.isNotEmpty) {
@@ -915,8 +941,20 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
           final matchSrc = matchItem['source'] as String;
           final matchBody = matchItem['body'] as String;
           final matchSubject = matchItem['subject'] as String?;
-          if (matchSrc == 'sms') smsBody = matchBody;
-          if (matchSrc == 'email') emailBody = matchBody;
+          if (matchSrc == 'sms') {
+            if (smsBody.isEmpty) {
+              smsBody = matchBody;
+            } else if (!smsBody.contains(matchBody)) {
+              smsBody = '$smsBody\n\n$matchBody';
+            }
+          }
+          if (matchSrc == 'email') {
+            if (emailBody.isEmpty) {
+              emailBody = matchBody;
+            } else if (!emailBody.contains(matchBody)) {
+              emailBody = '$emailBody\n\n$matchBody';
+            }
+          }
           if (mergedSubject == null || mergedSubject.isEmpty) {
             mergedSubject = matchSubject;
           }

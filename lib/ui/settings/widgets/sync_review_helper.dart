@@ -159,6 +159,8 @@ void showSyncReviewDialog(
   ParsedSmsTransaction? lastGemini;
   ParsedSmsTransaction? lastRegex;
 
+  String activeFilter = 'all'; // 'all', 'sms', 'email'
+
   final controller = TransactionFormController();
 
   showDialog(
@@ -171,6 +173,52 @@ void showSyncReviewDialog(
             final unprocessedRejectedIndices = List.generate(rejectedItems.length, (i) => i)
                 .where((i) => !processedIndices.contains(i))
                 .toList();
+
+            final filteredRejectedIndices = unprocessedRejectedIndices.where((i) {
+              final item = rejectedItems[i];
+              final String source = item['source'] ?? 'sms';
+              if (activeFilter == 'sms') {
+                return source == 'sms' || source == 'sms_email';
+              } else if (activeFilter == 'email') {
+                return source == 'email' || source == 'sms_email';
+              }
+              return true;
+            }).toList();
+
+            Widget buildFilterButton({
+              required String label,
+              required bool isSelected,
+              required VoidCallback onTap,
+            }) {
+              return InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(8),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected 
+                        ? AppColors.neonTeal.withOpacity(0.2) 
+                        : Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected 
+                          ? AppColors.neonTeal 
+                          : AppColors.glassBorder,
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? AppColors.neonTeal : Colors.white70,
+                    ),
+                  ),
+                ),
+              );
+            }
 
             if (unprocessedRejectedIndices.isEmpty) {
               return Dialog(
@@ -267,6 +315,30 @@ void showSyncReviewDialog(
                         'These messages were filtered out by rules. Tap any message to manually approve it as a transaction.',
                         style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                       ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          buildFilterButton(
+                            label: '📱 SMS',
+                            isSelected: activeFilter == 'sms',
+                            onTap: () {
+                              setState(() {
+                                activeFilter = activeFilter == 'sms' ? 'all' : 'sms';
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          buildFilterButton(
+                            label: '📧 Email',
+                            isSelected: activeFilter == 'email',
+                            onTap: () {
+                              setState(() {
+                                activeFilter = activeFilter == 'email' ? 'all' : 'email';
+                              });
+                            },
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       Container(
                         constraints: BoxConstraints(
@@ -274,9 +346,9 @@ void showSyncReviewDialog(
                         ),
                         child: ListView.builder(
                           shrinkWrap: true,
-                          itemCount: unprocessedRejectedIndices.length,
+                          itemCount: filteredRejectedIndices.length,
                           itemBuilder: (context, index) {
-                            final rejectedIndex = unprocessedRejectedIndices[index];
+                            final rejectedIndex = filteredRejectedIndices[index];
                             final rejectedItem = rejectedItems[rejectedIndex];
                             final String body = rejectedItem['body'] ?? '';
                             final DateTime date = rejectedItem['date'] ?? DateTime.now();
@@ -507,6 +579,7 @@ void showSyncReviewDialog(
                                   lastInitializedIndex = null;
                                   lastGemini = null;
                                   lastRegex = null;
+                                  activeFilter = 'all';
                                   controller.reset();
                                 });
                               },
@@ -619,8 +692,32 @@ void showSyncReviewDialog(
                       if (controller.selectedCategory == 'Utilities') controller.selectedCategory = 'Bills';
 
                       controller.selectedAccount = 'Cash';
-                      if (geminiResult.matchedAccountId != null) {
-                        controller.selectedAccount = geminiResult.matchedAccountId!;
+                      controller.selectedToAccount = 'Cash';
+                      final matchedId = geminiResult.matchedAccountId;
+                      if (matchedId != null) {
+                        if (controller.selectedType == 'transfer' && matchedId.startsWith('card:')) {
+                          controller.selectedToAccount = matchedId;
+                          if (geminiResult.accountLast4 != null) {
+                            bankAccountsState.whenData((banks) {
+                              final match = banks.firstWhere((b) => b.last4 == geminiResult.accountLast4, orElse: () => BankAccount());
+                              if (match.id != Isar.autoIncrement) {
+                                controller.selectedAccount = 'bank:${match.id}';
+                              }
+                            });
+                          } else {
+                            final bodyLower = bodyText.toLowerCase();
+                            bankAccountsState.whenData((banks) {
+                              for (final bank in banks) {
+                                if (bodyLower.contains(bank.bankName.toLowerCase())) {
+                                  controller.selectedAccount = 'bank:${bank.id}';
+                                  break;
+                                }
+                              }
+                            });
+                          }
+                        } else {
+                          controller.selectedAccount = matchedId;
+                        }
                       } else {
                         final bodyLower = bodyText.toLowerCase();
                         if (bodyLower.contains('hdfc')) {
@@ -657,15 +754,68 @@ void showSyncReviewDialog(
                           }
                         }
                       }
+
+                      if (controller.selectedType == 'transfer') {
+                        if (controller.selectedToAccount == 'Cash') {
+                          if (geminiResult.cardLast4 != null) {
+                            cardsState.whenData((cards) {
+                              final match = cards.firstWhere((c) => c.last4 == geminiResult.cardLast4, orElse: () => CreditCard());
+                              if (match.id != Isar.autoIncrement) {
+                                controller.selectedToAccount = 'card:${match.id}';
+                              }
+                            });
+                          } else {
+                            final bodyLower = bodyText.toLowerCase();
+                            cardsState.whenData((cards) {
+                              for (final card in cards) {
+                                if (bodyLower.contains(card.cardName.toLowerCase())) {
+                                  controller.selectedToAccount = 'card:${card.id}';
+                                  break;
+                                }
+                              }
+                            });
+                          }
+                        }
+                        if (controller.selectedToAccount == 'Cash') {
+                          final merchantLower = geminiResult.merchant.toLowerCase();
+                          final bodyLower = bodyText.toLowerCase();
+                          bankAccountsState.whenData((banks) {
+                            for (final bank in banks) {
+                              if (merchantLower.contains(bank.bankName.toLowerCase()) || 
+                                  (bodyLower.contains(bank.bankName.toLowerCase()) && 
+                                   controller.selectedAccount != 'bank:${bank.id}')) {
+                                controller.selectedToAccount = 'bank:${bank.id}';
+                                break;
+                              }
+                            }
+                          });
+                        }
+                      }
                     }
                   });
                 } else {
                   setState(() {
+                    geminiCache[index] = ParsedSmsTransaction(
+                      amount: 0.0,
+                      description: '',
+                      transactionType: 'expense',
+                      category: 'Other',
+                      merchant: 'Unknown',
+                      isTransaction: false,
+                    );
                     geminiLoading[index] = false;
                   });
                 }
               }).catchError((e) {
                 setState(() {
+                  geminiCache[index] = ParsedSmsTransaction(
+                    amount: 0.0,
+                    description: '',
+                    transactionType: 'expense',
+                    category: 'Other',
+                    merchant: 'Unknown',
+                    isTransaction: false,
+                  );
                   geminiLoading[index] = false;
                 });
                 parser.logDebug('Gemini parse error: $e');
@@ -698,8 +848,32 @@ void showSyncReviewDialog(
             if (controller.selectedCategory == 'Utilities') controller.selectedCategory = 'Bills';
 
             controller.selectedAccount = 'Cash';
-            if (initialSource?.matchedAccountId != null) {
-              controller.selectedAccount = initialSource!.matchedAccountId!;
+            controller.selectedToAccount = 'Cash';
+            final matchedId = initialSource?.matchedAccountId;
+            if (matchedId != null) {
+              if (controller.selectedType == 'transfer' && matchedId.startsWith('card:')) {
+                controller.selectedToAccount = matchedId;
+                if (initialSource?.accountLast4 != null) {
+                  bankAccountsState.whenData((banks) {
+                    final match = banks.firstWhere((b) => b.last4 == initialSource!.accountLast4, orElse: () => BankAccount());
+                    if (match.id != Isar.autoIncrement) {
+                      controller.selectedAccount = 'bank:${match.id}';
+                    }
+                  });
+                } else {
+                  final bodyLower = rawBody.toLowerCase();
+                  bankAccountsState.whenData((banks) {
+                    for (final bank in banks) {
+                      if (bodyLower.contains(bank.bankName.toLowerCase())) {
+                        controller.selectedAccount = 'bank:${bank.id}';
+                        break;
+                      }
+                    }
+                  });
+                }
+              } else {
+                controller.selectedAccount = matchedId;
+              }
             } else {
               final bodyLower = rawBody.toLowerCase();
               if (bodyLower.contains('hdfc')) {
@@ -737,6 +911,43 @@ void showSyncReviewDialog(
                     });
                   }
                 }
+              }
+            }
+
+            if (controller.selectedType == 'transfer') {
+              if (controller.selectedToAccount == 'Cash') {
+                if (initialSource?.cardLast4 != null) {
+                  cardsState.whenData((cards) {
+                    final match = cards.firstWhere((c) => c.last4 == initialSource!.cardLast4, orElse: () => CreditCard());
+                    if (match.id != Isar.autoIncrement) {
+                      controller.selectedToAccount = 'card:${match.id}';
+                    }
+                  });
+                } else {
+                  final bodyLower = rawBody.toLowerCase();
+                  cardsState.whenData((cards) {
+                    for (final card in cards) {
+                      if (bodyLower.contains(card.cardName.toLowerCase())) {
+                        controller.selectedToAccount = 'card:${card.id}';
+                        break;
+                      }
+                    }
+                  });
+                }
+              }
+              if (controller.selectedToAccount == 'Cash') {
+                final merchantLower = (initialSource?.merchant ?? '').toLowerCase();
+                final bodyLower = rawBody.toLowerCase();
+                bankAccountsState.whenData((banks) {
+                  for (final bank in banks) {
+                    if (merchantLower.contains(bank.bankName.toLowerCase()) || 
+                        (bodyLower.contains(bank.bankName.toLowerCase()) && 
+                         controller.selectedAccount != 'bank:${bank.id}')) {
+                      controller.selectedToAccount = 'bank:${bank.id}';
+                      break;
+                    }
+                  }
+                });
               }
             }
           }
@@ -1446,19 +1657,25 @@ void showSyncReviewDialog(
                                         final allLoans = ref.read(loansProvider).valueOrNull ?? [];
                                         try {
                                           final target = allLoans.firstWhere((l) => l.id == controller.selectedDebtId);
-                                          if (amt >= target.remainingBalance) {
-                                            final overpaid = amt - target.remainingBalance;
-                                            if (overpaid > 0) {
-                                              target.isLent = true;
-                                              target.remainingBalance = overpaid;
-                                              target.amount = overpaid;
-                                              target.isCompleted = false;
-                                            } else {
-                                              target.remainingBalance = 0.0;
-                                              target.isCompleted = true;
-                                            }
+                                          if (target.isLent) {
+                                            target.amount += amt;
+                                            target.remainingBalance += amt;
+                                            target.isCompleted = false;
                                           } else {
-                                            target.remainingBalance -= amt;
+                                            if (amt >= target.remainingBalance) {
+                                              final overpaid = amt - target.remainingBalance;
+                                              if (overpaid > 0) {
+                                                target.isLent = true;
+                                                target.remainingBalance = overpaid;
+                                                target.amount = overpaid;
+                                                target.isCompleted = false;
+                                              } else {
+                                                target.remainingBalance = 0.0;
+                                                target.isCompleted = true;
+                                              }
+                                            } else {
+                                              target.remainingBalance -= amt;
+                                            }
                                           }
                                           await ref.read(loansProvider.notifier).addLoan(target);
                                         } catch (_) {}

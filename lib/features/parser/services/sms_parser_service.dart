@@ -70,6 +70,10 @@ class SmsParserService {
     caseSensitive: false,
   );
 
+  static bool isOtpOrPromo(String text) {
+    return _otpOrPromotionalKeywords.hasMatch(text);
+  }
+
   Future<ParsedSmsTransaction?> parseAsync(
     String smsBody, {
     bool isBulk = false,
@@ -194,6 +198,13 @@ class SmsParserService {
 
   Future<Map<String, dynamic>> previewParse(String smsBody) async {
     final body = smsBody.trim();
+    if (_otpOrPromotionalKeywords.hasMatch(body)) {
+      return {
+        'regex': null,
+        'gemini': null,
+        'geminiRaw': null,
+      };
+    }
     final regexResult = _parseRegex(body);
     final key = await _storage.read(key: 'ai_gemini_key');
     ParsedSmsTransaction? geminiResult;
@@ -220,6 +231,19 @@ class SmsParserService {
   }) async {
     final body = smsBody.trim();
     await logDebug('parseGeminiOnly SMS Body: "$body"');
+    final prefs = await SharedPreferences.getInstance();
+    final customRedList = prefs.getStringList('custom_red_flags') ?? [];
+    RegExp otpOrPromotionalKeywords = _otpOrPromotionalKeywords;
+    if (customRedList.isNotEmpty) {
+      final escaped = customRedList.map((e) => RegExp.escape(e)).join('|');
+      otpOrPromotionalKeywords = RegExp(
+        '(${_otpOrPromotionalKeywords.pattern}|$escaped)',
+        caseSensitive: false,
+      );
+    }
+    if (otpOrPromotionalKeywords.hasMatch(body)) {
+      return null;
+    }
     final key = await _storage.read(key: 'ai_gemini_key');
     if (key == null || key.isEmpty) return null;
     final geminiRaw = await _parseWithGeminiRaw(body, key, cards: cards, bankAccounts: bankAccounts);
@@ -400,6 +424,9 @@ SMS: "$sms"
 
   ParsedSmsTransaction? _parseRegex(String smsBody) {
     final body = smsBody.trim();
+    if (_otpOrPromotionalKeywords.hasMatch(body)) {
+      return null;
+    }
 
     double? amount;
     String transactionType = 'expense';

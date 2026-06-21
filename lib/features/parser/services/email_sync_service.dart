@@ -112,7 +112,34 @@ class EmailSyncService {
                 .timestampEqualTo(date)
                 .findFirst();
 
-            if (existing == null) {
+            bool isDuplicate = existing != null;
+            if (!isDuplicate) {
+              final bodyLower = bodyText.toLowerCase();
+              final isCardPayment = bodyLower.contains('cred') ||
+                  bodyLower.contains('towards') ||
+                  bodyLower.contains('card payment') ||
+                  bodyLower.contains('credit card');
+              if (isCardPayment) {
+                final startTime = date.subtract(const Duration(minutes: 15));
+                final endTime = date.add(const Duration(minutes: 15));
+                final similarTxs = await isar.transactions
+                    .filter()
+                    .timestampBetween(startTime, endTime)
+                    .isDeletedEqualTo(false)
+                    .findAll();
+                for (final tx in similarTxs) {
+                  final diff = (tx.amount - parsed.amount).abs();
+                  if (diff <= 150.0 && (diff / tx.amount) < 0.02) {
+                    if (tx.transactionType == 'transfer' || tx.category == 'Credit card payment' || tx.category == 'Bills') {
+                      isDuplicate = true;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+
+            if (!isDuplicate) {
               // --- Resolve Account ---
               String? cardId;
               String? accountName;

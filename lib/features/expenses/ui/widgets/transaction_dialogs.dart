@@ -660,7 +660,7 @@ class TransactionFormFields extends ConsumerWidget {
                 DropdownButtonFormField<int?>(
                   value: controller.selectedDebtId,
                   decoration: const InputDecoration(
-                    labelText: 'Is this repaying a borrowed debt?',
+                    labelText: 'Link to existing loan or debt?',
                     border: OutlineInputBorder(),
                   ),
                   dropdownColor: AppColors.obsidianSurface,
@@ -673,10 +673,12 @@ class TransactionFormFields extends ConsumerWidget {
                         child: Text('No, regular transaction'),
                       ),
                       ...activeLoans
-                          .where((l) => !l.isLent && l.remainingBalance > 0 && !l.isCompleted)
+                          .where((l) => !l.isCompleted)
                           .map((l) => DropdownMenuItem<int?>(
                                 value: l.id,
-                                child: Text('${l.contactName} (Rem: ₹${l.remainingBalance.toStringAsFixed(0)})'),
+                                child: Text(l.isLent
+                                    ? '${l.contactName} (Lent: ₹${l.remainingBalance.toStringAsFixed(0)})'
+                                    : '${l.contactName} (Debt: ₹${l.remainingBalance.toStringAsFixed(0)})'),
                               )),
                     ];
                     if (controller.selectedDebtId != null && !items.any((item) => item.value == controller.selectedDebtId)) {
@@ -684,7 +686,9 @@ class TransactionFormFields extends ConsumerWidget {
                         final l = activeLoans.firstWhere((loan) => loan.id == controller.selectedDebtId);
                         items.add(DropdownMenuItem<int?>(
                           value: l.id,
-                          child: Text('${l.contactName} (Rem: ₹${l.remainingBalance.toStringAsFixed(0)})'),
+                          child: Text(l.isLent
+                              ? '${l.contactName} (Lent: ₹${l.remainingBalance.toStringAsFixed(0)})'
+                              : '${l.contactName} (Debt: ₹${l.remainingBalance.toStringAsFixed(0)})'),
                         ));
                       } catch (_) {}
                     }
@@ -1227,27 +1231,35 @@ Future<void> showTransactionEntryDialog(
                                 }
                               }
 
-                              // Handle Loan repayments
+                              // Handle Loan updates
                               if ((controller.selectedType == 'expense' || controller.selectedType == 'transfer') && controller.selectedDebtId != null && !controller.isSplit) {
                                 final allLoans = ref.read(loansProvider).valueOrNull ?? [];
                                 try {
                                   final target = allLoans.firstWhere((l) => l.id == controller.selectedDebtId);
-                                  if (amount >= target.remainingBalance) {
-                                    final overpaid = amount - target.remainingBalance;
-                                    if (overpaid > 0) {
-                                      // Flip to Lent loan (receivable)
-                                      target.isLent = true;
-                                      target.remainingBalance = overpaid;
-                                      target.amount = overpaid;
-                                      target.isCompleted = false;
-                                    } else {
-                                      // Fully paid
-                                      target.remainingBalance = 0.0;
-                                      target.isCompleted = true;
-                                    }
+                                  if (target.isLent) {
+                                    // Lending more money: increases receivable balance
+                                    target.amount += amount;
+                                    target.remainingBalance += amount;
+                                    target.isCompleted = false;
                                   } else {
-                                    // Partially paid
-                                    target.remainingBalance -= amount;
+                                    // Repaying a borrowed debt: decreases debt balance
+                                    if (amount >= target.remainingBalance) {
+                                      final overpaid = amount - target.remainingBalance;
+                                      if (overpaid > 0) {
+                                        // Flip to Lent loan (receivable)
+                                        target.isLent = true;
+                                        target.remainingBalance = overpaid;
+                                        target.amount = overpaid;
+                                        target.isCompleted = false;
+                                      } else {
+                                        // Fully paid
+                                        target.remainingBalance = 0.0;
+                                        target.isCompleted = true;
+                                      }
+                                    } else {
+                                      // Partially paid
+                                      target.remainingBalance -= amount;
+                                    }
                                   }
                                   await ref.read(loansProvider.notifier).addLoan(target);
                                 } catch (_) {}

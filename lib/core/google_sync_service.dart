@@ -993,13 +993,46 @@ class GoogleSyncService {
           }
 
           final isar = dbService.isar;
-          final isAlreadyRecorded =
+          var isAlreadyRecorded =
               await isar.transactions
                   .filter()
                   .rawMessageEqualTo(bodyText)
                   .isDeletedEqualTo(false)
                   .findFirst() !=
               null;
+
+          if (!isAlreadyRecorded) {
+            final bodyLower = bodyText.toLowerCase();
+            final isCardPayment = bodyLower.contains('cred') ||
+                bodyLower.contains('towards') ||
+                bodyLower.contains('card payment') ||
+                bodyLower.contains('credit card');
+            if (isCardPayment) {
+              final amountReg = RegExp(r'(?:rs\.?|inr|₹)\s*([0-9,]+(?:\.[0-9]{2})?)', caseSensitive: false);
+              final amtMatch = amountReg.firstMatch(bodyText);
+              if (amtMatch != null) {
+                final amt = double.tryParse(amtMatch.group(1)!.replaceAll(',', '')) ?? 0.0;
+                if (amt > 0) {
+                  final startTime = date.subtract(const Duration(minutes: 15));
+                  final endTime = date.add(const Duration(minutes: 15));
+                  final similarTxs = await isar.transactions
+                      .filter()
+                      .timestampBetween(startTime, endTime)
+                      .isDeletedEqualTo(false)
+                      .findAll();
+                  for (final tx in similarTxs) {
+                    final diff = (tx.amount - amt).abs();
+                    if (diff <= 150.0 && (diff / tx.amount) < 0.02) {
+                      if (tx.transactionType == 'transfer' || tx.category == 'Credit card payment' || tx.category == 'Bills') {
+                        isAlreadyRecorded = true;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
 
           final isSkipped = skippedList.contains(bodyText);
 

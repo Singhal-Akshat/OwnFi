@@ -278,6 +278,7 @@ class _WebDavSyncDialogState extends ConsumerState<WebDavSyncDialog> {
                             // Reload all providers
                             await ref.read(transactionsProvider.notifier).loadTransactions();
                             await ref.read(creditCardsProvider.notifier).loadCreditCards();
+                            await ref.read(bankAccountsProvider.notifier).loadBankAccounts();
                             await ref.read(loansProvider.notifier).loadLoans();
                             await ref.read(holdingsProvider.notifier).loadHoldings();
 
