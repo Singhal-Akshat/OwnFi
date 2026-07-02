@@ -32,7 +32,13 @@ class DatabaseService {
     if (_isar != null) return;
     final dir = await getApplicationSupportDirectory();
     _isar = await Isar.open(
-      [TransactionSchema, CreditCardSchema, LoanSchema, HoldingSchema, BankAccountSchema],
+      [
+        TransactionSchema,
+        CreditCardSchema,
+        LoanSchema,
+        HoldingSchema,
+        BankAccountSchema,
+      ],
       directory: dir.path,
       inspector: true, // Enable local Isar DB inspector in debug mode
     );
@@ -196,7 +202,11 @@ class DatabaseService {
 
   // ----------------- TRANSACTIONS CRUD -----------------
   List<Transaction> getActiveTransactionsSync() {
-    return isar.transactions.filter().isDeletedEqualTo(false).sortByTimestampDesc().findAllSync();
+    return isar.transactions
+        .filter()
+        .isDeletedEqualTo(false)
+        .sortByTimestampDesc()
+        .findAllSync();
   }
 
   List<Transaction> getAllTransactionsSync() {
@@ -204,7 +214,11 @@ class DatabaseService {
   }
 
   Future<List<Transaction>> getActiveTransactions() async {
-    return isar.transactions.filter().isDeletedEqualTo(false).sortByTimestampDesc().findAll();
+    return isar.transactions
+        .filter()
+        .isDeletedEqualTo(false)
+        .sortByTimestampDesc()
+        .findAll();
   }
 
   Future<List<Transaction>> getAllTransactions() async {
@@ -212,7 +226,11 @@ class DatabaseService {
   }
 
   Future<List<Transaction>> getDeletedTransactions() async {
-    return isar.transactions.filter().isDeletedEqualTo(true).sortByDeletedAtDesc().findAll();
+    return isar.transactions
+        .filter()
+        .isDeletedEqualTo(true)
+        .sortByDeletedAtDesc()
+        .findAll();
   }
 
   Future<void> saveTransaction(Transaction transaction) async {
@@ -249,12 +267,14 @@ class DatabaseService {
             }
           }
 
-          if (oldTx.accountName != null && oldTx.accountName!.startsWith('bank:')) {
+          if (oldTx.accountName != null &&
+              oldTx.accountName!.startsWith('bank:')) {
             final bankIdInt = int.tryParse(oldTx.accountName!.substring(5));
             if (bankIdInt != null) {
               final bank = await isar.bankAccounts.get(bankIdInt);
               if (bank != null) {
-                if (oldTx.transactionType == 'expense' || oldTx.transactionType == 'transfer') {
+                if (oldTx.transactionType == 'expense' ||
+                    oldTx.transactionType == 'transfer') {
                   bank.balance += oldTx.amount;
                 } else if (oldTx.transactionType == 'income') {
                   bank.balance -= oldTx.amount;
@@ -298,12 +318,15 @@ class DatabaseService {
       }
 
       // Adjust bank account balance if transaction is linked to a bank
-      if (transaction.accountName != null && transaction.accountName!.startsWith('bank:') && !transaction.isDeleted) {
+      if (transaction.accountName != null &&
+          transaction.accountName!.startsWith('bank:') &&
+          !transaction.isDeleted) {
         final bankIdInt = int.tryParse(transaction.accountName!.substring(5));
         if (bankIdInt != null) {
           final bank = await isar.bankAccounts.get(bankIdInt);
           if (bank != null) {
-            if (transaction.transactionType == 'expense' || transaction.transactionType == 'transfer') {
+            if (transaction.transactionType == 'expense' ||
+                transaction.transactionType == 'transfer') {
               bank.balance -= transaction.amount;
             } else if (transaction.transactionType == 'income') {
               bank.balance += transaction.amount;
@@ -318,28 +341,39 @@ class DatabaseService {
 
   Future<void> softDeleteTransaction(int id) async {
     print('DEBUG: softDeleteTransaction called for id: $id');
+    Transaction? deletedTx;
     await isar.writeTxn(() async {
       final transaction = await isar.transactions.get(id);
       if (transaction != null) {
         transaction.isDeleted = true;
         transaction.deletedAt = DateTime.now();
+        deletedTx = transaction;
 
         // Delete associated loan if linked
         if (transaction.linkedLoanId != null) {
           await isar.loans.delete(transaction.linkedLoanId!);
-          print('DEBUG: softDeleteTransaction - deleted linked loan ID: ${transaction.linkedLoanId}');
+          print(
+            'DEBUG: softDeleteTransaction - deleted linked loan ID: ${transaction.linkedLoanId}',
+          );
           transaction.linkedLoanId = null;
         }
 
         // Also find and delete any loans where linkedTransactionId == transaction.id
-        final linkedLoans = await isar.loans.filter().linkedTransactionIdEqualTo(id).findAll();
+        final linkedLoans = await isar.loans
+            .filter()
+            .linkedTransactionIdEqualTo(id)
+            .findAll();
         for (final loan in linkedLoans) {
           await isar.loans.delete(loan.id);
-          print('DEBUG: softDeleteTransaction - deleted loan ID ${loan.id} linked via transaction ID $id');
+          print(
+            'DEBUG: softDeleteTransaction - deleted loan ID ${loan.id} linked via transaction ID $id',
+          );
         }
 
         await isar.transactions.put(transaction);
-        print('DEBUG: softDeleteTransaction - marked transaction ${transaction.id} as deleted. type: ${transaction.transactionType}, amount: ${transaction.amount}, accountName: ${transaction.accountName}, cardId: ${transaction.cardId}');
+        print(
+          'DEBUG: softDeleteTransaction - marked transaction ${transaction.id} as deleted. type: ${transaction.transactionType}, amount: ${transaction.amount}, accountName: ${transaction.accountName}, cardId: ${transaction.cardId}',
+        );
 
         if (transaction.cardId != null) {
           if (transaction.cardId!.startsWith('bank:')) {
@@ -352,7 +386,9 @@ class DatabaseService {
                   toBank.balance -= transaction.amount;
                 }
                 await isar.bankAccounts.put(toBank);
-                print('DEBUG: softDeleteTransaction - reverted cardId bank (toBank) balance from $oldBalance to ${toBank.balance}');
+                print(
+                  'DEBUG: softDeleteTransaction - reverted cardId bank (toBank) balance from $oldBalance to ${toBank.balance}',
+                );
               }
             }
           } else {
@@ -368,35 +404,84 @@ class DatabaseService {
                   card.balance += transaction.amount;
                 }
                 await isar.creditCards.put(card);
-                print('DEBUG: softDeleteTransaction - reverted creditCard balance from $oldBalance to ${card.balance}');
+                print(
+                  'DEBUG: softDeleteTransaction - reverted creditCard balance from $oldBalance to ${card.balance}',
+                );
               }
             }
           }
         }
 
-        if (transaction.accountName != null && transaction.accountName!.startsWith('bank:')) {
+        if (transaction.accountName != null &&
+            transaction.accountName!.startsWith('bank:')) {
           // Revert bank balance adjustment
           final bankIdInt = int.tryParse(transaction.accountName!.substring(5));
           if (bankIdInt != null) {
             final bank = await isar.bankAccounts.get(bankIdInt);
             if (bank != null) {
               final oldBalance = bank.balance;
-              if (transaction.transactionType == 'expense' || transaction.transactionType == 'transfer') {
+              if (transaction.transactionType == 'expense' ||
+                  transaction.transactionType == 'transfer') {
                 bank.balance += transaction.amount;
               } else if (transaction.transactionType == 'income') {
                 bank.balance -= transaction.amount;
               }
               await isar.bankAccounts.put(bank);
-              print('DEBUG: softDeleteTransaction - reverted accountName bank balance from $oldBalance to ${bank.balance}');
+              print(
+                'DEBUG: softDeleteTransaction - reverted accountName bank balance from $oldBalance to ${bank.balance}',
+              );
             } else {
-              print('DEBUG: softDeleteTransaction - bank account with id $bankIdInt not found in DB');
+              print(
+                'DEBUG: softDeleteTransaction - bank account with id $bankIdInt not found in DB',
+              );
             }
           }
         }
       } else {
-        print('DEBUG: softDeleteTransaction - transaction with id $id was null');
+        print(
+          'DEBUG: softDeleteTransaction - transaction with id $id was null',
+        );
       }
     });
+
+    if (deletedTx != null) {
+      print(
+        'DEBUG: softDeleteTransaction - deletedTx source: ${deletedTx!.source}, timestamp: ${deletedTx!.timestamp}',
+      );
+      if (deletedTx!.source == 'sms' || deletedTx!.source == 'sms_email') {
+        try {
+          const storage = FlutterSecureStorage();
+          final lastSyncStr = await storage.read(key: 'last_sms_sync_time');
+          print(
+            'DEBUG: softDeleteTransaction - current last_sms_sync_time: $lastSyncStr',
+          );
+          if (lastSyncStr != null) {
+            final lastSync = DateTime.parse(lastSyncStr);
+            if (deletedTx!.timestamp.isBefore(lastSync)) {
+              final targetTime = deletedTx!.timestamp.subtract(
+                const Duration(seconds: 1),
+              );
+              await storage.write(
+                key: 'last_sms_sync_time',
+                value: targetTime.toIso8601String(),
+              );
+              print(
+                'DEBUG: softDeleteTransaction - successfully moved last_sms_sync_time back to $targetTime',
+              );
+            } else {
+              print(
+                'DEBUG: softDeleteTransaction - transaction timestamp is not before last sync time',
+              );
+            }
+          }
+        } catch (e) {
+          print(
+            'DEBUG: softDeleteTransaction - failed to update last_sms_sync_time: $e',
+          );
+        }
+      }
+    }
+
     onChanged?.call();
   }
 
@@ -441,13 +526,15 @@ class DatabaseService {
           }
         }
 
-        if (transaction.accountName != null && transaction.accountName!.startsWith('bank:')) {
+        if (transaction.accountName != null &&
+            transaction.accountName!.startsWith('bank:')) {
           // Re-apply bank balance adjustment
           final bankIdInt = int.tryParse(transaction.accountName!.substring(5));
           if (bankIdInt != null) {
             final bank = await isar.bankAccounts.get(bankIdInt);
             if (bank != null) {
-              if (transaction.transactionType == 'expense' || transaction.transactionType == 'transfer') {
+              if (transaction.transactionType == 'expense' ||
+                  transaction.transactionType == 'transfer') {
                 bank.balance -= transaction.amount;
               } else if (transaction.transactionType == 'income') {
                 bank.balance += transaction.amount;
@@ -468,7 +555,10 @@ class DatabaseService {
         if (transaction.linkedLoanId != null) {
           await isar.loans.delete(transaction.linkedLoanId!);
         }
-        final linkedLoans = await isar.loans.filter().linkedTransactionIdEqualTo(id).findAll();
+        final linkedLoans = await isar.loans
+            .filter()
+            .linkedTransactionIdEqualTo(id)
+            .findAll();
         for (final loan in linkedLoans) {
           await isar.loans.delete(loan.id);
         }
@@ -481,7 +571,7 @@ class DatabaseService {
   Future<void> clearAllTransactions() async {
     await isar.writeTxn(() async {
       await isar.transactions.clear();
-      
+
       // Reset card balances to 0.0 when clearing all transactions
       final cards = await isar.creditCards.where().findAll();
       for (var card in cards) {
@@ -548,7 +638,10 @@ class DatabaseService {
 
   Future<void> deleteLoan(int id) async {
     await isar.writeTxn(() async {
-      final linkedTxs = await isar.transactions.filter().linkedLoanIdEqualTo(id).findAll();
+      final linkedTxs = await isar.transactions
+          .filter()
+          .linkedLoanIdEqualTo(id)
+          .findAll();
       for (final tx in linkedTxs) {
         tx.linkedLoanId = null;
         await isar.transactions.put(tx);

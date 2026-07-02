@@ -43,11 +43,102 @@ class CardsLoansView extends ConsumerWidget {
                 ),
                 error: (err, _) => Center(child: Text('Error: $err')),
                 data: (cards) {
+                  final sortedCards = List<CreditCard>.from(cards);
+                  final now = DateTime.now();
+                  final cardInfoMap = <int, ({bool isPaidOff, DateTime dueDate, DateTime nextStatementDate})>{};
+
+                  for (final card in sortedCards) {
+                    final DateTime mostRecentStatementDate;
+                    final DateTime previousStatementDate;
+                    if (now.day >= card.statementDay) {
+                      mostRecentStatementDate = DateTime(now.year, now.month, card.statementDay);
+                      previousStatementDate = DateTime(
+                        now.month == 1 ? now.year - 1 : now.year,
+                        now.month == 1 ? 12 : now.month - 1,
+                        card.statementDay,
+                      );
+                    } else {
+                      mostRecentStatementDate = DateTime(
+                        now.month == 1 ? now.year - 1 : now.year,
+                        now.month == 1 ? 12 : now.month - 1,
+                        card.statementDay,
+                      );
+                      final prevMonth = mostRecentStatementDate.month;
+                      final prevYear = mostRecentStatementDate.year;
+                      previousStatementDate = DateTime(
+                        prevMonth == 1 ? prevYear - 1 : prevYear,
+                        prevMonth == 1 ? 12 : prevMonth - 1,
+                        card.statementDay,
+                      );
+                    }
+
+                    final DateTime dueDate;
+                    if (card.dueDay > card.statementDay) {
+                      dueDate = DateTime(mostRecentStatementDate.year, mostRecentStatementDate.month, card.dueDay);
+                    } else {
+                      dueDate = DateTime(
+                        mostRecentStatementDate.month == 12 ? mostRecentStatementDate.year + 1 : mostRecentStatementDate.year,
+                        mostRecentStatementDate.month == 12 ? 1 : mostRecentStatementDate.month + 1,
+                        card.dueDay,
+                      );
+                    }
+
+                    final DateTime nextStatementDate;
+                    if (now.day < card.statementDay) {
+                      nextStatementDate = DateTime(now.year, now.month, card.statementDay);
+                    } else {
+                      nextStatementDate = DateTime(
+                        now.month == 12 ? now.year + 1 : now.year,
+                        now.month == 12 ? 1 : now.month + 1,
+                        card.statementDay,
+                      );
+                    }
+
+                    final cardId = card.id.toString();
+                    final computedStatement = allTxs
+                        .where((t) =>
+                            t.cardId == cardId &&
+                            t.transactionType == 'expense' &&
+                            (t.timestamp.isAtSameMomentAs(previousStatementDate) || t.timestamp.isAfter(previousStatementDate)) &&
+                            t.timestamp.isBefore(mostRecentStatementDate))
+                        .fold<double>(0.0, (sum, t) => sum + t.amount);
+
+                    final payments = allTxs
+                        .where((t) =>
+                            t.cardId == cardId &&
+                            t.transactionType == 'transfer' &&
+                            (t.timestamp.isAtSameMomentAs(mostRecentStatementDate) || t.timestamp.isAfter(mostRecentStatementDate)))
+                        .fold<double>(0.0, (sum, t) => sum + t.amount);
+
+                    final targetStatementAmount = card.statementAmount > 0.0 ? card.statementAmount : computedStatement;
+                    final isPaidOff = targetStatementAmount <= 0.0 || payments >= targetStatementAmount;
+
+                    cardInfoMap[card.id] = (
+                      isPaidOff: isPaidOff,
+                      dueDate: dueDate,
+                      nextStatementDate: nextStatementDate,
+                    );
+                  }
+
+                  sortedCards.sort((a, b) {
+                    final infoA = cardInfoMap[a.id]!;
+                    final infoB = cardInfoMap[b.id]!;
+
+                    if (!infoA.isPaidOff && infoB.isPaidOff) return -1;
+                    if (infoA.isPaidOff && !infoB.isPaidOff) return 1;
+
+                    if (!infoA.isPaidOff) {
+                      return infoA.dueDate.compareTo(infoB.dueDate);
+                    } else {
+                      return infoB.nextStatementDate.compareTo(infoA.nextStatementDate);
+                    }
+                  });
+
                   return ListView(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
                     children: [
-                      ...cards.map((card) {
+                      ...sortedCards.map((card) {
                         return _buildCreditCardItem(context, ref, card, allTxs);
                       }),
                       _buildAddCardButton(context, ref),
@@ -373,10 +464,6 @@ class CardsLoansView extends ConsumerWidget {
     CreditCard card,
     List<dynamic> allTxs,
   ) {
-    bool showSpent = true; // State for toggle
-    bool isLongPressed = false; // State for edit/delete
-    bool isFlipped = false; // State for flip
-
     // Compute dynamic spent (current cycle) and statement (last cycle) from transactions
     final now = DateTime.now();
     final DateTime mostRecentStatementDate;
@@ -407,16 +494,28 @@ class CardsLoansView extends ConsumerWidget {
         .where((t) =>
             t.cardId == cardId &&
             t.transactionType == 'expense' &&
-            t.timestamp.isAfter(mostRecentStatementDate))
+            (t.timestamp.isAtSameMomentAs(mostRecentStatementDate) || t.timestamp.isAfter(mostRecentStatementDate)))
         .fold<double>(0.0, (sum, t) => sum + t.amount);
     final computedStatement = allTxs
         .where((t) =>
             t.cardId == cardId &&
             t.transactionType == 'expense' &&
-            t.timestamp.isAfter(previousStatementDate) &&
-            t.timestamp.isBefore(
-                mostRecentStatementDate.add(const Duration(seconds: 1))))
+            (t.timestamp.isAtSameMomentAs(previousStatementDate) || t.timestamp.isAfter(previousStatementDate)) &&
+            t.timestamp.isBefore(mostRecentStatementDate))
         .fold<double>(0.0, (sum, t) => sum + t.amount);
+
+    final payments = allTxs
+        .where((t) =>
+            t.cardId == cardId &&
+            t.transactionType == 'transfer' &&
+            (t.timestamp.isAtSameMomentAs(mostRecentStatementDate) || t.timestamp.isAfter(mostRecentStatementDate)))
+        .fold<double>(0.0, (sum, t) => sum + t.amount);
+
+    final targetStatementAmount = card.statementAmount > 0.0 ? card.statementAmount : computedStatement;
+    final isPaidOff = targetStatementAmount <= 0.0 || payments >= targetStatementAmount;
+    bool showSpent = isPaidOff; // State for toggle, defaults to statement (false) if unpaid
+    bool isLongPressed = false; // State for edit/delete
+    bool isFlipped = false; // State for flip
 
     return StatefulBuilder(
       builder: (context, setState) {

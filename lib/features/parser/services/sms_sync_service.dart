@@ -295,12 +295,21 @@ class SmsSyncService {
     final bool allowDuplicates = allowDuplicatesStr == 'true';
 
     DateTime? lastSyncTime;
+    final lastSyncStr = await _storage.read(key: 'last_sms_sync_time');
+    DateTime? storedLastSync;
+    if (lastSyncStr != null && !allowDuplicates) {
+      storedLastSync = DateTime.parse(lastSyncStr);
+    }
+
     if (since != null) {
-      lastSyncTime = since;
+      if (storedLastSync != null && storedLastSync.isBefore(since)) {
+        lastSyncTime = storedLastSync;
+      } else {
+        lastSyncTime = since;
+      }
     } else if (customStart == null || customEnd == null) {
-      final lastSyncStr = await _storage.read(key: 'last_sms_sync_time');
-      if (lastSyncStr != null && !allowDuplicates) {
-        lastSyncTime = DateTime.parse(lastSyncStr);
+      if (storedLastSync != null) {
+        lastSyncTime = storedLastSync;
       } else {
         final lookbackValueStr = await _storage.read(key: 'settings_sms_lookback_value');
         final lookbackValue = int.tryParse(lookbackValueStr ?? '180') ?? 180;

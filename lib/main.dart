@@ -42,7 +42,6 @@ void main() async {
       frequency: const Duration(hours: 24),
       constraints: Constraints(
         networkType: NetworkType.unmetered,
-        requiresCharging: true,
         requiresDeviceIdle: true,
       ),
     );
