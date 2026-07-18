@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/utils/gemma_initializer.dart';
 import '../../../services/model_repository.dart';
 import '../../cards_loans/models/card_loan_models.dart';
 import 'package:path_provider/path_provider.dart';
@@ -352,6 +353,7 @@ class SmsParserService {
       final file = File(modelPath);
       if (!await file.exists()) return null;
 
+      await GemmaInitializer.ensureInitialized();
       if (!FlutterGemma.hasActiveModel()) {
         await FlutterGemma.installModel(
           modelType: ModelType.gemmaIt,

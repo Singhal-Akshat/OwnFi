@@ -6,6 +6,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../features/expenses/models/transaction_model.dart';
 import '../features/cards_loans/models/card_loan_models.dart';
 import '../features/investments/models/holding_model.dart';
+import 'logging/structured_logger.dart';
+import 'database/db_migration.dart';
 
 part 'database_service.g.dart';
 
@@ -42,6 +44,11 @@ class DatabaseService {
       directory: dir.path,
       inspector: true, // Enable local Isar DB inspector in debug mode
     );
+
+    // Run database migrations
+    final migrationManager = DbMigrationManager();
+    await migrationManager.runMigrations(_isar!);
+
     await seedDemoData();
   }
 

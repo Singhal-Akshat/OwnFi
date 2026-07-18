@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:my_personal_tracker/core/theme.dart';
-import 'package:my_personal_tracker/core/google_sync_service.dart';
+import 'package:my_personal_tracker/core/sync/google_auth_manager.dart';
+import 'package:my_personal_tracker/core/providers.dart';
 
 class SmsLookbackDialog extends ConsumerStatefulWidget {
   final int initialValue;
@@ -387,7 +388,7 @@ class _SmsLookbackDialogState extends ConsumerState<SmsLookbackDialog> {
 
                       // Force full scan on next sync
                       await _storage.delete(key: 'last_sms_sync_time');
-                      final accounts = await ref.read(googleSyncServiceProvider).getLinkedAccounts();
+                      final accounts = await ref.read(googleAuthManagerProvider).getLinkedAccounts();
                       for (var acc in accounts) {
                         await _storage.delete(key: 'last_gmail_sync_time_${acc.email}');
                       }

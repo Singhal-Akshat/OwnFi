@@ -14,7 +14,7 @@ import '../../../../features/cards_loans/models/card_loan_models.dart';
 import '../../../../features/investments/models/holding_model.dart';
 import '../../../../features/parser/services/sms_parser_service.dart';
 import '../../../../features/expenses/ui/widgets/transaction_dialogs.dart';
-import '../../../../core/google_sync_service.dart';
+import '../../../../core/sync/google_auth_manager.dart';
 
 
 // Expose GlassBlur if defined locally or copy its style
@@ -255,7 +255,7 @@ void showSyncReviewDialog(
                           onPressed: () async {
                             const storage = FlutterSecureStorage();
                             await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
-                            await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
+                            await ref.read(googleAuthManagerProvider).updateLastSyncTimeForAllAccounts();
                             ref.read(transactionsProvider.notifier).loadTransactions();
                             ref.read(creditCardsProvider.notifier).loadCreditCards();
                             ref.read(loansProvider.notifier).loadLoans();
@@ -301,7 +301,7 @@ void showSyncReviewDialog(
                             onPressed: () async {
                               const storage = FlutterSecureStorage();
                               await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
-                              await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
+                              await ref.read(googleAuthManagerProvider).updateLastSyncTimeForAllAccounts();
                               ref.read(transactionsProvider.notifier).loadTransactions();
                               ref.read(creditCardsProvider.notifier).loadCreditCards();
                               ref.read(loansProvider.notifier).loadLoans();
@@ -484,7 +484,7 @@ void showSyncReviewDialog(
                             onPressed: () async {
                               const storage = FlutterSecureStorage();
                               await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
-                              await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
+                              await ref.read(googleAuthManagerProvider).updateLastSyncTimeForAllAccounts();
                               ref.read(transactionsProvider.notifier).loadTransactions();
                               ref.read(creditCardsProvider.notifier).loadCreditCards();
                               ref.read(loansProvider.notifier).loadLoans();
@@ -557,7 +557,7 @@ void showSyncReviewDialog(
                               onPressed: () async {
                                 const storage = FlutterSecureStorage();
                                 await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
-                                await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
+                                await ref.read(googleAuthManagerProvider).updateLastSyncTimeForAllAccounts();
                                 ref.read(transactionsProvider.notifier).loadTransactions();
                                 ref.read(creditCardsProvider.notifier).loadCreditCards();
                                 ref.read(loansProvider.notifier).loadLoans();
@@ -634,7 +634,7 @@ void showSyncReviewDialog(
                         onPressed: () async {
                           const storage = FlutterSecureStorage();
                           await storage.write(key: 'last_sms_sync_time', value: DateTime.now().toIso8601String());
-                          await ref.read(googleSyncServiceProvider).updateLastSyncTimeForAllAccounts();
+                          await ref.read(googleAuthManagerProvider).updateLastSyncTimeForAllAccounts();
                           ref.read(transactionsProvider.notifier).loadTransactions();
                           ref.read(creditCardsProvider.notifier).loadCreditCards();
                           ref.read(loansProvider.notifier).loadLoans();

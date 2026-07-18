@@ -67,7 +67,7 @@ final totalReceivablesProvider = AutoDisposeProvider<double>.internal(
 );
 
 typedef TotalReceivablesRef = AutoDisposeProviderRef<double>;
-String _$cashAndBankHash() => r'b49463ce0f83519bc25eb42a5cd91cd745421d6a';
+String _$cashAndBankHash() => r'2b68915e04ab890977fc5b928d45ba8d25c90410';
 
 /// See also [cashAndBank].
 @ProviderFor(cashAndBank)
@@ -172,7 +172,69 @@ final syncServiceProvider = Provider<SyncService>.internal(
 );
 
 typedef SyncServiceRef = ProviderRef<SyncService>;
-String _$transactionsHash() => r'023c37488d702c441714612e529b1c12653c55ec';
+String _$googleAuthManagerHash() => r'ba99301daec3d7fbfa0e0d8a3206811d1bbf4c71';
+
+/// See also [googleAuthManager].
+@ProviderFor(googleAuthManager)
+final googleAuthManagerProvider = Provider<GoogleAuthManager>.internal(
+  googleAuthManager,
+  name: r'googleAuthManagerProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$googleAuthManagerHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef GoogleAuthManagerRef = ProviderRef<GoogleAuthManager>;
+String _$driveBackupServiceHash() =>
+    r'ed5818305a21765ca08da88f86ed4a4c35610ac5';
+
+/// See also [driveBackupService].
+@ProviderFor(driveBackupService)
+final driveBackupServiceProvider = Provider<DriveBackupService>.internal(
+  driveBackupService,
+  name: r'driveBackupServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$driveBackupServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef DriveBackupServiceRef = ProviderRef<DriveBackupService>;
+String _$gmailSyncServiceHash() => r'20d60f893d2ffdfc056fc6ee4e2c0ed8a85eb979';
+
+/// See also [gmailSyncService].
+@ProviderFor(gmailSyncService)
+final gmailSyncServiceProvider = Provider<GmailSyncService>.internal(
+  gmailSyncService,
+  name: r'gmailSyncServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$gmailSyncServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef GmailSyncServiceRef = ProviderRef<GmailSyncService>;
+String _$backupOrchestratorHash() =>
+    r'b40d04deaf6ffb5f3a565bc3757c0839881fbd41';
+
+/// See also [backupOrchestrator].
+@ProviderFor(backupOrchestrator)
+final backupOrchestratorProvider = Provider<BackupOrchestrator>.internal(
+  backupOrchestrator,
+  name: r'backupOrchestratorProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$backupOrchestratorHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef BackupOrchestratorRef = ProviderRef<BackupOrchestrator>;
+String _$transactionsHash() => r'34c97595b84151f1fa43bc45a031ad524b252204';
 
 /// See also [Transactions].
 @ProviderFor(Transactions)

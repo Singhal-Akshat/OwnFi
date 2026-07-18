@@ -8,6 +8,10 @@ import 'package:my_personal_tracker/features/parser/services/sms_sync_service.da
 import 'package:my_personal_tracker/features/parser/services/email_sync_service.dart';
 import '../features/investments/services/portfolio_parser_service.dart';
 import '../features/investments/services/investment_sync_service.dart';
+import 'sync/google_auth_manager.dart';
+import 'sync/drive_backup_service.dart';
+import 'sync/gmail_sync_service.dart';
+import 'sync/backup_orchestrator.dart';
 
 part 'providers.g.dart';
 
@@ -309,4 +313,26 @@ InvestmentSyncService investmentSyncService(InvestmentSyncServiceRef ref) {
 SyncService syncService(SyncServiceRef ref) {
   final db = ref.watch(databaseServiceProvider);
   return SyncService(db);
+}
+
+@Riverpod(keepAlive: true)
+GoogleAuthManager googleAuthManager(GoogleAuthManagerRef ref) {
+  return GoogleAuthManager();
+}
+
+@Riverpod(keepAlive: true)
+DriveBackupService driveBackupService(DriveBackupServiceRef ref) {
+  final auth = ref.watch(googleAuthManagerProvider);
+  return DriveBackupService(auth);
+}
+
+@Riverpod(keepAlive: true)
+GmailSyncService gmailSyncService(GmailSyncServiceRef ref) {
+  final auth = ref.watch(googleAuthManagerProvider);
+  return GmailSyncService(auth);
+}
+
+@Riverpod(keepAlive: true)
+BackupOrchestrator backupOrchestrator(BackupOrchestratorRef ref) {
+  return BackupOrchestrator();
 }

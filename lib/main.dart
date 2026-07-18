@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:workmanager/workmanager.dart';
 import 'core/database_service.dart';
 import 'core/providers.dart';
-import 'core/google_sync_service.dart';
+import 'core/sync/google_auth_manager.dart';
+import 'core/sync/drive_backup_service.dart';
+import 'core/sync/gmail_sync_service.dart';
+import 'core/sync/backup_orchestrator.dart';
+import 'core/sync_service.dart';
 import 'app.dart';
 import 'core/utils/category_utils.dart';
 
@@ -15,9 +18,14 @@ void callbackDispatcher() {
     try {
       final dbService = DatabaseService();
       await dbService.init();
-      final syncService = GoogleSyncService();
-      await syncService.backupToCloud(dbService);
-      await syncService.syncTransactionsFromGmail(dbService);
+      final auth = GoogleAuthManager();
+      final driveBackup = DriveBackupService(auth);
+      final gmailSync = GmailSyncService(auth);
+      final webdavSync = SyncService(dbService);
+      final orchestrator = BackupOrchestrator();
+
+      await orchestrator.backupToConfiguredBackends(dbService, driveBackup, webdavSync);
+      await gmailSync.syncTransactionsFromGmail(dbService);
     } catch (e, stackTrace) {
       debugPrint('Workmanager task execution failed: $e\n$stackTrace');
     }
@@ -28,11 +36,6 @@ void callbackDispatcher() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await CategoryUtils.loadCustomCategories();
-  try {
-    await FlutterGemma.initialize();
-  } catch (e) {
-    debugPrint('Failed to initialize FlutterGemma: $e');
-  }
 
   try {
     await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
@@ -53,9 +56,12 @@ void main() async {
   await dbService.init();
 
   // Hook up automatic backups on database changes
-  final syncService = GoogleSyncService();
+  final auth = GoogleAuthManager();
+  final driveBackup = DriveBackupService(auth);
+  final webdavSync = SyncService(dbService);
+  final orchestrator = BackupOrchestrator();
   dbService.onChanged = () {
-    syncService.triggerAutoBackup(dbService);
+    orchestrator.triggerAutoBackup(dbService, driveBackup, webdavSync);
   };
 
   runApp(

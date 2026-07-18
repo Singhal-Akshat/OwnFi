@@ -1,10 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
+import 'icon_list.dart';
 
 class CategoryUtils {
   static Map<String, IconData> customIcons = {};
   static Map<String, Color> customColors = {};
+
+  static Map<int, IconData>? _codePointToIconMap;
+
+  static IconData? _getIconFromCodePoint(int codePoint) {
+    if (_codePointToIconMap == null) {
+      final map = <int, IconData>{};
+      for (final icon in availableCategoryIcons.values) {
+        map[icon.codePoint] = icon;
+      }
+      for (final list in iconLibrary.values) {
+        for (final icon in list) {
+          map[icon.codePoint] = icon;
+        }
+      }
+      for (final icon in IconList.allIcons.values) {
+        map[icon.codePoint] = icon;
+      }
+      _codePointToIconMap = map;
+    }
+    return _codePointToIconMap![codePoint];
+  }
 
   static const Map<String, IconData> availableCategoryIcons = {
     'Food': Icons.fastfood_rounded,
@@ -230,7 +252,12 @@ class CategoryUtils {
           final iconKey = parts[1];
           final codePoint = int.tryParse(iconKey);
           if (codePoint != null) {
-            customIcons[cat] = IconData(codePoint, fontFamily: 'MaterialIcons');
+            final staticIcon = _getIconFromCodePoint(codePoint);
+            if (staticIcon != null) {
+              customIcons[cat] = staticIcon;
+            } else {
+              customIcons[cat] = Icons.category_rounded;
+            }
           } else if (availableCategoryIcons.containsKey(iconKey)) {
             customIcons[cat] = availableCategoryIcons[iconKey]!;
           }

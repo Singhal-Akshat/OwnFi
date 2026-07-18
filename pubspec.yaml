@@ -33,62 +33,62 @@ dependencies:
   flutter:
     sdk: flutter
 
-  cupertino_icons: ^1.0.8
+  cupertino_icons: 1.0.8
 
   # State Management
-  flutter_riverpod: ^2.5.1
-  riverpod_annotation: ^2.3.3
+  flutter_riverpod: 2.6.1
+  riverpod_annotation: 2.6.1
 
   # Local Database
   isar: 3.1.0+1
   isar_flutter_libs: 3.1.0+1
-  path_provider: ^2.1.2
+  path_provider: 2.1.5
 
   # Security & Key Storage
-  flutter_secure_storage: ^9.0.0
-  local_auth: ^2.2.0
-  permission_handler: ^11.3.0
-  nfc_manager: ^3.3.0
+  flutter_secure_storage: 9.2.4
+  local_auth: 2.3.0
+  permission_handler: 11.4.0
+  nfc_manager: 3.5.1
 
   # SMS Inbox & IMAP Email Fetching
-  flutter_sms_inbox: ^1.0.5
-  enough_mail: ^2.1.0
+  flutter_sms_inbox: 1.0.5
+  enough_mail: 2.1.6
 
   # Parsers & Formatters
-  syncfusion_flutter_pdf: ^25.1.37
-  excel: ^4.0.3
+  syncfusion_flutter_pdf: 25.2.7
+  excel: 4.0.6
 
   # Charts & Visualizations
-  fl_chart: ^0.68.0
+  fl_chart: 0.68.0
 
   # API Network Calls & AI Integration
-  http: ^1.2.0
-  google_generative_ai: ^0.4.0
-  file_picker: ^11.0.2
-  flutter_gemma: ^0.13.6
-  shared_preferences: ^2.5.5
-  disk_space_2: ^1.0.12
-  google_fonts: ^8.1.0
-  flutter_svg: ^2.3.0
+  http: 1.6.0
+  google_generative_ai: 0.4.0
+  file_picker: 11.0.2
+  flutter_gemma: 0.13.6
+  shared_preferences: 2.5.5
+  disk_space_2: 1.0.12
+  google_fonts: 8.1.0
+  flutter_svg: 2.3.0
 
   # Google APIs & Background tasks
-  google_sign_in: ^6.2.1
-  googleapis: ^13.0.0
-  extension_google_sign_in_as_googleapis_auth: ^2.0.1
-  googleapis_auth: ^2.0.0
-  workmanager: ^0.9.0
+  google_sign_in: 6.3.0
+  googleapis: 13.2.0
+  extension_google_sign_in_as_googleapis_auth: 2.0.13
+  googleapis_auth: 2.3.1
+  workmanager: 0.9.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_lints: ^3.0.0
+  flutter_lints: 3.0.2
 
   # Code Generators for Isar and Riverpod
-  build_runner: ^2.4.8
+  build_runner: 2.4.13
   isar_generator: 3.1.0+1
-  riverpod_generator: ^2.3.9
-  flutter_launcher_icons: ^0.13.1
+  riverpod_generator: 2.4.0
+  flutter_launcher_icons: 0.13.1
 
 flutter:
   uses-material-design: true
@@ -98,6 +98,7 @@ flutter:
     - assets/models/
     - assets/credit_card_images/
     - assets/bank_logos/
+    - shorebird.yaml
 
 flutter_launcher_icons:
   android: "launcher_icon"

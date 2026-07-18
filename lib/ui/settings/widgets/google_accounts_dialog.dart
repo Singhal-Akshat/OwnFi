@@ -4,7 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:my_personal_tracker/core/theme.dart';
 import 'package:my_personal_tracker/core/database_service.dart';
 import 'package:my_personal_tracker/core/providers.dart';
-import 'package:my_personal_tracker/core/google_sync_service.dart';
+import 'package:my_personal_tracker/core/sync/google_auth_manager.dart';
+import 'package:my_personal_tracker/core/sync/drive_backup_service.dart';
 
 class GoogleAccountsDialog extends ConsumerStatefulWidget {
   const GoogleAccountsDialog({super.key});
@@ -30,7 +31,7 @@ class _GoogleAccountsDialogState extends ConsumerState<GoogleAccountsDialog> {
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: FutureBuilder<List<LinkedGoogleAccount>>(
-            future: ref.read(googleSyncServiceProvider).getLinkedAccounts(),
+            future: ref.read(googleAuthManagerProvider).getLinkedAccounts(),
             builder: (context, snapshot) {
               final accounts = snapshot.data ?? [];
               final primary = accounts.firstWhere(
@@ -121,7 +122,7 @@ class _GoogleAccountsDialogState extends ConsumerState<GoogleAccountsDialog> {
                               onPressed: () async {
                                 try {
                                   final acc = await ref
-                                      .read(googleSyncServiceProvider)
+                                      .read(googleAuthManagerProvider)
                                       .authenticateAccount(true);
                                   if (acc != null && mounted) {
                                     setState(() {});
@@ -153,7 +154,7 @@ class _GoogleAccountsDialogState extends ConsumerState<GoogleAccountsDialog> {
                               ),
                               onPressed: () async {
                                 final error = await ref
-                                    .read(googleSyncServiceProvider)
+                                    .read(driveBackupServiceProvider)
                                     .backupToCloud(
                                       ref.read(databaseServiceProvider),
                                     );
@@ -189,7 +190,7 @@ class _GoogleAccountsDialogState extends ConsumerState<GoogleAccountsDialog> {
                                 }
                                 try {
                                   final restored = await ref
-                                      .read(googleSyncServiceProvider)
+                                      .read(driveBackupServiceProvider)
                                       .syncOnStartup(
                                         ref.read(databaseServiceProvider),
                                       );
@@ -235,7 +236,7 @@ class _GoogleAccountsDialogState extends ConsumerState<GoogleAccountsDialog> {
                               ),
                               onPressed: () async {
                                 final error = await ref
-                                    .read(googleSyncServiceProvider)
+                                    .read(driveBackupServiceProvider)
                                     .restoreFromCloud(
                                       ref.read(databaseServiceProvider),
                                     );
@@ -269,7 +270,7 @@ class _GoogleAccountsDialogState extends ConsumerState<GoogleAccountsDialog> {
                               ),
                               onPressed: () async {
                                 await ref
-                                    .read(googleSyncServiceProvider)
+                                    .read(googleAuthManagerProvider)
                                     .removeAccount(primary.email);
                                 if (mounted) {
                                   setState(() {});
@@ -307,7 +308,7 @@ class _GoogleAccountsDialogState extends ConsumerState<GoogleAccountsDialog> {
                         onPressed: () async {
                           try {
                             final acc = await ref
-                                .read(googleSyncServiceProvider)
+                                .read(googleAuthManagerProvider)
                                 .authenticateAccount(false);
                             if (acc != null && mounted) {
                               setState(() {});
@@ -378,7 +379,7 @@ class _GoogleAccountsDialogState extends ConsumerState<GoogleAccountsDialog> {
                                       constraints: const BoxConstraints(),
                                       onPressed: () async {
                                         await ref
-                                            .read(googleSyncServiceProvider)
+                                            .read(googleAuthManagerProvider)
                                             .removeAccount(sec.email);
                                         if (mounted) {
                                           setState(() {});

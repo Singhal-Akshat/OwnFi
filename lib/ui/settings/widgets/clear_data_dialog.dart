@@ -5,8 +5,8 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_personal_tracker/core/theme.dart';
 import 'package:my_personal_tracker/core/database_service.dart';
+import 'package:my_personal_tracker/core/sync/google_auth_manager.dart';
 import 'package:my_personal_tracker/core/providers.dart';
-import 'package:my_personal_tracker/core/google_sync_service.dart';
 
 class ClearDataDialog extends ConsumerStatefulWidget {
   final String type;
@@ -286,7 +286,7 @@ class _ClearDataDialogState extends ConsumerState<ClearDataDialog> {
 
                                 await _storage.delete(key: 'last_sms_sync_time');
                                 await _storage.delete(key: 'last_email_sync_time');
-                                final accounts = await ref.read(googleSyncServiceProvider).getLinkedAccounts();
+                                final accounts = await ref.read(googleAuthManagerProvider).getLinkedAccounts();
                                 for (var acc in accounts) {
                                   await _storage.delete(key: 'last_gmail_sync_time_${acc.email}');
                                 }

@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme.dart';
 import '../../../core/database_service.dart';
 import '../../../core/providers.dart';
-import '../../../core/google_sync_service.dart';
+import '../../../core/sync/drive_backup_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/category_utils.dart';
 import '../../expenses/models/transaction_model.dart';
@@ -80,7 +80,7 @@ class DashboardView extends ConsumerWidget {
                         );
                         try {
                           final restored = await ref
-                              .read(googleSyncServiceProvider)
+                              .read(driveBackupServiceProvider)
                               .syncOnStartup(ref.read(databaseServiceProvider));
                           if (restored) {
                             ref
