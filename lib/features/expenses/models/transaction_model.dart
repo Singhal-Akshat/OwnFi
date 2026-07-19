@@ -30,6 +30,7 @@ class Transaction {
   String? aiComparisonNotes; // A/B testing comparison
   String? rawMessage; // Store original SMS or Email body
   int? linkedLoanId; // Nullable link to a Loan
+  String? receiptPath; // Local path to attached receipt image/document
 }
 
 @embedded

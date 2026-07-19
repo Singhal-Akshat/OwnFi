@@ -95,6 +95,306 @@ final netWorthProvider = AutoDisposeProvider<double>.internal(
 );
 
 typedef NetWorthRef = AutoDisposeProviderRef<double>;
+String _$monthlyCategoryDistributionHash() =>
+    r'a960e76e9820c7dbddaf69ec5c61a9d46522ca7d';
+
+/// Copied from Dart SDK
+class _SystemHash {
+  _SystemHash._();
+
+  static int combine(int hash, int value) {
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + value);
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+    return hash ^ (hash >> 6);
+  }
+
+  static int finish(int hash) {
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
+    // ignore: parameter_assignments
+    hash = hash ^ (hash >> 11);
+    return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
+  }
+}
+
+/// See also [monthlyCategoryDistribution].
+@ProviderFor(monthlyCategoryDistribution)
+const monthlyCategoryDistributionProvider = MonthlyCategoryDistributionFamily();
+
+/// See also [monthlyCategoryDistribution].
+class MonthlyCategoryDistributionFamily extends Family<Map<String, double>> {
+  /// See also [monthlyCategoryDistribution].
+  const MonthlyCategoryDistributionFamily();
+
+  /// See also [monthlyCategoryDistribution].
+  MonthlyCategoryDistributionProvider call({
+    required DateTime month,
+    required String type,
+  }) {
+    return MonthlyCategoryDistributionProvider(
+      month: month,
+      type: type,
+    );
+  }
+
+  @override
+  MonthlyCategoryDistributionProvider getProviderOverride(
+    covariant MonthlyCategoryDistributionProvider provider,
+  ) {
+    return call(
+      month: provider.month,
+      type: provider.type,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'monthlyCategoryDistributionProvider';
+}
+
+/// See also [monthlyCategoryDistribution].
+class MonthlyCategoryDistributionProvider
+    extends AutoDisposeProvider<Map<String, double>> {
+  /// See also [monthlyCategoryDistribution].
+  MonthlyCategoryDistributionProvider({
+    required DateTime month,
+    required String type,
+  }) : this._internal(
+          (ref) => monthlyCategoryDistribution(
+            ref as MonthlyCategoryDistributionRef,
+            month: month,
+            type: type,
+          ),
+          from: monthlyCategoryDistributionProvider,
+          name: r'monthlyCategoryDistributionProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$monthlyCategoryDistributionHash,
+          dependencies: MonthlyCategoryDistributionFamily._dependencies,
+          allTransitiveDependencies:
+              MonthlyCategoryDistributionFamily._allTransitiveDependencies,
+          month: month,
+          type: type,
+        );
+
+  MonthlyCategoryDistributionProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.month,
+    required this.type,
+  }) : super.internal();
+
+  final DateTime month;
+  final String type;
+
+  @override
+  Override overrideWith(
+    Map<String, double> Function(MonthlyCategoryDistributionRef provider)
+        create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: MonthlyCategoryDistributionProvider._internal(
+        (ref) => create(ref as MonthlyCategoryDistributionRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        month: month,
+        type: type,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeProviderElement<Map<String, double>> createElement() {
+    return _MonthlyCategoryDistributionProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MonthlyCategoryDistributionProvider &&
+        other.month == month &&
+        other.type == type;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, month.hashCode);
+    hash = _SystemHash.combine(hash, type.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin MonthlyCategoryDistributionRef
+    on AutoDisposeProviderRef<Map<String, double>> {
+  /// The parameter `month` of this provider.
+  DateTime get month;
+
+  /// The parameter `type` of this provider.
+  String get type;
+}
+
+class _MonthlyCategoryDistributionProviderElement
+    extends AutoDisposeProviderElement<Map<String, double>>
+    with MonthlyCategoryDistributionRef {
+  _MonthlyCategoryDistributionProviderElement(super.provider);
+
+  @override
+  DateTime get month => (origin as MonthlyCategoryDistributionProvider).month;
+  @override
+  String get type => (origin as MonthlyCategoryDistributionProvider).type;
+}
+
+String _$monthlyCashFlowHash() => r'101158449a0c458ef8dd12c4554234ee7b39a5b8';
+
+/// See also [monthlyCashFlow].
+@ProviderFor(monthlyCashFlow)
+const monthlyCashFlowProvider = MonthlyCashFlowFamily();
+
+/// See also [monthlyCashFlow].
+class MonthlyCashFlowFamily extends Family<Map<String, double>> {
+  /// See also [monthlyCashFlow].
+  const MonthlyCashFlowFamily();
+
+  /// See also [monthlyCashFlow].
+  MonthlyCashFlowProvider call(
+    DateTime month,
+  ) {
+    return MonthlyCashFlowProvider(
+      month,
+    );
+  }
+
+  @override
+  MonthlyCashFlowProvider getProviderOverride(
+    covariant MonthlyCashFlowProvider provider,
+  ) {
+    return call(
+      provider.month,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'monthlyCashFlowProvider';
+}
+
+/// See also [monthlyCashFlow].
+class MonthlyCashFlowProvider extends AutoDisposeProvider<Map<String, double>> {
+  /// See also [monthlyCashFlow].
+  MonthlyCashFlowProvider(
+    DateTime month,
+  ) : this._internal(
+          (ref) => monthlyCashFlow(
+            ref as MonthlyCashFlowRef,
+            month,
+          ),
+          from: monthlyCashFlowProvider,
+          name: r'monthlyCashFlowProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$monthlyCashFlowHash,
+          dependencies: MonthlyCashFlowFamily._dependencies,
+          allTransitiveDependencies:
+              MonthlyCashFlowFamily._allTransitiveDependencies,
+          month: month,
+        );
+
+  MonthlyCashFlowProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.month,
+  }) : super.internal();
+
+  final DateTime month;
+
+  @override
+  Override overrideWith(
+    Map<String, double> Function(MonthlyCashFlowRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: MonthlyCashFlowProvider._internal(
+        (ref) => create(ref as MonthlyCashFlowRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        month: month,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeProviderElement<Map<String, double>> createElement() {
+    return _MonthlyCashFlowProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MonthlyCashFlowProvider && other.month == month;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, month.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin MonthlyCashFlowRef on AutoDisposeProviderRef<Map<String, double>> {
+  /// The parameter `month` of this provider.
+  DateTime get month;
+}
+
+class _MonthlyCashFlowProviderElement
+    extends AutoDisposeProviderElement<Map<String, double>>
+    with MonthlyCashFlowRef {
+  _MonthlyCashFlowProviderElement(super.provider);
+
+  @override
+  DateTime get month => (origin as MonthlyCashFlowProvider).month;
+}
+
 String _$smsSyncServiceHash() => r'90332136b2df49452b1a0caae3b384bd3d0d2b63';
 
 /// See also [smsSyncService].
@@ -234,7 +534,25 @@ final backupOrchestratorProvider = Provider<BackupOrchestrator>.internal(
 );
 
 typedef BackupOrchestratorRef = ProviderRef<BackupOrchestrator>;
-String _$transactionsHash() => r'34c97595b84151f1fa43bc45a031ad524b252204';
+String _$filteredTransactionsHash() =>
+    r'8dfe59bf4ba331a599734554a19e362f74c11575';
+
+/// See also [filteredTransactions].
+@ProviderFor(filteredTransactions)
+final filteredTransactionsProvider =
+    AutoDisposeProvider<AsyncValue<List<Transaction>>>.internal(
+  filteredTransactions,
+  name: r'filteredTransactionsProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$filteredTransactionsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef FilteredTransactionsRef
+    = AutoDisposeProviderRef<AsyncValue<List<Transaction>>>;
+String _$transactionsHash() => r'7c22b4c628bd34d3bf4d198355339f65c16ac7ed';
 
 /// See also [Transactions].
 @ProviderFor(Transactions)
@@ -308,5 +626,49 @@ final holdingsProvider =
 );
 
 typedef _$Holdings = AsyncNotifier<List<Holding>>;
+String _$budgetsHash() => r'6a2738abff5fb6d81ef0cf262ce7e74285ec8722';
+
+/// See also [Budgets].
+@ProviderFor(Budgets)
+final budgetsProvider = AsyncNotifierProvider<Budgets, List<Budget>>.internal(
+  Budgets.new,
+  name: r'budgetsProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$budgetsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$Budgets = AsyncNotifier<List<Budget>>;
+String _$alertsHash() => r'ebcaaa7ef6168a6c8ba3035c0f62421feaa95680';
+
+/// See also [Alerts].
+@ProviderFor(Alerts)
+final alertsProvider = AsyncNotifierProvider<Alerts, List<InAppAlert>>.internal(
+  Alerts.new,
+  name: r'alertsProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$alertsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$Alerts = AsyncNotifier<List<InAppAlert>>;
+String _$subscriptionsHash() => r'fc19244d4bdef97b42ca40d5786cff68e6407e37';
+
+/// See also [Subscriptions].
+@ProviderFor(Subscriptions)
+final subscriptionsProvider =
+    AsyncNotifierProvider<Subscriptions, List<Subscription>>.internal(
+  Subscriptions.new,
+  name: r'subscriptionsProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$subscriptionsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$Subscriptions = AsyncNotifier<List<Subscription>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

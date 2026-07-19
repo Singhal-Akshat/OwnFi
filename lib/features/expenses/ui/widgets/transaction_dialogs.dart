@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:isar/isar.dart';
+import 'package:file_picker/file_picker.dart' as fp;
+import '../../services/receipt_ocr_service.dart';
 import '../../../../core/theme.dart';
 import '../../../../core/database_service.dart';
 import '../../../../core/providers.dart';
@@ -20,6 +23,7 @@ class TransactionFormController {
   String selectedCategory = 'Other';
   String selectedAccount = 'Cash';
   String selectedToAccount = 'Cash';
+  String? selectedReceiptPath;
 
   // Payback details
   bool isPayback = false;
@@ -55,6 +59,7 @@ class TransactionFormController {
     String? category,
     String? account,
     String? toAccount,
+    String? receiptPath,
   }) {
     amountController.text = amount != null ? amount.toStringAsFixed(0) : '';
     descriptionController.text = description ?? '';
@@ -62,6 +67,7 @@ class TransactionFormController {
     selectedCategory = category ?? 'Other';
     selectedAccount = account ?? 'Cash';
     selectedToAccount = toAccount ?? 'Cash';
+    selectedReceiptPath = receiptPath;
     isPayback = false;
     paybackContactController.clear();
     paybackDate = DateTime.now().add(const Duration(days: 30));
@@ -350,10 +356,25 @@ class TransactionFormFields extends ConsumerWidget {
             // Amount
             TextField(
               controller: controller.amountController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Amount (INR)',
                 prefixText: '₹ ',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                suffixIcon: controller.selectedReceiptPath != null
+                    ? IconButton(
+                        icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.neonTeal, size: 18),
+                        tooltip: 'Scan receipt with OCR',
+                        onPressed: () async {
+                          final ocrResult = await ReceiptOcrService.parseReceipt(controller.selectedReceiptPath!);
+                          if (ocrResult != null) {
+                            if (ocrResult.amount != null) {
+                              controller.amountController.text = ocrResult.amount!.toStringAsFixed(0);
+                            }
+                            onStateChanged();
+                          }
+                        },
+                      )
+                    : null,
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
@@ -362,10 +383,25 @@ class TransactionFormFields extends ConsumerWidget {
             // Description
             TextField(
               controller: controller.descriptionController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Description',
                 hintText: 'e.g. Croma Store',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                suffixIcon: controller.selectedReceiptPath != null
+                    ? IconButton(
+                        icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.neonTeal, size: 18),
+                        tooltip: 'Scan receipt with OCR',
+                        onPressed: () async {
+                          final ocrResult = await ReceiptOcrService.parseReceipt(controller.selectedReceiptPath!);
+                          if (ocrResult != null) {
+                            if (ocrResult.merchant != null) {
+                              controller.descriptionController.text = ocrResult.merchant!;
+                            }
+                            onStateChanged();
+                          }
+                        },
+                      )
+                    : null,
               ),
             ),
             const SizedBox(height: 12),
@@ -798,6 +834,73 @@ class TransactionFormFields extends ConsumerWidget {
                 ),
               ],
             ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.neonTeal,
+                      side: const BorderSide(color: AppColors.glassBorder),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    icon: const Icon(Icons.receipt_long_rounded),
+                    label: Text(
+                      controller.selectedReceiptPath != null
+                          ? 'Receipt Attached'
+                          : 'Attach Receipt',
+                    ),
+                    onPressed: () async {
+                      final result = await fp.FilePicker.pickFiles(
+                        type: fp.FileType.image,
+                      );
+                      if (result != null && result.files.single.path != null) {
+                        final path = result.files.single.path!;
+                        controller.selectedReceiptPath = path;
+                        
+                        // Parse OCR details from receipt
+                        final ocrResult = await ReceiptOcrService.parseReceipt(path);
+                        if (ocrResult != null) {
+                          if (ocrResult.amount != null && controller.amountController.text.isEmpty) {
+                            controller.amountController.text = ocrResult.amount!.toStringAsFixed(0);
+                          }
+                          if (ocrResult.merchant != null && controller.descriptionController.text.isEmpty) {
+                            controller.descriptionController.text = ocrResult.merchant!;
+                          }
+                        }
+                        onStateChanged();
+                      }
+                    },
+                  ),
+                ),
+                if (controller.selectedReceiptPath != null) ...[
+                  const SizedBox(width: 10),
+                  IconButton(
+                    icon: const Icon(Icons.clear_rounded, color: Colors.redAccent),
+                    onPressed: () {
+                      controller.selectedReceiptPath = null;
+                      onStateChanged();
+                    },
+                  ),
+                ],
+              ],
+            ),
+            if (controller.selectedReceiptPath != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.glassBorder),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.file(
+                  File(controller.selectedReceiptPath!),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
+              ),
+            ],
           ],
         );
   }
@@ -872,6 +975,7 @@ Future<void> showTransactionEntryDialog(
       category: existingTransaction.category,
       account: account,
       toAccount: toAccount,
+      receiptPath: existingTransaction.receiptPath,
     );
 
     // Repopulate loan link
@@ -907,17 +1011,18 @@ Future<void> showTransactionEntryDialog(
         builder: (context, ref, child) {
           return Dialog(
             backgroundColor: Colors.transparent,
-        child: GlassBlur(
-          borderRadius: 24,
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
             child: SingleChildScrollView(
-              child: StatefulBuilder(
-                builder: (context, setState) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+              child: GlassBlur(
+                borderRadius: 24,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: StatefulBuilder(
+                    builder: (context, setState) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1039,6 +1144,7 @@ Future<void> showTransactionEntryDialog(
                                 tx.source = 'manual';
                               }
                               tx.transactionType = controller.selectedType;
+                              tx.receiptPath = controller.selectedReceiptPath;
 
                               if (controller.selectedType == 'transfer') {
                                 tx.accountName = controller.selectedAccount;
@@ -1281,16 +1387,16 @@ Future<void> showTransactionEntryDialog(
                       ),
                     ],
                   );
-                },
+                    },
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       );
     },
   );
-  },
-);
 }
 
 // Dialog helper to show transaction details, with edit & delete capabilities
@@ -1461,6 +1567,82 @@ void showTransactionDetailDialog(BuildContext context, Transaction tx) {
                               fontSize: 11,
                               fontFamily: 'monospace',
                               color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (tx.receiptPath != null && tx.receiptPath!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Divider(color: Colors.white10),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Attached Receipt / Document:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => Dialog(
+                              backgroundColor: Colors.transparent,
+                              child: Stack(
+                                alignment: Alignment.topRight,
+                                children: [
+                                  InteractiveViewer(
+                                    maxScale: 5.0,
+                                    child: Center(
+                                      child: Image.file(
+                                        File(tx.receiptPath!),
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 10,
+                                    right: 10,
+                                    child: CircleAvatar(
+                                      backgroundColor: Colors.black54,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.close_rounded, color: Colors.white),
+                                        onPressed: () => Navigator.pop(context),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          height: 140,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white10),
+                            image: DecorationImage(
+                              image: FileImage(File(tx.receiptPath!)),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.zoom_in_rounded, color: Colors.white, size: 16),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Tap to zoom receipt',
+                                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
                             ),
                           ),
                         ),

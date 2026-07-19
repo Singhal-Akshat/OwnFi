@@ -67,3 +67,9 @@ default.isar
 # Log files
 *.log
 sms_parser_debug.log
+
+# Feature Gaps & Tracking
+FEATURE_GAP_ANALYSIS.md
+TODO_FEATURES.md
+
+flutter_*.png

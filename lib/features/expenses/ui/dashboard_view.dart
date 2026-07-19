@@ -13,13 +13,33 @@ import '../../cards_loans/models/card_loan_models.dart';
 import '../../investments/models/holding_model.dart';
 import '../../../../ui/settings/widgets/bank_account_card.dart';
 import 'widgets/transaction_dialogs.dart';
+import 'widgets/insights_view.dart';
+import 'widgets/subscriptions_view.dart';
+import '../../expenses/models/alert_model.dart';
+import 'widgets/filter_bottom_sheet.dart';
 
-class DashboardView extends ConsumerWidget {
+class DashboardView extends ConsumerStatefulWidget {
   const DashboardView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final txsState = ref.watch(transactionsProvider);
+  ConsumerState<DashboardView> createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends ConsumerState<DashboardView> {
+  int _activeDashboardTab = 0; // 0 = Transactions, 1 = Insights
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
+    final txsState = ref.watch(filteredTransactionsProvider);
     final cardsState = ref.watch(creditCardsProvider);
     final loansState = ref.watch(loansProvider);
     final holdingsState = ref.watch(holdingsProvider);
@@ -33,12 +53,13 @@ class DashboardView extends ConsumerWidget {
     final netWorth = ref.watch(netWorthProvider);
 
     final bankAccountsState = ref.watch(bankAccountsProvider);
+    final alertsState = ref.watch(alertsProvider);
+    final alerts = alertsState.valueOrNull ?? [];
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final mainContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_activeDashboardTab == 0) ...[
           // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -64,6 +85,35 @@ class DashboardView extends ConsumerWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (alerts.isNotEmpty) ...[
+                    GlassBlur(
+                      borderRadius: 14,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                            onPressed: () {
+                              _showActiveAlertsDialog(context, ref, alerts);
+                            },
+                          ),
+                          Positioned(
+                            right: 6,
+                            top: 6,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
+                              child: Text(
+                                alerts.length.toString(),
+                                style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
                   GlassBlur(
                     borderRadius: 14,
                     child: IconButton(
@@ -186,129 +236,233 @@ class DashboardView extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 25),
+        ],
 
-          // Title
-          Text(
-            'Recent Transactions',
-            style: Theme.of(context).textTheme.titleLarge,
+        // Title / Segmented Tab Selector
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => setState(() => _activeDashboardTab = 0),
+                child: Text(
+                  'Transactions',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: _activeDashboardTab == 0 ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 24),
+              GestureDetector(
+                onTap: () => setState(() => _activeDashboardTab = 1),
+                child: Text(
+                  'Insights',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: _activeDashboardTab == 1 ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 24),
+              GestureDetector(
+                onTap: () => setState(() => _activeDashboardTab = 2),
+                child: Text(
+                  'Subscriptions',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: _activeDashboardTab == 2 ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Search Bar & Filter Row
+        if (_activeDashboardTab == 0) ...[
+          Row(
+            children: [
+              Expanded(
+                child: GlassBlur(
+                  borderRadius: 14,
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20),
+                      hintText: 'Search transactions...',
+                      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, color: AppColors.textSecondary, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                ref.read(transactionSearchQueryProvider.notifier).state = '';
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (val) {
+                      ref.read(transactionSearchQueryProvider.notifier).state = val;
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              GlassBlur(
+                borderRadius: 14,
+                child: IconButton(
+                  icon: Icon(
+                    Icons.filter_list_rounded,
+                    color: (ref.watch(transactionTypeFilterProvider) != null ||
+                            ref.watch(transactionCategoryFilterProvider) != null ||
+                            ref.watch(transactionAccountFilterProvider) != null)
+                        ? AppColors.neonTeal
+                        : Colors.white70,
+                  ),
+                  onPressed: () {
+                    FilterBottomSheet.show(context);
+                  },
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
 
-          // Transactions List
-          Expanded(
-            child: txsState.when(
-              loading: () => const Center(
+          // Active Filter Chips List
+          _buildActiveFilterChips(context, ref),
+          const SizedBox(height: 12),
+        ],
+
+        // Transactions List inline (only when Tab 0 is active)
+        if (_activeDashboardTab == 0)
+          txsState.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
                 child: CircularProgressIndicator(color: AppColors.neonTeal),
               ),
-              error: (err, _) => Center(
-                child: Text(
-                  'Error: $err',
-                  style: const TextStyle(color: Colors.redAccent),
-                ),
+            ),
+            error: (err, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent)),
               ),
-              data: (txs) {
-                if (txs.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No transactions yet. Click + to add one!',
-                      style: TextStyle(color: AppColors.textMuted),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: txs.length,
-                  itemBuilder: (context, index) {
-                    final tx = txs[index];
-                    Color iconColor = AppColors.neonTeal;
-                    if (tx.transactionType == 'income') {
-                      iconColor = AppColors.neonEmerald;
-                    } else if (tx.transactionType == 'transfer') {
-                      iconColor = AppColors.neonPink;
-                    } else if (tx.category == 'Entertainment') {
-                      iconColor = AppColors.neonPurple;
-                    }
+            ),
+            data: (txs) {
+              if (txs.isEmpty) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Text('No transactions yet. Click + to add one!', style: TextStyle(color: AppColors.textMuted)),
+                  ),
+                );
+              }
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: txs.length,
+                itemBuilder: (context, index) {
+                  final tx = txs[index];
+                  Color iconColor = AppColors.neonTeal;
+                  if (tx.transactionType == 'income') {
+                    iconColor = AppColors.neonEmerald;
+                  } else if (tx.transactionType == 'transfer') {
+                    iconColor = AppColors.neonPink;
+                  } else if (tx.category == 'Entertainment') {
+                    iconColor = AppColors.neonPurple;
+                  }
 
-                    final formattedAmt =
-                        '${tx.transactionType == 'income' ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
-                    final dateStr =
-                        '${tx.timestamp.day} ${_getMonthName(tx.timestamp.month)}';
+                  final formattedAmt =
+                      '${tx.transactionType == 'income' ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}';
+                  final dateStr =
+                      '${tx.timestamp.day} ${_getMonthName(tx.timestamp.month)}';
 
-                    return Dismissible(
-                      key: ValueKey(tx.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.delete_sweep_rounded,
-                          color: Colors.redAccent,
-                          size: 28,
-                        ),
+                  return Dismissible(
+                    key: ValueKey(tx.id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      onDismissed: (_) {
-                        ref
-                            .read(transactionsProvider.notifier)
-                            .removeTransaction(tx.id);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${tx.description} deleted'),
-                            backgroundColor: AppColors.obsidianSurface,
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: GlassBlur(
-                          borderRadius: 16,
-                          useBlur: false,
-                          child: ListTile(
-                            onTap: () => showTransactionDetailDialog(context, tx),
-                            leading: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: CategoryUtils.getCategoryColor(tx.category, iconColor).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    CategoryUtils.getCategoryIcon(tx.category),
-                                    color: CategoryUtils.getCategoryColor(tx.category, iconColor),
+                      child: const Icon(
+                        Icons.delete_sweep_rounded,
+                        color: Colors.redAccent,
+                        size: 28,
+                      ),
+                    ),
+                    onDismissed: (_) {
+                      ref
+                          .read(transactionsProvider.notifier)
+                          .removeTransaction(tx.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${tx.description} deleted'),
+                          backgroundColor: AppColors.obsidianSurface,
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: GlassBlur(
+                        borderRadius: 16,
+                        useBlur: false,
+                        child: ListTile(
+                          onTap: () => showTransactionDetailDialog(context, tx),
+                          leading: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: CategoryUtils.getCategoryColor(tx.category, iconColor).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  CategoryUtils.getCategoryIcon(tx.category),
+                                  color: CategoryUtils.getCategoryColor(tx.category, iconColor),
+                                  size: 16,
+                                ),
+                                const SizedBox(height: 4),
+                                () {
+                                  Widget accountIcon = Icon(
+                                    tx.cardId != null
+                                        ? Icons.credit_card_rounded
+                                        : (tx.accountName != null &&
+                                                (tx.accountName!.startsWith('bank:') ||
+                                                    tx.accountName == 'Bank')
+                                            ? Icons.account_balance_rounded
+                                            : Icons.wallet_rounded),
+                                    color: tx.cardId != null
+                                        ? Colors.white70
+                                        : (tx.accountName != null &&
+                                                (tx.accountName!.startsWith('bank:') ||
+                                                    tx.accountName == 'Bank')
+                                            ? Colors.white70
+                                            : AppColors.neonEmerald),
                                     size: 16,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  () {
-                                    Widget accountIcon = Icon(
-                                      tx.cardId != null
-                                          ? Icons.credit_card_rounded
-                                          : (tx.accountName != null &&
-                                                  (tx.accountName!.startsWith('bank:') ||
-                                                      tx.accountName == 'Bank')
-                                              ? Icons.account_balance_rounded
-                                              : Icons.wallet_rounded),
-                                      color: tx.cardId != null
-                                          ? Colors.white70
-                                          : (tx.accountName != null &&
-                                                  (tx.accountName!.startsWith('bank:') ||
-                                                      tx.accountName == 'Bank')
-                                              ? Colors.white70
-                                              : AppColors.neonEmerald),
-                                      size: 16,
+                                  );
+                                  if (tx.cardId != null) {
+                                    final cardId = int.tryParse(tx.cardId!);
+                                    final card = cardsState.valueOrNull?.firstWhere(
+                                      (c) => c.id == cardId,
+                                      orElse: () => CreditCard(),
                                     );
-                                    if (tx.cardId != null) {
-                                      final cardId = int.tryParse(tx.cardId!);
-                                      final card = cardsState.valueOrNull?.firstWhere(
-                                        (c) => c.id == cardId,
-                                        orElse: () => CreditCard(),
-                                      );
-                                      if (card != null && card.imageUrl.isNotEmpty) {
+                                    if (card != null && card.imageUrl.isNotEmpty) {
                                         accountIcon = ClipRRect(
                                           borderRadius: BorderRadius.circular(3),
                                           child: SizedBox(
@@ -387,13 +541,27 @@ class DashboardView extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                            title: Text(
-                               tx.description,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    tx.description,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (tx.receiptPath != null && tx.receiptPath!.isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  const Icon(
+                                    Icons.attach_file_rounded,
+                                    size: 14,
+                                    color: AppColors.neonTeal,
+                                  ),
+                                ],
+                              ],
                             ),
                             subtitle: () {
                               String accountDisplayName;
@@ -471,11 +639,28 @@ class DashboardView extends ConsumerWidget {
                     );
                   },
                 );
-              },
-            ),
+            },
+          )
+        else
+          Expanded(
+            child: _activeDashboardTab == 1
+                ? const InsightsView()
+                : const SingleChildScrollView(
+                    physics: BouncingScrollPhysics(),
+                    child: SubscriptionsView(),
+                  ),
           ),
-        ],
-      ),
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: _activeDashboardTab == 0
+          ? SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: mainContent,
+            )
+          : mainContent,
     );
   }
 
@@ -1091,6 +1276,171 @@ class DashboardView extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+
+  Widget _buildAlertsBanner(BuildContext context, WidgetRef ref) {
+    return const SizedBox.shrink();
+  }
+
+  void _showActiveAlertsDialog(BuildContext context, WidgetRef ref, List<InAppAlert> alerts) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+          child: GlassBlur(
+            borderRadius: 24,
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Active Alerts & Dues',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.neonTeal,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.4,
+                    ),
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        children: alerts.map((alert) {
+                          String cleanMessage(String msg) {
+                            final idx = msg.indexOf('(ref:');
+                            if (idx != -1) {
+                              return msg.substring(0, idx).trim();
+                            }
+                            return msg;
+                          }
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.redAccent.withOpacity(0.2), width: 0.5),
+                            ),
+                            child: ListTile(
+                              leading: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                              title: Text(
+                                alert.title,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                              subtitle: Text(
+                                cleanMessage(alert.message),
+                                style: const TextStyle(fontSize: 11, color: Colors.white70),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.check_circle_outline_rounded, color: AppColors.textSecondary, size: 20),
+                                onPressed: () {
+                                  ref.read(alertsProvider.notifier).markAsRead(alert.id);
+                                  // Close dialog if it was the last alert
+                                  if (alerts.length <= 1) {
+                                    Navigator.pop(context);
+                                  }
+                                },
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildActiveFilterChips(BuildContext context, WidgetRef ref) {
+    final activeType = ref.watch(transactionTypeFilterProvider);
+    final activeCategory = ref.watch(transactionCategoryFilterProvider);
+    final activeAccount = ref.watch(transactionAccountFilterProvider);
+    final activeMonth = ref.watch(transactionMonthFilterProvider);
+
+    if (activeType == null && activeCategory == null && activeAccount == null && activeMonth == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: [
+            if (activeMonth != null) ...[
+              InputChip(
+                label: Text(
+                  'Month: ${_getMonthName(activeMonth.month)} ${activeMonth.year}',
+                  style: const TextStyle(fontSize: 11, color: Colors.black),
+                ),
+                backgroundColor: AppColors.neonTeal,
+                deleteIcon: const Icon(Icons.close_rounded, size: 14, color: Colors.black),
+                onDeleted: () {
+                  ref.read(transactionMonthFilterProvider.notifier).state = null;
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (activeType != null) ...[
+              InputChip(
+                label: Text('Type: ${activeType[0].toUpperCase()}${activeType.substring(1)}', style: const TextStyle(fontSize: 11, color: Colors.black)),
+                backgroundColor: AppColors.neonTeal,
+                deleteIcon: const Icon(Icons.close_rounded, size: 14, color: Colors.black),
+                onDeleted: () {
+                  ref.read(transactionTypeFilterProvider.notifier).state = null;
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (activeCategory != null) ...[
+              InputChip(
+                label: Text('Category: $activeCategory', style: const TextStyle(fontSize: 11, color: Colors.black)),
+                backgroundColor: AppColors.neonTeal,
+                deleteIcon: const Icon(Icons.close_rounded, size: 14, color: Colors.black),
+                onDeleted: () {
+                  ref.read(transactionCategoryFilterProvider.notifier).state = null;
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (activeAccount != null) ...[
+              InputChip(
+                label: const Text('Account Filtered', style: TextStyle(fontSize: 11, color: Colors.black)),
+                backgroundColor: AppColors.neonTeal,
+                deleteIcon: const Icon(Icons.close_rounded, size: 14, color: Colors.black),
+                onDeleted: () {
+                  ref.read(transactionAccountFilterProvider.notifier).state = null;
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

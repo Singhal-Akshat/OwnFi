@@ -7,6 +7,8 @@ import 'package:local_auth/local_auth.dart';
 import '../../../core/theme.dart';
 import '../../../core/providers.dart';
 import '../../cards_loans/models/card_loan_models.dart';
+import '../utils/card_timeline_helper.dart';
+import '../../expenses/models/transaction_model.dart';
 import '../../cards_loans/widgets/nfc_scan_radar.dart';
 import 'widgets/loan_detail_page.dart';
 import 'widgets/credit_card_detail_view.dart';
@@ -464,6 +466,7 @@ class CardsLoansView extends ConsumerWidget {
     CreditCard card,
     List<dynamic> allTxs,
   ) {
+    final timeline = CardTimelineHelper.calculateTimeline(card, allTxs.cast<Transaction>());
     // Compute dynamic spent (current cycle) and statement (last cycle) from transactions
     final now = DateTime.now();
     final DateTime mostRecentStatementDate;
@@ -686,6 +689,7 @@ class CardsLoansView extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      const Spacer(),
                       GestureDetector(
                         onTap: authenticateAndFlipCard,
                         child: Row(
@@ -709,8 +713,7 @@ class CardsLoansView extends ConsumerWidget {
                           ],
                         ),
                       ),
-
-                      const SizedBox(height: 100),
+                      const SizedBox(height: 16),
 
                       // Bottom area: Spent/Statement Toggle
                       GestureDetector(
@@ -768,15 +771,42 @@ class CardsLoansView extends ConsumerWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
-                                  showSpent
-                                      ? '${card.statementDay} ${_getMonthName(card.statementDay)}'
-                                      : '${card.dueDay} ${_getMonthName(card.dueDay)}',
-                                  style: GoogleFonts.montserrat(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      showSpent
+                                          ? '${card.statementDay} ${_getMonthName(card.statementDay)}'
+                                          : '${card.dueDay} ${_getMonthName(card.dueDay)}',
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 14,
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    () {
+                                      final bool isPaid = timeline.status == CardTimelineStatus.paid;
+                                      final statusText = isPaid ? 'Paid' : 'Due';
+                                      final color = isPaid ? AppColors.neonEmerald : Colors.orangeAccent;
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: color.withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: color.withOpacity(0.3), width: 0.5),
+                                        ),
+                                        child: Text(
+                                          statusText,
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      );
+                                    }(),
+                                  ],
                                 ),
                               ],
                             ),

@@ -77,24 +77,29 @@ const TransactionSchema = CollectionSchema(
       name: r'rawMessage',
       type: IsarType.string,
     ),
-    r'source': PropertySchema(
+    r'receiptPath': PropertySchema(
       id: 12,
+      name: r'receiptPath',
+      type: IsarType.string,
+    ),
+    r'source': PropertySchema(
+      id: 13,
       name: r'source',
       type: IsarType.string,
     ),
     r'splitDetails': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'splitDetails',
       type: IsarType.objectList,
       target: r'TransactionSplitDetail',
     ),
     r'timestamp': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'timestamp',
       type: IsarType.dateTime,
     ),
     r'transactionType': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'transactionType',
       type: IsarType.string,
     )
@@ -151,6 +156,12 @@ int _transactionEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.receiptPath;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.source.length * 3;
   bytesCount += 3 + object.splitDetails.length * 3;
   {
@@ -183,15 +194,16 @@ void _transactionSerialize(
   writer.writeLong(offsets[9], object.linkedLoanId);
   writer.writeString(offsets[10], object.parserSource);
   writer.writeString(offsets[11], object.rawMessage);
-  writer.writeString(offsets[12], object.source);
+  writer.writeString(offsets[12], object.receiptPath);
+  writer.writeString(offsets[13], object.source);
   writer.writeObjectList<TransactionSplitDetail>(
-    offsets[13],
+    offsets[14],
     allOffsets,
     TransactionSplitDetailSchema.serialize,
     object.splitDetails,
   );
-  writer.writeDateTime(offsets[14], object.timestamp);
-  writer.writeString(offsets[15], object.transactionType);
+  writer.writeDateTime(offsets[15], object.timestamp);
+  writer.writeString(offsets[16], object.transactionType);
 }
 
 Transaction _transactionDeserialize(
@@ -214,16 +226,17 @@ Transaction _transactionDeserialize(
   object.linkedLoanId = reader.readLongOrNull(offsets[9]);
   object.parserSource = reader.readStringOrNull(offsets[10]);
   object.rawMessage = reader.readStringOrNull(offsets[11]);
-  object.source = reader.readString(offsets[12]);
+  object.receiptPath = reader.readStringOrNull(offsets[12]);
+  object.source = reader.readString(offsets[13]);
   object.splitDetails = reader.readObjectList<TransactionSplitDetail>(
-        offsets[13],
+        offsets[14],
         TransactionSplitDetailSchema.deserialize,
         allOffsets,
         TransactionSplitDetail(),
       ) ??
       [];
-  object.timestamp = reader.readDateTime(offsets[14]);
-  object.transactionType = reader.readString(offsets[15]);
+  object.timestamp = reader.readDateTime(offsets[15]);
+  object.transactionType = reader.readString(offsets[16]);
   return object;
 }
 
@@ -259,8 +272,10 @@ P _transactionDeserializeProp<P>(
     case 11:
       return (reader.readStringOrNull(offset)) as P;
     case 12:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 13:
+      return (reader.readString(offset)) as P;
+    case 14:
       return (reader.readObjectList<TransactionSplitDetail>(
             offset,
             TransactionSplitDetailSchema.deserialize,
@@ -268,9 +283,9 @@ P _transactionDeserializeProp<P>(
             TransactionSplitDetail(),
           ) ??
           []) as P;
-    case 14:
-      return (reader.readDateTime(offset)) as P;
     case 15:
+      return (reader.readDateTime(offset)) as P;
+    case 16:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1692,6 +1707,160 @@ extension TransactionQueryFilter
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'receiptPath',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'receiptPath',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'receiptPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'receiptPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'receiptPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'receiptPath',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'receiptPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'receiptPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'receiptPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'receiptPath',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'receiptPath',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterFilterCondition>
+      receiptPathIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'receiptPath',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterFilterCondition> sourceEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -2271,6 +2440,18 @@ extension TransactionQuerySortBy
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByReceiptPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'receiptPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> sortByReceiptPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'receiptPath', Sort.desc);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterSortBy> sortBySource() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'source', Sort.asc);
@@ -2471,6 +2652,18 @@ extension TransactionQuerySortThenBy
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByReceiptPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'receiptPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Transaction, Transaction, QAfterSortBy> thenByReceiptPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'receiptPath', Sort.desc);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QAfterSortBy> thenBySource() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'source', Sort.asc);
@@ -2591,6 +2784,13 @@ extension TransactionQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Transaction, Transaction, QDistinct> distinctByReceiptPath(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'receiptPath', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Transaction, Transaction, QDistinct> distinctBySource(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -2691,6 +2891,12 @@ extension TransactionQueryProperty
   QueryBuilder<Transaction, String?, QQueryOperations> rawMessageProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'rawMessage');
+    });
+  }
+
+  QueryBuilder<Transaction, String?, QQueryOperations> receiptPathProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'receiptPath');
     });
   }
 

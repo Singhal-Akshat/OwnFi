@@ -9,6 +9,8 @@ import '../../../../core/providers.dart';
 import '../../../../core/animated_gradient_background.dart';
 import '../../../../core/utils/category_utils.dart';
 import '../../../cards_loans/models/card_loan_models.dart';
+import '../../utils/card_timeline_helper.dart';
+import '../../../expenses/models/transaction_model.dart';
 import 'package:my_personal_tracker/features/expenses/ui/widgets/transaction_dialogs.dart';
 
 class CreditCardDetailView extends ConsumerStatefulWidget {
@@ -626,8 +628,122 @@ class _CreditCardDetailViewState extends ConsumerState<CreditCardDetailView> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  // Dynamic Payment Timeline Widget
+                  () {
+                    final timeline = CardTimelineHelper.calculateTimeline(widget.card, allTxs.cast<Transaction>());
+                    final Color statusColor;
+                    final String statusLabel;
+                    switch (timeline.status) {
+                      case CardTimelineStatus.paid:
+                        statusColor = AppColors.neonEmerald;
+                        statusLabel = 'Fully Paid Off';
+                        break;
+                      case CardTimelineStatus.dueSoon:
+                        statusColor = Colors.orangeAccent;
+                        statusLabel = 'Due in ${timeline.daysRemaining} days';
+                        break;
+                      case CardTimelineStatus.overdue:
+                        statusColor = Colors.redAccent;
+                        statusLabel = 'OVERDUE by ${-timeline.daysRemaining} days';
+                        break;
+                      case CardTimelineStatus.normal:
+                        statusColor = Colors.white70;
+                        statusLabel = 'Payment Pending';
+                        break;
+                    }
 
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    final dueStr = '${timeline.dueDate.day} ${months[timeline.dueDate.month - 1]}';
+                    final statementStr = '${timeline.statementDate.day} ${months[timeline.statementDate.month - 1]}';
+
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      child: GlassBlur(
+                        borderRadius: 16,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Payment Timeline',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: statusColor.withOpacity(0.3), width: 0.5),
+                                    ),
+                                    child: Text(
+                                      statusLabel.toUpperCase(),
+                                      style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Statement Generated', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                      const SizedBox(height: 2),
+                                      Text(statementStr, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      const Text('Payment Due Date', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                      const SizedBox(height: 2),
+                                      Text(dueStr, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              if (timeline.statementBalance > 0) ...[
+                                const SizedBox(height: 12),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: (timeline.totalPaid / timeline.statementBalance).clamp(0.0, 1.0),
+                                    backgroundColor: Colors.white10,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      timeline.status == CardTimelineStatus.paid ? AppColors.neonEmerald : AppColors.neonTeal,
+                                    ),
+                                    minHeight: 5,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Paid: \u{20B9}${timeline.totalPaid.toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                    ),
+                                    Text(
+                                      'Total Bill: \u{20B9}${timeline.statementBalance.toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }(),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

@@ -60,6 +60,7 @@ class _ManagePasswordsDialogState extends ConsumerState<ManagePasswordsDialog> {
               const SizedBox(height: 16),
               DropdownButtonFormField<int>(
                 value: _selectedCardId,
+                isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Select Credit Card',
                   border: OutlineInputBorder(),

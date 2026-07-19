@@ -45,8 +45,10 @@ import 'widgets/huggingface_dialog.dart';
 import 'widgets/clear_data_dialog.dart';
 import 'widgets/webdav_sync_dialog.dart';
 import 'widgets/skipped_messages_log_dialog.dart';
+import 'widgets/budget_dialog.dart';
 import 'model_download_page.dart';
 import '../../features/expenses/ui/widgets/transaction_dialogs.dart';
+import '../../features/expenses/ui/widgets/export_dialog.dart';
 import 'widgets/sync_review_helper.dart';
 
 class SettingsView extends ConsumerStatefulWidget {
@@ -381,6 +383,46 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     color: AppColors.neonPurple,
                   ),
                    onTap: () => CategoriesDialog.show(context),
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
+                  title: const Text(
+                    'Budget & Limit Configurations',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Set monthly spending limits for overall and categories',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.trending_down_rounded,
+                    size: 20,
+                    color: AppColors.neonTeal,
+                  ),
+                  onTap: () => BudgetDialog.show(context),
+                ),
+                const Divider(height: 1, color: AppColors.glassBorder),
+                ListTile(
+                  title: const Text(
+                    'Export Transactions & Reports',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Download statements in CSV, Excel, or PDF report formats',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.download_rounded,
+                    size: 20,
+                    color: AppColors.neonEmerald,
+                  ),
+                  onTap: () => ExportDialog.show(context),
                 ),
               ],
             ),

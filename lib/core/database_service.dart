@@ -4,6 +4,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../features/expenses/models/transaction_model.dart';
+import '../features/expenses/models/budget_model.dart';
+import '../features/expenses/models/alert_model.dart';
+import '../features/expenses/models/subscription_model.dart';
 import '../features/cards_loans/models/card_loan_models.dart';
 import '../features/investments/models/holding_model.dart';
 import 'logging/structured_logger.dart';
@@ -40,6 +43,9 @@ class DatabaseService {
         LoanSchema,
         HoldingSchema,
         BankAccountSchema,
+        BudgetSchema,
+        InAppAlertSchema,
+        SubscriptionSchema,
       ],
       directory: dir.path,
       inspector: true, // Enable local Isar DB inspector in debug mode
@@ -714,6 +720,82 @@ class DatabaseService {
       await isar.loans.clear();
       await isar.holdings.clear();
       await isar.bankAccounts.clear();
+      await isar.budgets.clear();
+      await isar.inAppAlerts.clear();
+      await isar.subscriptions.clear();
+    });
+    onChanged?.call();
+  }
+
+  // ----------------- SUBSCRIPTIONS CRUD -----------------
+  Future<List<Subscription>> getSubscriptions() async {
+    return isar.subscriptions.where().findAll();
+  }
+
+  List<Subscription> getSubscriptionsSync() {
+    return isar.subscriptions.where().findAllSync();
+  }
+
+  Future<void> saveSubscription(Subscription sub) async {
+    await isar.writeTxn(() async {
+      await isar.subscriptions.put(sub);
+    });
+    onChanged?.call();
+  }
+
+  Future<void> deleteSubscription(int id) async {
+    await isar.writeTxn(() async {
+      await isar.subscriptions.delete(id);
+    });
+    onChanged?.call();
+  }
+
+  // ----------------- BUDGETS CRUD -----------------
+  Future<List<Budget>> getMonthlyBudgets(int yearMonth) async {
+    return isar.budgets.filter().yearMonthEqualTo(yearMonth).findAll();
+  }
+
+  List<Budget> getMonthlyBudgetsSync(int yearMonth) {
+    return isar.budgets.filter().yearMonthEqualTo(yearMonth).findAllSync();
+  }
+
+  Future<void> saveBudget(Budget budget) async {
+    await isar.writeTxn(() async {
+      await isar.budgets.put(budget);
+    });
+    onChanged?.call();
+  }
+
+  Future<void> deleteBudget(int id) async {
+    await isar.writeTxn(() async {
+      await isar.budgets.delete(id);
+    });
+    onChanged?.call();
+  }
+
+  // ----------------- ALERTS CRUD -----------------
+  Future<List<InAppAlert>> getUnreadAlerts() async {
+    return isar.inAppAlerts.filter().isReadEqualTo(false).sortByTimestampDesc().findAll();
+  }
+
+  List<InAppAlert> getUnreadAlertsSync() {
+    return isar.inAppAlerts.filter().isReadEqualTo(false).sortByTimestampDesc().findAllSync();
+  }
+
+  Future<void> saveAlert(InAppAlert alert) async {
+    await isar.writeTxn(() async {
+      await isar.inAppAlerts.put(alert);
+    });
+    onChanged?.call();
+  }
+
+  Future<void> markAlertAsRead(int id) async {
+    await isar.writeTxn(() async {
+      final alert = await isar.inAppAlerts.get(id);
+      if (alert != null) {
+        alert.isRead = true;
+        await isar.inAppAlerts.put(alert);
+      }
     });
     onChanged?.call();
   }
